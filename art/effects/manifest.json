@@ -1,0 +1,83 @@
+{
+  "frame_size": [
+    200,
+    320
+  ],
+  "fps_suggested": 12,
+  "soil_line_y": 282,
+  "anchor": "bottom-centre of frame sits on the centre of the bed soil; plant drawn between bed and effect or effect on top (effect never includes the plant)",
+  "effects": {
+    "sun-day-loop": {
+      "frames": "sun-day-loop/00..11.png",
+      "strip": "sun-day-loop-strip.png",
+      "count": 12,
+      "loop": true
+    },
+    "sun-day-absorb": {
+      "frames": "sun-day-absorb/00..11.png",
+      "strip": "sun-day-absorb-strip.png",
+      "count": 12,
+      "loop": false
+    },
+    "sun-night-loop": {
+      "frames": "sun-night-loop/00..11.png",
+      "strip": "sun-night-loop-strip.png",
+      "count": 12,
+      "loop": true
+    },
+    "sun-night-absorb": {
+      "frames": "sun-night-absorb/00..11.png",
+      "strip": "sun-night-absorb-strip.png",
+      "count": 12,
+      "loop": false
+    },
+    "water-day-loop": {
+      "frames": "water-day-loop/00..11.png",
+      "strip": "water-day-loop-strip.png",
+      "count": 12,
+      "loop": true
+    },
+    "water-day-absorb": {
+      "frames": "water-day-absorb/00..11.png",
+      "strip": "water-day-absorb-strip.png",
+      "count": 12,
+      "loop": false
+    },
+    "water-night-loop": {
+      "frames": "water-night-loop/00..11.png",
+      "strip": "water-night-loop-strip.png",
+      "count": 12,
+      "loop": true
+    },
+    "water-night-absorb": {
+      "frames": "water-night-absorb/00..11.png",
+      "strip": "water-night-absorb-strip.png",
+      "count": 12,
+      "loop": false
+    },
+    "fertilizer-day-loop": {
+      "frames": "fertilizer-day-loop/00..11.png",
+      "strip": "fertilizer-day-loop-strip.png",
+      "count": 12,
+      "loop": true
+    },
+    "fertilizer-day-absorb": {
+      "frames": "fertilizer-day-absorb/00..11.png",
+      "strip": "fertilizer-day-absorb-strip.png",
+      "count": 12,
+      "loop": false
+    },
+    "fertilizer-night-loop": {
+      "frames": "fertilizer-night-loop/00..11.png",
+      "strip": "fertilizer-night-loop-strip.png",
+      "count": 12,
+      "loop": true
+    },
+    "fertilizer-night-absorb": {
+      "frames": "fertilizer-night-absorb/00..11.png",
+      "strip": "fertilizer-night-absorb-strip.png",
+      "count": 12,
+      "loop": false
+    }
+  }
+}

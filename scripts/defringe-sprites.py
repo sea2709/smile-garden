@@ -1,6 +1,6 @@
 """Remove the pale paper fringe ("soil halo") around the painted plant sprites.
 
-Reads /workspace/smile-garden-art/plants/<id>/stage-N.png (or ART_SRC) and
+Reads art/plants/<id>/stage-N.png (override with ART_SRC) and
 writes assets/plants/<id>/stage-N.png. Only pixels within a few px of the
 transparent edge that look like warm, light, unsaturated paper are faded out
 and their colour is un-mixed from the paper tone; interior highlights stay.
@@ -10,7 +10,8 @@ import numpy as np
 from PIL import Image
 from scipy import ndimage
 
-SRC = os.environ.get('ART_SRC', '/workspace/smile-garden-art/plants')
+_SRC_DEFAULT = os.path.normpath(os.path.join(os.path.dirname(__file__), '..', 'art', 'plants'))
+SRC = os.environ.get('ART_SRC', _SRC_DEFAULT)
 DST = os.path.join(os.path.dirname(__file__), '..', 'assets', 'plants')
 PAPER = np.array([246, 238, 216], dtype=np.float32)
 
