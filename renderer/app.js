@@ -1,0 +1,931 @@
+// renderer/app.js — Smile Garden v3: a calm daily visit to a painted garden.
+//
+// Flow: (one-time wellness notice) -> greeting -> [plant seeds] -> smile ~45 s
+// (sunlight) -> talk ~30 s (water) -> optional guided breathing (fertilizer)
+// -> summary -> garden. State persists in localStorage. Plants grow at most
+// one stage per local day; see game/visit.js.
+
+(function () {
+    'use strict';
+    const L = window.SmileLogic;
+    const V = window.SmileVisit;
+    const ART = window.SmileArt;
+    const STORE_KEY = 'smile-garden.v3';
+    const $ = (id) => document.getElementById(id);
+    const els = {};
+    for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-live',
+        'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub', 'meter-sun', 'meter-water', 'meter-fert',
+        'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
+        'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
+        'breath-sub', 'breath-count', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'plot-tip', 'float-layer', 'toast',
+        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
+        'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
+        'screen-summary', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
+        'btn-sum-done', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
+        'dev-fill', 'dev-reset', 'error-banner', 'error-title', 'error-message', 'btn-error-keyboard', 'btn-error-dismiss']) {
+        els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = $(id);
+    }
+
+    // ------------------------------------------------------------------
+    // State + persistence
+    // ------------------------------------------------------------------
+    let config = { mock: true, fast: false };
+    let state = V.loadState(safeGet(), new Date());
+    const clock = new V.GameClock({ offsetDays: state.settings.offsetDays });
+    function safeGet() { try { return localStorage.getItem(STORE_KEY); } catch { return null; } }
+    function save() {
+        state.settings.offsetDays = clock.offsetDays;
+        try { localStorage.setItem(STORE_KEY, V.serializeState(state)); } catch (e) { console.warn('[smile-garden] save failed', e); }
+    }
+
+    const scene = window.SmileScene.createScene(els.garden);
+    const trace = new L.SmileTrace({ windowSec: 10, capacity: 480 });
+    let screen = 'loading';
+    let session = null;
+    let source = null;
+    let sourceReady = false;
+    let lastResult = null;
+    let pickerTarget = null;
+    let currentDay = clock.today();
+    let lighting = 'midday';
+    let devOpen = false;
+
+    const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', faceGoneAt: 0 };
+
+    // ------------------------------------------------------------------
+    // Screens
+    // ------------------------------------------------------------------
+    const overlays = ['screenWellness', 'screenGreeting', 'screenPicker', 'screenSummary', 'screenJournal'];
+    function show(name) {
+        screen = name;
+        document.body.dataset.screen = name;
+        for (const o of overlays) els[o].hidden = true;
+        els.stepPanel.hidden = name !== 'visit';
+        els.idleBar.hidden = name !== 'idle';
+        if (name !== 'visit') { els.breathGuide.hidden = true; els.hint.hidden = true; }
+        if (name === 'wellness') els.screenWellness.hidden = false;
+        if (name === 'greeting') { renderGreeting(); els.screenGreeting.hidden = false; }
+        if (name === 'picker') { renderPicker(); els.screenPicker.hidden = false; }
+        if (name === 'summary') els.screenSummary.hidden = false;
+        if (name === 'journal') els.screenJournal.hidden = false;
+        if (name === 'idle') renderIdle();
+        scene.setHighlight(name === 'picker' ? pickerTarget : null);
+        if (name !== 'picker') scene.setHover(null);
+        els.plotTip.hidden = true;
+    }
+
+    let journalReturn = 'idle';
+    function openJournal(tab) {
+        if (screen === 'visit') return;
+        journalReturn = screen === 'journal' ? journalReturn : screen;
+        renderJournal(tab || 'diary');
+        show('journal');
+    }
+    function closeJournal() { show(journalReturn === 'journal' || journalReturn === 'loading' ? 'idle' : journalReturn); }
+
+    // ------------------------------------------------------------------
+    // HUD
+    // ------------------------------------------------------------------
+    function fmtDate(d) {
+        return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    }
+    function refreshLighting() {
+        const l = V.lightingFor(clock.now(), state.settings.lighting === 'auto' ? null : state.settings.lighting);
+        if (l !== lighting) {
+            lighting = l;
+            scene.setLighting(l);
+            document.body.dataset.lighting = l;
+            if (source && source.setNight) source.setNight(l === 'night');
+        }
+    }
+    function renderHud() {
+        const now = clock.now();
+        const time = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+        els.clockChip.textContent = `${fmtDate(now)} · ${time} · ${V.LIGHTING_LABELS[lighting]}${state.settings.lighting !== 'auto' ? ' (demo light)' : ''}`;
+        const weekly = V.weeklyVisits(state, now);
+        const start = V.weekStartKey(now);
+        const today = V.dayKey(now);
+        els.weekDots.textContent = '';
+        for (let i = 0; i < 7; i++) {
+            const k = V.addDaysKey(start, i);
+            const dot = document.createElement('i');
+            if (state.visitDays.includes(k)) dot.className = 'on';
+            if (k === today) dot.classList.add('today');
+            dot.title = V.dayStart(k).toLocaleDateString(undefined, { weekday: 'short' });
+            els.weekDots.appendChild(dot);
+        }
+        els.weekText.textContent = `${weekly} ${weekly === 1 ? 'visit' : 'visits'} this week`;
+        const sc = V.score(state);
+        els.scoreChip.textContent = `🌱 ${sc.planted}/${sc.plots} planted · ❀ ${sc.mature} grown`;
+        document.body.dataset.planted = String(sc.planted);
+        document.body.dataset.mature = String(sc.mature);
+        els.devDay.textContent = clock.offsetDays ? `+${clock.offsetDays} day${clock.offsetDays > 1 ? 's' : ''}` : 'today';
+    }
+
+    const meterImgs = {};
+    for (const k of ['sun', 'water', 'fertilizer']) {
+        meterImgs[k] = new Image();
+        meterImgs[k].src = `../assets/ui/meter-${k}.png`;
+    }
+    const METER_COLORS = { sun: ['#fbe29a', '#e3a22a'], water: ['#d2e5f4', '#5b92c6'], fertilizer: ['#dfe8b8', '#7b9646'] };
+    function drawMeter(canvas, kind, frac) {
+        const meta = ART.meters[kind];
+        const img = meterImgs[kind];
+        const dpr = window.devicePixelRatio || 1;
+        const W = 132, H = Math.round(132 * meta.h / meta.w);
+        if (canvas.width !== Math.round(W * dpr)) { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); canvas.style.height = H + 'px'; }
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(dpr * W / meta.w, 0, 0, dpr * W / meta.w, 0, 0);
+        ctx.clearRect(0, 0, meta.w, meta.h);
+        if (img.complete && img.naturalWidth) ctx.drawImage(img, 0, 0, meta.w, meta.h);
+        const n = meta.dots.length;
+        const filled = Math.max(0, Math.min(1, frac)) * n;
+        const [c0, c1] = METER_COLORS[kind];
+        meta.dots.forEach(([x, y, r], i) => {
+            ctx.beginPath();
+            ctx.arc(x, y, r * 0.92, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(214, 206, 188, 0.55)';
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(170, 160, 140, 0.55)';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            const f = Math.max(0, Math.min(1, filled - i));
+            if (f <= 0) return;
+            ctx.save();
+            ctx.globalAlpha = 0.35 + 0.65 * f;
+            const g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.35, r * 0.1, x, y, r);
+            g.addColorStop(0, c0);
+            g.addColorStop(1, c1);
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(x, y, r * (0.55 + 0.37 * f), 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+    }
+    function meterValues() {
+        if (session) return { sun: session.sunHours, water: session.water, fert: session.fertilizer, fertUsed: session.breathTaken };
+        if (lastResult && lastResult.day === clock.today()) return { sun: lastResult.sunHours, water: lastResult.water, fert: lastResult.fertilizer, fertUsed: lastResult.fertilizer > 0 };
+        return { sun: 0, water: 0, fert: 0, fertUsed: false };
+    }
+    function renderMeters() {
+        const m = meterValues();
+        drawMeter(els.meterSun, 'sun', m.sun / V.TUNING.maxSunHours);
+        drawMeter(els.meterWater, 'water', m.water);
+        drawMeter(els.meterFert, 'fertilizer', m.fert);
+        els.meterSunVal.textContent = `${m.sun.toFixed(1)} / 12 h`;
+        els.meterWaterVal.textContent = `${Math.round(m.water * 100)}%`;
+        els.meterFertVal.textContent = m.fertUsed ? `${Math.round(m.fert * 100)}%` : 'optional';
+        const step = session ? session.step : '';
+        els.meterSunWrap.classList.toggle('active', step === 'smile');
+        els.meterWaterWrap.classList.toggle('active', step === 'talk');
+        els.meterFertWrap.classList.toggle('active', step === 'breathe' || step === 'breathe-offer');
+    }
+
+    // ------------------------------------------------------------------
+    // Greeting / idle
+    // ------------------------------------------------------------------
+    function gardenStatusLine() {
+        const sc = V.score(state);
+        if (!sc.planted) return 'Your beds are freshly dug and waiting. Pick a seed to plant, then spend a couple of minutes with your garden.';
+        const growing = state.plots.filter((p) => p && p.stage < V.MAX_STAGE).length;
+        const parts = [`${sc.planted} of 8 beds planted`];
+        if (sc.mature) parts.push(`${sc.mature} fully grown`);
+        if (growing) parts.push(`${growing} still growing`);
+        return parts.join(', ') + '.';
+    }
+    function renderGreeting() {
+        const now = clock.now();
+        els.greetDate.textContent = `${fmtDate(now)} · ${V.LIGHTING_LABELS[lighting]}`;
+        els.greetTitle.textContent = V.greetingFor(lighting);
+        els.greetStatus.textContent = gardenStatusLine();
+        els.planSmile.textContent = String(config.fast ? V.TUNING.fastSmileSeconds : V.TUNING.smileSeconds);
+        els.planTalk.textContent = String(config.fast ? V.TUNING.fastTalkSeconds : V.TUNING.talkSeconds);
+        const empty = V.emptyPlots(state).length;
+        els.btnGreetPlant.hidden = !empty;
+        els.btnGreetPlant.textContent = V.plantedCount(state) ? '🌱 Plant another seed' : '🌱 Plant a seed';
+        let note = '';
+        if (V.visitedToday(state, now)) note = 'You already visited today. Plants grow once a day, but they always enjoy the company.';
+        else if (lighting === 'night') note = 'Night visits are extra calm. A soft light in front of you helps the camera see your smile.';
+        else note = `Plants grow one stage on a day they get enough sun and water. ${V.weeklyVisits(state, now)} visits so far this week, and every one counts.`;
+        els.greetNote.textContent = note;
+        els.greetFine.textContent = config.mock
+            ? 'Demo mode: a simulated player smiles and chats. Hold S / T to take over with the keyboard.'
+            : (config.enableTelemetry ? 'SmartSpectra SDK telemetry is on (SMARTSPECTRA_TELEMETRY=0 to opt out). ' : '') + 'For fun and general wellness only.';
+    }
+    function renderIdle() {
+        const now = clock.now();
+        const visited = V.visitedToday(state, now);
+        els.idleText.textContent = visited
+            ? (V.matureCount(state) === 8 ? 'Every bed is in full growth. What a garden!' : 'Visit done for today. Come back tomorrow to see what grows.')
+            : 'Your garden is waiting for today\'s visit.';
+        els.btnVisit.textContent = visited ? 'Visit again' : 'Start today\'s visit';
+        els.btnPlantIdle.hidden = !V.emptyPlots(state).length;
+    }
+
+    // ------------------------------------------------------------------
+    // Seed picker
+    // ------------------------------------------------------------------
+    function openPicker(plot) {
+        const empty = V.emptyPlots(state);
+        if (!empty.length) { toast('Every bed is planted.'); return; }
+        pickerReturn = screen === 'picker' ? pickerReturn : screen;
+        pickerTarget = plot !== undefined && plot !== null && empty.includes(plot) ? plot : empty[0];
+        show('picker');
+    }
+    let pickerReturn = 'greeting';
+    function closePicker() { pickerTarget = null; show(pickerReturn === 'picker' ? 'idle' : pickerReturn); }
+
+    function renderPicker() {
+        els.pickerTarget.textContent = `for bed ${pickerTarget + 1}`;
+        els.seedCards.textContent = '';
+        for (const p of L.PLANTS) {
+            const info = V.plantInfo(p.id);
+            const unlocked = V.isUnlocked(state, p.id);
+            const card = document.createElement('button');
+            card.type = 'button';
+            card.className = 'seed-card' + (unlocked ? '' : ' locked');
+            card.dataset.plant = p.id;
+            if (!unlocked) card.dataset.lock = `Unlocks after ${info.unlockAtVisit} visits`;
+            const img = document.createElement('img');
+            img.src = ART.plantSrc(p.id, 5);
+            img.alt = '';
+            const h3 = document.createElement('h3');
+            h3.textContent = p.name;
+            const diff = document.createElement('span');
+            diff.className = `diff diff-${p.difficulty}`;
+            diff.textContent = p.difficultyLabel;
+            h3.appendChild(diff);
+            const sun = document.createElement('div');
+            sun.className = 'seed-sun';
+            sun.textContent = `☀ ${p.sunHoursLabel} of sun a day`;
+            const meta = document.createElement('div');
+            meta.className = 'seed-meta';
+            meta.textContent = `Needs ${p.cost} sun-hours per stage · 4 stages to grow`;
+            const blurb = document.createElement('p');
+            blurb.className = 'seed-blurb';
+            blurb.textContent = info.tips[0] || p.blurb;
+            const src = document.createElement('div');
+            src.className = 'seed-src';
+            src.textContent = 'Sun need: ' + p.sourceLabel.split(':')[0];
+            card.append(img, h3, sun, meta, blurb, src);
+            if (unlocked) card.addEventListener('click', () => plant(p.id));
+            els.seedCards.appendChild(card);
+        }
+    }
+
+    function plant(plantId, plot) {
+        const target = plot !== undefined ? plot : pickerTarget;
+        const res = V.plantSeed(state, target, plantId, clock.now());
+        if (!res.ok) { toast(res.reason === 'locked' ? 'Those seeds unlock with more visits.' : 'That bed is taken.'); return res; }
+        save();
+        scene.setPlots(state.plots);
+        floatLabel(res.plot, `${L.plantById(plantId).name} planted`);
+        renderHud();
+        const empty = V.emptyPlots(state);
+        if (screen === 'picker') {
+            if (empty.length) { pickerTarget = empty[0]; scene.setHighlight(pickerTarget); renderPicker(); }
+            else closePicker();
+        }
+        return res;
+    }
+
+    // ------------------------------------------------------------------
+    // Visit
+    // ------------------------------------------------------------------
+    const STEP_COPY = {
+        smile: { title: 'Smile: sunlight', text: 'Smile at your garden. Every smile pours warm light onto the beds. Big or small, it all counts.' },
+        talk: { title: 'Talk: water', text: 'Tell your plants about your day, out loud or in a whisper. Talking fills the watering can.' },
+        'breathe-offer': { title: 'Calm breaths: fertilizer', text: 'Optional. A few soft breaths through your nose give the beds a little fertilizer, which only speeds growth.' },
+        breathe: { title: 'Breathe with the light', text: 'Follow the glow: in as it grows, out as it fades. No holding, no straining.' },
+    };
+    const TALK_PROMPTS = ['What made you smile today?', 'Tell the tomatoes about your morning.', 'What are you looking forward to?',
+        'Describe the weather where you are.', 'Say hello to each bed.', 'What would you cook with this harvest?'];
+
+    async function ensureSource() {
+        if (source) return true;
+        try {
+            if (config.mock || config.keyboard) {
+                source = window.SmileSources.createMockSource({ auto: !config.keyboard });
+            } else {
+                source = window.SmileSources.createSdkSource({ apiKey: config.apiKey, enableTelemetry: config.enableTelemetry, calmCheck: false });
+            }
+        } catch (e) {
+            showError('Could not start the camera reading', String(e && e.message || e), true);
+            return false;
+        }
+        source.on('expression', (e) => { signal.h = e.happiness; signal.hAt = performance.now(); });
+        source.on('talking', (e) => { signal.talking = !!e.detected; signal.talkAt = performance.now(); });
+        source.on('validation', (v) => { signal.validation = v.code; });
+        source.on('status', (s) => { document.body.dataset.status = s; });
+        source.on('error', (e) => showError('SmartSpectra error', `${e.name}: ${e.message || ''}`, !config.mock));
+        source.on('stream', (stream) => { els.preview.srcObject = stream || null; els.pip.hidden = !stream; });
+        if (source.setNight) source.setNight(lighting === 'night');
+        return true;
+    }
+
+    async function beginVisit() {
+        if (!(await ensureSource())) return;
+        session = new V.VisitSession({ fast: config.fast, pace: state.settings.pace, breaths: state.settings.breaths });
+        trace.clear();
+        talkPromptIdx = Math.floor(Math.random() * TALK_PROMPTS.length);
+        show('visit');
+        session.begin();
+        onStep('smile');
+        try {
+            await source.start();
+            sourceReady = true;
+        } catch (e) {
+            showError('Camera could not start', String(e && e.message || e), !config.mock);
+        }
+    }
+
+    let talkPromptIdx = 0;
+    let lastStep = null;
+    function onStep(step) {
+        lastStep = step;
+        document.body.dataset.step = step;
+        if (source && source.setPhase) source.setPhase(step);
+        const order = ['smile', 'talk', 'breathe', 'summary'];
+        const idx = order.indexOf(step === 'breathe-offer' ? 'breathe' : step);
+        els.stepTrack.querySelectorAll('span').forEach((s, i) => {
+            s.classList.toggle('on', i === idx);
+            s.classList.toggle('done', i < idx);
+        });
+        if (step === 'summary') { finishVisit(); return; }
+        const copy = STEP_COPY[step];
+        els.stepTitle.textContent = copy.title;
+        els.stepText.textContent = copy.text;
+        els.breathGuide.hidden = step !== 'breathe';
+        renderStepActions(step);
+        if (step === 'breathe') renderBreathCount(0);
+    }
+
+    function renderStepActions(step) {
+        const box = els.stepPanel.querySelector('.step-actions');
+        box.textContent = '';
+        const opt = document.getElementById('breath-options');
+        if (opt) opt.remove();
+        if (step === 'breathe-offer') {
+            const group = document.createElement('div');
+            group.className = 'opt-group';
+            group.id = 'breath-options';
+            for (const key of ['standard', 'gentle']) {
+                const lab = document.createElement('label');
+                const r = document.createElement('input');
+                r.type = 'radio'; r.name = 'pace'; r.value = key; r.checked = state.settings.pace === key;
+                r.addEventListener('change', () => { state.settings.pace = key; save(); });
+                lab.append(r, document.createTextNode(' ' + V.PACES[key].label + (key === 'gentle' ? ': a good place to start' : '')));
+                group.appendChild(lab);
+            }
+            const st = document.createElement('label');
+            st.className = 'stepper';
+            const minus = document.createElement('button'); minus.type = 'button'; minus.textContent = '−';
+            const plus = document.createElement('button'); plus.type = 'button'; plus.textContent = '+';
+            const val = document.createElement('b'); val.textContent = String(state.settings.breaths);
+            const setB = (n) => { state.settings.breaths = V.clampBreaths(n); val.textContent = String(state.settings.breaths); save(); };
+            minus.addEventListener('click', () => setB(state.settings.breaths - 1));
+            plus.addEventListener('click', () => setB(state.settings.breaths + 1));
+            st.append(document.createTextNode('Breaths: '), minus, val, plus, document.createTextNode(' (3–6)'));
+            group.appendChild(st);
+            const note = document.createElement('div');
+            note.className = 'note';
+            note.textContent = 'Skip it if you have a heart or lung condition, are pregnant, or just don\'t feel like it today.';
+            group.appendChild(note);
+            els.stepText.after(group);
+            const skip = mkBtn('Skip to summary', 'btn btn-ghost', () => { session.skip(); });
+            skip.id = 'btn-skip';
+            const go = mkBtn('Start breathing', 'btn btn-primary', () => {
+                session.startBreathing({ pace: state.settings.pace, breaths: state.settings.breaths });
+            });
+            go.id = 'btn-breathe-start';
+            box.append(skip, go);
+        } else {
+            const skip = mkBtn(step === 'breathe' ? 'Skip breathing' : 'Skip', 'btn btn-ghost', () => { session.skip(); });
+            skip.id = 'btn-skip';
+            box.append(skip);
+        }
+    }
+    function mkBtn(text, cls, fn) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = cls; b.textContent = text;
+        b.addEventListener('click', fn);
+        return b;
+    }
+    function renderBreathCount(done) {
+        const total = session && session.pacer ? session.pacer.breaths : state.settings.breaths;
+        els.breathCount.textContent = '';
+        for (let i = 0; i < total; i++) {
+            const d = document.createElement('i');
+            if (i < done) d.className = 'on';
+            els.breathCount.appendChild(d);
+        }
+    }
+
+    function currentInput() {
+        const now = performance.now();
+        const fresh = signal.hAt && now - signal.hAt < 700;
+        const valOk = signal.validation === 'Ok' || signal.validation === 'CameraTuning';
+        const faceVisible = !!fresh && valOk;
+        return {
+            happiness: faceVisible ? signal.h : null,
+            talking: faceVisible && now - signal.talkAt < 700 ? signal.talking : false,
+            faceVisible,
+        };
+    }
+
+    function updateVisit(dt, t) {
+        const input = currentInput();
+        const events = session.update(dt, input);
+        trace.push({ t, happiness: input.happiness, faceVisible: input.faceVisible, talking: input.talking, smiling: session.smiling });
+        for (const ev of events) if (ev.type === 'step' && ev.step !== lastStep) onStep(ev.step);
+        if (!session) return;
+        const step = session.step;
+        document.body.dataset.smiling = session.smiling ? '1' : '0';
+        document.body.dataset.talking = session.talking ? '1' : '0';
+
+        // ring + live text
+        const dur = session.stepDuration();
+        const rem = session.stepRemaining();
+        const frac = dur > 0 ? 1 - rem / dur : 0;
+        els.ringFg.style.strokeDashoffset = String(276.46 * frac);
+        els.ringText.textContent = step === 'breathe-offer' ? '🍃' : String(Math.ceil(rem));
+        if (step === 'smile') {
+            els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
+                : session.smiling ? `☀ Sunlight pouring: ${session.sunHours.toFixed(1)} h` : `${session.sunHours.toFixed(1)} h of sun so far. Smile when you're ready`;
+        } else if (step === 'talk') {
+            els.stepText.textContent = `${STEP_COPY.talk.text} Try: “${TALK_PROMPTS[(talkPromptIdx + Math.floor(t / 7)) % TALK_PROMPTS.length]}”`;
+            els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
+                : session.talking ? `💧 Watering: can ${Math.round(session.water * 100)}% full` : `Watering can ${Math.round(session.water * 100)}% full`;
+        } else if (step === 'breathe-offer') {
+            els.stepLive.textContent = '';
+        } else if (step === 'breathe') {
+            const b = session.pacer.at(session.breathT);
+            const scale = 0.45 + 0.55 * b.size;
+            els.breathOrb.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
+            els.breathHalo.style.transform = `translate(-50%, -50%) scale(${(0.5 + 0.55 * b.size).toFixed(3)})`;
+            els.breathHalo.style.opacity = String(0.4 + 0.6 * b.size);
+            els.breathWord.textContent = b.phase === 'in' ? 'Breathe in' : 'And slowly out';
+            els.breathSub.textContent = b.phase === 'in' ? `softly through your nose · ${Math.ceil(b.remaining)}` : `let it go gently · ${Math.ceil(b.remaining)}`;
+            document.body.dataset.breathPhase = b.phase;
+            document.body.dataset.breath = String(session.breathsDone);
+            renderBreathCount(session.breathsDone);
+            els.stepLive.textContent = `🍃 Breath ${Math.min(session.pacer.breaths, b.breath + 1)} of ${session.pacer.breaths} · fertilizer ${Math.round(session.fertilizer * 100)}%`;
+            scene.setEffects({ breath: b.size });
+        }
+
+        // scene effects
+        const on = L.DEFAULTS.smileOn;
+        const smileAmt = step === 'smile' && session.smiling ? 0.45 + 0.55 * L.clamp01((session.h - on) / (1 - on)) : 0;
+        scene.setEffects({ sun: smileAmt, water: step === 'talk' && session.talking ? 1 : 0, fert: step === 'breathe' ? 0.9 : 0 });
+
+        // hints
+        updateHint(step, input);
+    }
+
+    function updateHint(step, input) {
+        const active = step === 'smile' || step === 'talk';
+        const poor = active && session.poorReading;
+        const dark = active && (signal.validation === 'TooDark' || signal.validation === 'TooDarkOrBacklit');
+        let title = '', sub = '';
+        if ((poor || dark) && lighting === 'night') {
+            title = '🌙 It\'s a little dark in here';
+            sub = 'Try turning on a soft light in front of you. Your garden will wait.';
+        } else if (dark) {
+            title = 'A little more light, please';
+            sub = 'Soft, even light on your face (not behind you) helps.';
+        } else if (poor) {
+            title = 'Where did you go?';
+            sub = 'Look toward the camera, about an arm\'s length away. The timer waits for you.';
+        }
+        els.hint.hidden = !title;
+        document.body.dataset.hint = title ? (lighting === 'night' ? 'night-light' : 'face') : '';
+        if (title) { els.hintTitle.textContent = title; els.hintSub.textContent = sub; }
+    }
+
+    async function finishVisit() {
+        const result = session.result();
+        const before = state.plots.map((p) => (p ? { plantId: p.plantId, stage: p.stage } : null));
+        const out = V.applyVisit(state, result, clock.now());
+        lastResult = Object.assign({}, out);
+        save();
+        if (source) { try { await source.stop(); } catch { /* ignore */ } }
+        sourceReady = false;
+        session = null;
+        scene.setEffects({ sun: 0, water: 0, fert: 0 });
+        document.body.dataset.step = 'summary';
+        renderSummary(out);
+        show('summary');
+        renderHud();
+        // reveal growth one bed at a time
+        const shown = before.slice();
+        scene.setPlots(shown, { instant: true });
+        out.grew.forEach((g, k) => {
+            setTimeout(() => {
+                shown[g.plot] = { plantId: g.plantId, stage: g.to };
+                scene.setPlots(shown);
+                floatLabel(g.plot, g.mature ? `${g.name}: fully grown!` : `${g.name} → ${V.STAGES[g.to].label}`);
+            }, 700 + k * 650);
+        });
+        setTimeout(() => { scene.setPlots(state.plots, { instant: true }); document.body.dataset.revealed = '1'; }, 900 + out.grew.length * 650 + 2300);
+        document.body.dataset.revealed = '0';
+        document.body.dataset.grew = String(out.grew.length);
+    }
+
+    function renderSummary(out) {
+        const now = clock.now();
+        els.sumDate.textContent = `${fmtDate(now)} · ${V.LIGHTING_LABELS[lighting]}`;
+        els.sumTitle.textContent = out.grew.length ? (out.grew.some((g) => g.mature) ? 'Something grew all the way!' : 'Your garden grew today') : 'A lovely, quiet visit';
+        els.sumSun.textContent = `${out.sunHours.toFixed(1)} h`;
+        els.sumWater.textContent = `${Math.round(out.water * 100)}%`;
+        els.sumFert.textContent = out.fertilizer > 0 ? `${Math.round(out.fertilizer * 100)}%` : 'skipped';
+        els.sumGrew.textContent = '';
+        for (const g of out.grew) {
+            const li = document.createElement('li');
+            li.textContent = g.mature ? `${g.name} in bed ${g.plot + 1} is fully grown.` : `${g.name} in bed ${g.plot + 1} grew: ${V.STAGES[g.from].label} → ${V.STAGES[g.to].label}.`;
+            els.sumGrew.appendChild(li);
+        }
+        if (!out.grew.length && !V.plantedCount(state)) {
+            const li = document.createElement('li');
+            li.textContent = 'Plant a seed next time and today\'s kind of sunlight will make it sprout.';
+            els.sumGrew.appendChild(li);
+        }
+        els.sumWait.textContent = '';
+        for (const w of out.waiting.slice(0, 4)) {
+            const li = document.createElement('li');
+            li.textContent = V.waitingText(w);
+            els.sumWait.appendChild(li);
+        }
+        for (const id of out.unlocked) {
+            const li = document.createElement('li');
+            li.textContent = `New seeds unlocked: ${L.plantById(id).name}!`;
+            els.sumGrew.appendChild(li);
+        }
+        els.sumWeek.textContent = `${out.weekly} ${out.weekly === 1 ? 'visit' : 'visits'} this week. ` +
+            (out.fertilizer > 0 ? 'Thanks for breathing with the garden.' : 'Breathing is always optional.') +
+            ' Plants grow at most one stage a day.';
+    }
+
+    // ------------------------------------------------------------------
+    // Journal
+    // ------------------------------------------------------------------
+    function renderJournal(tab) {
+        els.screenJournal.querySelectorAll('.tab').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
+        document.body.dataset.journalTab = tab;
+        const body = els.journalBody;
+        body.textContent = '';
+        if (tab === 'diary') {
+            const entries = state.journal.slice().reverse();
+            if (!entries.length) { const p = document.createElement('p'); p.className = 'j-empty'; p.textContent = 'Nothing yet. Plant a seed and your garden\'s story starts here.'; body.appendChild(p); return; }
+            let day = null;
+            for (const e of entries) {
+                if (e.day !== day) {
+                    day = e.day;
+                    const h = document.createElement('div');
+                    h.className = 'j-day';
+                    h.textContent = V.dayStart(day).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+                    body.appendChild(h);
+                }
+                const row = document.createElement('div');
+                row.className = 'j-entry';
+                if (e.plantId && ART.plants[e.plantId]) {
+                    const img = document.createElement('img');
+                    img.src = ART.plantSrc(e.plantId, Math.max(1, Math.min(5, e.stage || 5)));
+                    img.alt = '';
+                    row.appendChild(img);
+                } else {
+                    const ic = document.createElement('span');
+                    ic.className = 'j-icon';
+                    ic.textContent = e.kind === 'visit' ? '☀' : '❀';
+                    row.appendChild(ic);
+                }
+                const span = document.createElement('span');
+                span.textContent = e.text || e.kind;
+                row.appendChild(span);
+                body.appendChild(row);
+            }
+        } else if (tab === 'plants') {
+            const any = state.plots.some(Boolean);
+            if (!any) { const p = document.createElement('p'); p.className = 'j-empty'; p.textContent = 'No plants yet.'; body.appendChild(p); return; }
+            const today = clock.today();
+            state.plots.forEach((p, i) => {
+                if (!p) return;
+                const kind = L.plantById(p.plantId);
+                const row = document.createElement('div');
+                row.className = 'mine-row';
+                const img = document.createElement('img');
+                img.src = ART.plantSrc(p.plantId, p.stage);
+                img.alt = '';
+                const txt = document.createElement('div');
+                const days = p.plantedDay ? V.daysBetween(p.plantedDay, today) : 0;
+                const b = document.createElement('b');
+                b.textContent = `Bed ${i + 1}: ${kind.name}`;
+                const pips = document.createElement('span');
+                pips.className = 'stage-pips';
+                for (let s = 1; s <= 5; s++) { const d = document.createElement('i'); if (s <= p.stage) d.className = 'on'; pips.appendChild(d); }
+                const line = document.createElement('div');
+                line.className = 'note';
+                line.textContent = `${V.STAGES[p.stage].label} · planted ${days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago'} · needs ${kind.sunHoursLabel} of sun a day`;
+                txt.append(b, pips, line);
+                if (p.stage < 5) {
+                    const bank = document.createElement('div');
+                    bank.className = 'note';
+                    const bar = document.createElement('span'); bar.className = 'bank';
+                    const fill = document.createElement('i'); fill.style.width = `${Math.round(100 * p.sunBank / kind.cost)}%`;
+                    bar.appendChild(fill);
+                    bank.append(document.createTextNode(`Sun saved for next stage: ${p.sunBank.toFixed(1)}/${kind.cost} h `), bar);
+                    txt.appendChild(bank);
+                }
+                row.append(img, txt);
+                body.appendChild(row);
+            });
+        } else {
+            const grid = document.createElement('div');
+            grid.className = 'lib-grid';
+            for (const p of L.PLANTS) {
+                const info = V.plantInfo(p.id);
+                const card = document.createElement('div');
+                card.className = 'lib-card';
+                const img = document.createElement('img');
+                img.src = ART.plantSrc(p.id, 5);
+                img.alt = '';
+                const txt = document.createElement('div');
+                const h = document.createElement('h3'); h.textContent = p.name;
+                const sun = document.createElement('div'); sun.className = 'seed-sun'; sun.textContent = `☀ Sun need: ${p.sunHoursLabel} a day · in the game ${p.cost} sun-hours per stage`;
+                const blurb = document.createElement('div'); blurb.className = 'note'; blurb.textContent = p.blurb;
+                const ul = document.createElement('ul');
+                for (const tip of info.tips) { const li = document.createElement('li'); li.textContent = tip; ul.appendChild(li); }
+                const src = document.createElement('div'); src.className = 'src';
+                const sb = document.createElement('b'); sb.textContent = 'Source: ';
+                src.append(sb, document.createTextNode(`${p.sourceLabel}. ${p.source}`));
+                txt.append(h, sun, blurb, ul, src);
+                card.append(img, txt);
+                grid.appendChild(card);
+            }
+            body.appendChild(grid);
+            const fine = document.createElement('p');
+            fine.className = 'fineprint';
+            fine.textContent = 'Sun needs come from the university extension sources shown. The other tips are general gardening advice; your local extension service knows your climate best. Water and fertilizer amounts in the game are simplified.';
+            body.appendChild(fine);
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Little UI helpers
+    // ------------------------------------------------------------------
+    function floatLabel(plot, text) {
+        const c = scene.plotClient(plot);
+        const pl = state.plots[plot];
+        const meta = pl && ART.plants[pl.plantId] ? ART.plants[pl.plantId].stages[pl.stage - 1] : null;
+        const hgt = meta ? (meta.base - meta.top) * ART.plots[plot].scale * c.s : 40;
+        const d = document.createElement('div');
+        d.className = 'float-label';
+        d.textContent = text;
+        d.style.left = `${c.x}px`;
+        d.style.top = `${Math.max(70, c.y - hgt - 10)}px`;
+        els.floatLayer.appendChild(d);
+        setTimeout(() => d.remove(), 3700);
+    }
+    let toastTimer = null;
+    function toast(msg) {
+        els.toast.textContent = msg;
+        els.toast.hidden = false;
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { els.toast.hidden = true; }, 2600);
+    }
+    function showError(title, msg, offerKeyboard) {
+        els.errorTitle.textContent = title;
+        els.errorMessage.textContent = msg;
+        els.btnErrorKeyboard.hidden = !offerKeyboard;
+        els.errorBanner.hidden = false;
+    }
+
+    // plot hover tips + clicks
+    els.garden.addEventListener('mousemove', (e) => {
+        const i = scene.plotAt(e.clientX, e.clientY);
+        scene.setHover(i);
+        if (screen === 'visit' || i === null) { els.plotTip.hidden = true; els.garden.style.cursor = ''; return; }
+        const p = state.plots[i];
+        els.garden.style.cursor = (!p && V.emptyPlots(state).length) ? 'pointer' : '';
+        if (!p) {
+            els.plotTip.textContent = screen === 'picker' ? `Plant in bed ${i + 1}` : `Bed ${i + 1}: empty. Click to plant`;
+        } else {
+            const kind = L.plantById(p.plantId);
+            els.plotTip.textContent = '';
+            const b = document.createElement('b'); b.textContent = kind.name;
+            els.plotTip.append(b, document.createTextNode(` · ${V.STAGES[p.stage].label}` + (p.stage < 5 ? ` · ${p.sunBank.toFixed(1)}/${kind.cost} sun-hours saved` : ' · fully grown')));
+        }
+        const c = scene.plotClient(i);
+        els.plotTip.style.left = `${c.x}px`;
+        els.plotTip.style.top = `${c.y - 70 * c.s}px`;
+        els.plotTip.hidden = false;
+    });
+    els.garden.addEventListener('mouseleave', () => { els.plotTip.hidden = true; scene.setHover(null); });
+    els.garden.addEventListener('click', (e) => {
+        const i = scene.plotAt(e.clientX, e.clientY);
+        if (i === null || state.plots[i]) return;
+        if (screen === 'picker') { pickerTarget = i; scene.setHighlight(i); els.pickerTarget.textContent = `for bed ${i + 1}`; }
+        else if (screen === 'idle' || screen === 'greeting') openPicker(i);
+    });
+
+    // ------------------------------------------------------------------
+    // Buttons + keys
+    // ------------------------------------------------------------------
+    els.chkAdult.addEventListener('change', () => { els.btnWellnessOk.disabled = !els.chkAdult.checked; });
+    els.btnWellnessOk.addEventListener('click', ackWellness);
+    function ackWellness() { state.wellnessAck = true; save(); show('greeting'); }
+    els.btnGreetPlant.addEventListener('click', () => openPicker());
+    els.btnBegin.addEventListener('click', beginVisit);
+    els.btnPickerClose.addEventListener('click', closePicker);
+    els.btnSumDone.addEventListener('click', () => show('idle'));
+    els.btnSumJournal.addEventListener('click', () => openJournal('diary'));
+    els.btnJournal.addEventListener('click', () => (screen === 'journal' ? closeJournal() : openJournal('diary')));
+    els.btnJournalClose.addEventListener('click', closeJournal);
+    els.screenJournal.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => renderJournal(b.dataset.tab)));
+    els.btnVisit.addEventListener('click', () => show('greeting'));
+    els.btnPlantIdle.addEventListener('click', () => openPicker());
+    els.btnDev.addEventListener('click', () => toggleDev());
+    els.btnErrorDismiss.addEventListener('click', () => { els.errorBanner.hidden = true; });
+    els.btnErrorKeyboard.addEventListener('click', () => {
+        els.errorBanner.hidden = true;
+        if (source) { try { source.destroy(); } catch { /* ignore */ } source = null; }
+        config.keyboard = true;
+        els.mockBadge.hidden = false;
+        els.mockMode.textContent = 'Keyboard player';
+        els.btnBegin.disabled = false;
+        toast('Keyboard mode: hold S to smile, T to talk.');
+        if (session) {
+            ensureSource().then((ok) => {
+                if (!ok) return;
+                source.setPhase(session.step);
+                return source.start();
+            }).catch(() => {});
+        }
+    });
+    function toggleDev(on) {
+        devOpen = on === undefined ? !devOpen : !!on;
+        els.devDrawer.hidden = !devOpen;
+        els.mockBadge.style.visibility = devOpen ? 'hidden' : '';
+    }
+    els.devNextDay.addEventListener('click', nextDay);
+    els.devLighting.addEventListener('change', () => setLightingOverride(els.devLighting.value));
+    els.devSim.addEventListener('click', () => simulateDays(5));
+    els.devFill.addEventListener('click', fillEmpty);
+    els.devReset.addEventListener('click', () => {
+        state = V.createState(clock.now());
+        state.wellnessAck = true;
+        clock.offsetDays = 0;
+        lastResult = null;
+        save();
+        scene.setPlots(state.plots, { instant: true });
+        refreshLighting(); renderHud();
+        show('greeting');
+    });
+
+    function nextDay() {
+        if (screen === 'visit') return;
+        clock.nextDay();
+        currentDay = clock.today();
+        save();
+        refreshLighting();
+        renderHud();
+        toast(`It's a new day: ${fmtDate(clock.now())}`);
+        if (screen === 'idle' || screen === 'summary') show('greeting');
+        else if (screen === 'greeting') renderGreeting();
+    }
+    function setLightingOverride(v) {
+        state.settings.lighting = V.LIGHTINGS.includes(v) ? v : 'auto';
+        els.devLighting.value = state.settings.lighting;
+        save();
+        refreshLighting();
+        renderHud();
+        if (screen === 'greeting') renderGreeting();
+    }
+    function simulateDays(n) {
+        if (screen === 'visit') return;
+        const res = V.simulateDays(state, clock, n, 1);
+        currentDay = clock.today();
+        save();
+        lastResult = res[res.length - 1] || lastResult;
+        scene.setPlots(state.plots);
+        refreshLighting(); renderHud();
+        toast(`Simulated ${n} sunny visits.`);
+        if (screen === 'greeting') renderGreeting();
+    }
+    function fillEmpty() {
+        const ids = V.unlockedPlants(state);
+        V.emptyPlots(state).forEach((plot, k) => V.plantSeed(state, plot, ids[k % ids.length], clock.now()));
+        save();
+        scene.setPlots(state.plots);
+        renderHud();
+    }
+
+    const manualKeys = { s: 'smile', ' ': 'smile', t: 'talk', f: 'hide' };
+    window.addEventListener('keydown', (e) => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
+        const k = e.key.toLowerCase();
+        if (k === 'g') { state.settings.chart = !state.settings.chart; save(); toast(state.settings.chart ? 'Smile chart on (shows during visits)' : 'Smile chart hidden'); return; }
+        if (k === 'j') { screen === 'journal' ? closeJournal() : openJournal('diary'); return; }
+        if (k === 'd') { toggleDev(); return; }
+        if (k === 'n' && devOpen) { nextDay(); return; }
+        if (k === 'escape') { if (screen === 'journal') closeJournal(); else if (screen === 'picker') closePicker(); toggleDev(false); return; }
+        if (k === 'a' && source && source.setAuto && config.mock) { source.setAuto(true); els.mockMode.textContent = 'Demo player (auto)'; return; }
+        if (manualKeys[k] && source && source.setKeys && (config.mock || config.keyboard)) {
+            if (k === ' ') e.preventDefault();
+            source.setKeys({ [manualKeys[k]]: true });
+            els.mockMode.textContent = 'Keyboard player';
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        const k = e.key.toLowerCase();
+        if (manualKeys[k] && source && source.setKeys && (config.mock || config.keyboard)) source.setKeys({ [manualKeys[k]]: false });
+    });
+
+    // ------------------------------------------------------------------
+    // Main loop
+    // ------------------------------------------------------------------
+    let lastT = performance.now() / 1000;
+    let hudAcc = 0;
+    function loop() {
+        const t = performance.now() / 1000;
+        const dt = Math.min(0.1, t - lastT);
+        lastT = t;
+        if (session && screen === 'visit') updateVisit(dt, t);
+        scene.update(dt, t);
+        scene.draw(t);
+        renderMeters();
+        const chartOn = state.settings.chart && screen === 'visit';
+        if (els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;
+        if (chartOn) window.SmileChart.drawSmileChart(els.smileChart, trace, t, els.chartLive);
+        hudAcc += dt;
+        if (hudAcc > 1) {
+            hudAcc = 0;
+            refreshLighting();
+            renderHud();
+            // Local midnight: a new day begins (outside of a visit).
+            const today = clock.today();
+            if (today !== currentDay) {
+                currentDay = today;
+                if (screen === 'idle') show('greeting');
+            }
+        }
+        requestAnimationFrame(loop);
+    }
+
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.onload = resolve;
+            s.onerror = () => reject(new Error(`failed to load ${src}`));
+            document.body.appendChild(s);
+        });
+    }
+
+    async function init() {
+        refreshLighting();
+        scene.setPlots(state.plots, { instant: true });
+        els.devLighting.value = state.settings.lighting;
+        renderHud();
+        requestAnimationFrame(loop);
+        try {
+            config = Object.assign(config, await window.smileGarden.getConfig());
+        } catch (e) {
+            showError('Startup error', 'Could not read app config: ' + (e && e.message));
+        }
+        if (config.mock) {
+            els.mockBadge.hidden = false;
+            els.mockMode.textContent = 'Demo player (auto)';
+        } else if (config.sdkLoadError || !config.hasApiKey) {
+            els.btnBegin.disabled = true;
+            showError(config.sdkLoadError ? 'SmartSpectra SDK could not load' : 'Missing API key',
+                (config.sdkLoadError || 'Set SMARTSPECTRA_API_KEY and restart (free key: https://physiology.presagetech.com/auth/register).') +
+                ' You can still play with the keyboard.', true);
+        } else {
+            try { await loadScript('../dist/sdk-source.bundle.js'); } catch {
+                els.btnBegin.disabled = true;
+                showError('Renderer bundle missing', 'Run `npm run build` (or `npm start`) first. You can still play with the keyboard.', true);
+            }
+        }
+        show(state.wellnessAck ? 'greeting' : 'wellness');
+        document.body.dataset.ready = '1';
+    }
+
+    // Dev/test hooks (used by scripts/capture-driver.js; harmless otherwise).
+    window.__smileGarden = {
+        get state() { return state; },
+        get session() { return session; },
+        get screen() { return screen; },
+        clock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness,
+        plant: (id, plot) => plant(id, plot),
+        begin: () => (screen === 'greeting' || screen === 'idle' ? beginVisit() : null),
+        skip: () => session && session.skip(),
+        startBreathing: (o) => session && session.startBreathing(o || {}),
+        show,
+        toggleDev,
+        reset() { localStorage.removeItem(STORE_KEY); state = V.createState(new Date()); clock.offsetDays = 0; scene.setPlots(state.plots, { instant: true }); renderHud(); },
+    };
+
+    window.addEventListener('beforeunload', () => { if (source) { try { source.destroy(); } catch { /* ignore */ } } });
+    init();
+})();

@@ -1,0 +1,27 @@
+{
+  "name": "smile-garden",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Smile Garden: a calm daily garden visit. Smile for sunlight, talk for water, breathe for fertilizer (Presage SmartSpectra Node/Electron SDK).",
+  "main": "main.js",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "esbuild renderer/sdk-source.js --bundle --outfile=dist/sdk-source.bundle.js --platform=browser --format=iife --log-level=warning && esbuild preload-sdk.js --bundle --outfile=dist/preload-sdk.bundle.js --platform=node --external:electron --format=cjs --log-level=warning",
+    "start": "npm run build && electron .",
+    "start:mock": "electron . --mock",
+    "start:mock:fast": "electron . --mock --fast",
+    "test": "node --test test/logic.test.js test/visit.test.js test/assets.test.js",
+    "check": "node scripts/check-syntax.js",
+    "screenshots": "node scripts/capture-screenshots.js"
+  },
+  "dependencies": {
+    "@smartspectra/node-sdk": "^3.5.0"
+  },
+  "devDependencies": {
+    "electron": "^43.8.1",
+    "esbuild": "^0.25.0"
+  }
+}
