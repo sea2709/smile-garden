@@ -16,6 +16,8 @@ Heily repainted plant stages **2–5** and **picked** without the painted soil m
 
 ![Before centering fix](plant-center-before.png)
 
-![After centered art + soil anchors](plant-center-after.png)
+![After mound-free art + soil anchors (midday)](plant-center-after.png)
 
-Re-capture after handoff: populate beds in mock mode and run `npm run screenshots` or the plant-center capture script when available.
+![Night spot-check (back row, stage 2)](plant-center-night.png)
+
+Handoff (final): `./scripts/apply-plants-handoff.sh /path/to/plants-centered.zip`
