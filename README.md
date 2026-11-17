@@ -36,8 +36,9 @@ talking metrics), with a keyboard/demo fallback so it runs without a camera or A
 6. **Summary.** Sun-hours, water and fertilizer; each bed that grew blooms in turn with a floating label;
    plants that are still waiting say why, kindly ("Sunflower has 7 of 10 sun-hours saved up").
 
-When the face is missing, the step timer **waits** and a hint appears. At **night** the hint becomes
-"🌙 It's a little dark in here: try turning on a soft light in front of you".
+When the face is missing, the step timer **waits** and a hint appears ("Where did you go?").
+If the camera reports the scene is too dark (or backlit), the hint asks for more light —
+at garden night: "🌙 It's a little dark in here: try turning on a soft light in front of you".
 
 ### Growing rules (`game/visit.js`)
 

@@ -77,8 +77,53 @@
     /** When true, HUD season stays on `state.season` (demo capture); otherwise it tracks `dayNumber`. */
     let hudSeasonOverride = false;
 
-    const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', faceGoneAt: 0, breathing: null };
+    const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', validationHint: '', faceGoneAt: 0, breathing: null };
     let breathHudDemoLock = false;
+
+    /** Friendly copy for SmartSpectra ValidationCode (leading k stripped). */
+    function faceGuidance(code, sdkHint) {
+        const hint = (sdkHint || '').trim();
+        switch (code) {
+            case 'NoFaceFound':
+                return { title: 'Where did you go?', sub: hint || 'Look toward the camera, about an arm\'s length away. The timer waits for you.' };
+            case 'MultipleFacesFound':
+                return { title: 'One face at a time', sub: hint || 'Make sure only you are in the camera frame.' };
+            case 'FaceNotCentered':
+                return { title: 'Center your face', sub: hint || 'Move so your face sits in the middle of the preview.' };
+            case 'FaceSizeOutOfRange':
+                return { title: 'Adjust your distance', sub: hint || 'Move a little closer or farther until your head fills more of the preview.' };
+            case 'FaceTooClose':
+                return { title: 'A bit too close', sub: hint || 'Scoot back so your shoulders and face fit comfortably in frame.' };
+            case 'FaceTooFar':
+                return { title: 'A bit too far', sub: hint || 'Move closer — about an arm\'s length — so your face is easier to read.' };
+            case 'FaceTooHigh':
+                return { title: 'A little lower', sub: hint || 'Lower the camera or tilt your face down into the center of the frame.' };
+            case 'FaceTooLow':
+                return { title: 'A little higher', sub: hint || 'Raise the camera or sit up so your face is nearer the center.' };
+            case 'FaceNotForward':
+                return { title: 'Face the camera', sub: hint || 'Look straight at the lens — not turned to the side.' };
+            case 'TooDark':
+            case 'TooDarkOrBacklit':
+                return { title: 'A little more light, please', sub: hint || 'Soft, even light on your face (not behind you) helps.' };
+            case 'TooBright':
+                return { title: 'A little less glare', sub: hint || 'Soften bright light in front of you, or angle away from harsh lamps.' };
+            case 'ExcessiveMotion':
+                return { title: 'Hold still a moment', sub: hint || 'Stay steady while the garden finds your face.' };
+            case 'FrameRateTooLow':
+                return { title: 'Camera is struggling', sub: hint || 'Close other apps using the webcam, or try better light.' };
+            case 'ChestNotVisible':
+                return { title: 'Show a bit more of your torso', sub: hint || 'Back up slightly so your upper chest is in view.' };
+            case 'CameraTuning':
+            case 'Ok':
+                return null;
+            default:
+                if (!code || code === 'Ok') return null;
+                return {
+                    title: 'Adjust for the camera',
+                    sub: hint || `Camera says: ${code}. Reposition a little and hold still.`,
+                };
+        }
+    }
 
     // ------------------------------------------------------------------
     // Screens
@@ -498,7 +543,10 @@
                 at: performance.now(),
             };
         });
-        source.on('validation', (v) => { signal.validation = v.code; });
+        source.on('validation', (v) => {
+            signal.validation = v && v.code ? v.code : 'Ok';
+            signal.validationHint = (v && v.hint) || '';
+        });
         source.on('status', (s) => { document.body.dataset.status = s; });
         source.on('error', (e) => showError('SmartSpectra error', `${e.name}: ${e.message || ''}`, !config.mock));
         source.on('stream', (stream) => { els.preview.srcObject = stream || null; els.pip.hidden = !stream; });
@@ -712,18 +760,18 @@
             const remH = session.remainingHarvestCount();
             els.stepLive.textContent = `${selectedPlantLabel()} · ready to pick · ${remH} bed${remH === 1 ? '' : 's'} left. Enter or Space to harvest.`;
         } else if (step === 'harvest-hold') {
-            els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
+            els.stepLive.textContent = session.poorReading ? pausedFaceLive()
                 : session.smiling ? '🧺 Picking… hold that smile' : `Smile gently · ${Math.ceil(rem)} s (or press Enter)`;
         } else if (step === 'pick') {
             const round = session.plantRound + 1;
             const total = session.plantedBeds.length;
             els.stepLive.textContent = `${selectedPlantLabel()} · plant ${round} of ${total}. Enter or Space to tend.`;
         } else if (step === 'smile') {
-            els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
+            els.stepLive.textContent = session.poorReading ? pausedFaceLive()
                 : session.smiling ? `☀ Sunlight pouring: ${session.sunHours.toFixed(1)} h` : `${session.sunHours.toFixed(1)} h of sun so far. Smile when you're ready`;
         } else if (step === 'talk') {
             els.stepText.textContent = `${STEP_COPY.talk.text} Try: “${TALK_PROMPTS[(talkPromptIdx + Math.floor(t / 7)) % TALK_PROMPTS.length]}”`;
-            els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
+            els.stepLive.textContent = session.poorReading ? pausedFaceLive()
                 : session.talking ? `💧 Watering: can ${Math.round(session.water * 100)}% full` : `Watering can ${Math.round(session.water * 100)}% full`;
         } else if (step === 'breathe-offer') {
             els.stepLive.textContent = '';
@@ -759,23 +807,39 @@
         updateHint(step, input);
     }
 
+    function pausedFaceLive() {
+        const g = faceGuidance(signal.validation, signal.validationHint);
+        if (g && signal.validation !== 'Ok' && signal.validation !== 'CameraTuning') {
+            return `Paused: ${g.title}`;
+        }
+        return 'Paused: waiting to see your face';
+    }
+
     function updateHint(step, input) {
-        const active = step === 'smile' || step === 'talk';
+        const active = step === 'smile' || step === 'talk' || step === 'harvest-hold';
         const poor = active && session.poorReading;
-        const dark = active && (signal.validation === 'TooDark' || signal.validation === 'TooDarkOrBacklit');
+        const code = signal.validation;
+        const dark = poor && (code === 'TooDark' || code === 'TooDarkOrBacklit');
         let title = '', sub = '';
-        if ((poor || dark) && lighting === 'night') {
+        // Only blame darkness when the camera says so — garden "night" lighting
+        // is cosmetic and must not override a bright room + missing face.
+        if (dark && lighting === 'night') {
             title = '🌙 It\'s a little dark in here';
             sub = 'Try turning on a soft light in front of you. Your garden will wait.';
-        } else if (dark) {
-            title = 'A little more light, please';
-            sub = 'Soft, even light on your face (not behind you) helps.';
         } else if (poor) {
-            title = 'Where did you go?';
-            sub = 'Look toward the camera, about an arm\'s length away. The timer waits for you.';
+            const g = faceGuidance(code, signal.validationHint);
+            if (g) {
+                title = g.title;
+                sub = g.sub;
+            } else {
+                // Validation Ok/CameraTuning but no fresh expression samples yet.
+                title = 'Looking for your expression…';
+                sub = 'Hold still, face the camera, and give a clear smile. Soft front light helps.';
+            }
         }
         els.hint.hidden = !title;
-        document.body.dataset.hint = title ? (lighting === 'night' ? 'night-light' : 'face') : '';
+        document.body.dataset.hint = dark && lighting === 'night' ? 'night-light' : (title ? 'face' : '');
+        document.body.dataset.validation = poor ? (code || '') : '';
         if (title) { els.hintTitle.textContent = title; els.hintSub.textContent = sub; }
     }
 
