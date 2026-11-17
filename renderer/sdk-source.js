@@ -1,10 +1,10 @@
-// renderer/sdk-source.js — real SmartSpectra face (+ optional cardio) source.
+// renderer/sdk-source.js — real SmartSpectra face + breathing (+ optional cardio) source.
 //
 // Bundled by esbuild (`npm run build`) into dist/sdk-source.bundle.js and
 // loaded by renderer.js only when NOT in mock mode. Uses only APIs from:
 //   - https://smartspectra.presagetech.com/docs/nodejs.md  (Electron integration)
-//   - https://smartspectra.presagetech.com/docs/nodejs/metrics.md  (bundles, reading face/cardio fields)
-//   - https://smartspectra.presagetech.com/docs/data-types.md  (Face, Expression, DetectionStatus, Cardio, Hrv)
+//   - https://smartspectra.presagetech.com/docs/nodejs/metrics.md  (bundles, reading face/breathing/cardio)
+//   - https://smartspectra.presagetech.com/docs/data-types.md  (Face, Expression, DetectionStatus, Breathing, Cardio, Hrv)
 //   - github.com/Presage-Security/SmartSpectra nodejs/samples/electron-quickstart/renderer.js
 //
 // Exposes window.SmileSources.createSdkSource(config) returning the same tiny
@@ -15,6 +15,7 @@
 //     expression  { happiness: 0..1, stable }         (HAPPY ExpressionScore / 100)
 //     talking     { detected, stable }                (Face.talking DetectionStatus)
 //     landmarks   { points: [{x, y}], stable, space } (Face.landmarks, latest)
+//     breathing   { rate, confidence, stable, t }     (Breathing.rate latest; stable ~= confidence >= 45)
 //     cardio      { pulse: [{t, value, confidence, stable}], hrv: [{t, rmssd, sdnn, meanNn, baevsky, confidence, stable}] }
 //     error       { code, name, message, retryable }
 //     stream      MediaStream | null                  (camera preview)
@@ -28,6 +29,7 @@ const {
     ValidationCode,
     SmartSpectraErrorCode,
     faceMetrics,
+    breathingMetrics,
     cardioMetrics,
 } = require('@smartspectra/node-sdk/renderer');
 
@@ -70,15 +72,13 @@ function createSdkSource(config) {
     function build() {
         sdk = new SmartSpectraSDK({
             apiKey: config.apiKey,
-            // Face bundle = FACE_LANDMARKS, BLINKING, TALKING, EXPRESSIONS.
-            // The optional calm check adds the cardio bundle = PULSE_RATE,
-            // ARTERIAL_PRESSURE_TRACE, HRV (docs/nodejs/metrics.md "Advanced").
-            // TODO(sdk): every official sample also requests breathingMetrics;
-            // the docs don't say whether a face-only request is accepted. If
-            // start() fails with kConfigurationFailed, add ...breathingMetrics.
-            // TODO(sdk): your API key must be authorized for face (and, for the
-            // calm check, cardio) metrics, or start() fails with kMetricNotAuthorized.
-            requestedMetrics: withCardio ? [...faceMetrics, ...cardioMetrics] : [...faceMetrics],
+            // Face + breathing for the whole visit (rate warms up during smile/talk).
+            // Optional calm check adds cardio = PULSE_RATE, ARTERIAL_PRESSURE_TRACE, HRV.
+            // TODO(sdk): your API key must be authorized for face + breathing (and, for
+            // the calm check, cardio) metrics, or start() fails with kMetricNotAuthorized.
+            requestedMetrics: withCardio
+                ? [...faceMetrics, ...breathingMetrics, ...cardioMetrics]
+                : [...faceMetrics, ...breathingMetrics],
             enableAccumulatedOutput: false,
             enableTelemetry: config.enableTelemetry !== false,
         });
@@ -127,6 +127,19 @@ function createSdkSource(config) {
                         // TODO(sdk): Point2dFloat x/y coordinate space (frame
                         // pixels vs normalized) isn't documented; renderer auto-detects.
                         space: 'auto',
+                    });
+                }
+            }
+            const breathing = m.breathing;
+            if (breathing && breathing.rate && breathing.rate.length) {
+                const r = breathing.rate[breathing.rate.length - 1];
+                if (r && typeof r.value === 'number') {
+                    em.emit('breathing', {
+                        rate: r.value,
+                        // stable <=> confidence >= 45 (data-types.md#breathing).
+                        confidence: typeof r.confidence === 'number' ? r.confidence : 0,
+                        stable: !!r.stable,
+                        t: toSeconds(r.timestamp) || fallbackT,
                     });
                 }
             }

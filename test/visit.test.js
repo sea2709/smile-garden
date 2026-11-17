@@ -222,11 +222,11 @@ test('plants stop at mature, seeds unlock with visits, weekly count has no strea
 test('breathing pace: 4 in / 6 out by default, gentler 3 in / 5 out, no holds', () => {
     assert.deepEqual([V.PACES.standard.inhale, V.PACES.standard.exhale], [4, 6]);
     assert.deepEqual([V.PACES.gentle.inhale, V.PACES.gentle.exhale], [3, 5]);
-    const p = new V.BreathPacer({ pace: 'standard', breaths: 4 });
+    // Visit path uses easeIn: false so a default 4-breath bout is exactly 40 s.
+    const p = new V.BreathPacer({ pace: 'standard', breaths: 4, easeIn: false });
     assert.equal(p.bpm, 6);
-    // easeIn: first breath at the gentler 3/5, then 4/6
-    assert.deepEqual(p.schedule.map((b) => [b.inhale, b.exhale]), [[3, 5], [4, 6], [4, 6], [4, 6]]);
-    assert.equal(p.total, 8 + 30);
+    assert.deepEqual(p.schedule.map((b) => [b.inhale, b.exhale]), [[4, 6], [4, 6], [4, 6], [4, 6]]);
+    assert.equal(p.total, 40);
     for (let i = 1; i < p.schedule.length; i++) {
         const prev = p.schedule[i - 1];
         assert.equal(p.schedule[i].start, prev.start + prev.inhale + prev.exhale, 'next inhale starts right as the exhale ends');
@@ -238,8 +238,9 @@ test('breathing pace: 4 in / 6 out by default, gentler 3 in / 5 out, no holds', 
     const g = new V.BreathPacer({ pace: 'gentle', breaths: 3 });
     assert.equal(g.total, 24);
     assert.equal(g.bpm, 7.5);
-    const noEase = new V.BreathPacer({ pace: 'standard', breaths: 3, easeIn: false });
-    assert.equal(noEase.total, 30);
+    const ease = new V.BreathPacer({ pace: 'standard', breaths: 4, easeIn: true });
+    assert.deepEqual(ease.schedule.map((b) => [b.inhale, b.exhale]), [[3, 5], [4, 6], [4, 6], [4, 6]]);
+    assert.equal(ease.total, 38);
 });
 
 test('breathing bouts are 3–6 breaths and the guide circle follows the breath', () => {
@@ -331,7 +332,7 @@ test('a full visit with every bed planted stays near 2–3 minutes of smile+talk
     const smile = V.perBedStepSeconds(V.TUNING.smileSeconds, 8, V.TUNING.minSmilePerBed);
     const talk = V.perBedStepSeconds(V.TUNING.talkSeconds, 8, V.TUNING.minTalkPerBed);
     const smileTalk = (smile + talk) * 8;
-    const breathe = new V.BreathPacer({ pace: 'standard', breaths: 4 }).total;
+    const breathe = new V.BreathPacer({ pace: 'standard', breaths: 4, easeIn: false }).total;
     assert.ok(smileTalk >= 75 && smileTalk <= 95, `smile+talk ${smileTalk} s for 8 beds`);
     assert.ok(smileTalk + breathe <= 180);
 });
