@@ -29,7 +29,9 @@ test('harvestPlot pull clears bed and grants spare seed', () => {
 
 test('harvestPlot regrow marks picked and increments pantry', () => {
     const s = V.createState(at(2026, 11, 16));
-    s.visitDays = ['2026-11-15', '2026-11-16'];
+    s.visitDays = ['garden-1', 'garden-2'];
+    s.daysCompleted = 2;
+    s.dayNumber = 3;
     V.plantSeed(s, 0, 'tomato', at(2026, 11, 16));
     s.plots[0].stage = 5;
     s.plots[0].matureWater = 1;
@@ -58,7 +60,8 @@ test('advanceRegrowPlots clears picked after regrow days', () => {
 test('seed unlocks use harvest milestones with visit fallback', () => {
     const s = V.createState(at(2026, 11, 16));
     assert.equal(V.isUnlocked(s, 'tomato'), false);
-    s.visitDays.push('2026-11-15', '2026-11-16');
+    s.visitDays.push('garden-1', 'garden-2');
+    s.daysCompleted = 2;
     assert.equal(V.isUnlocked(s, 'tomato'), true);
     const s2 = V.createState(at(2026, 11, 16));
     s2.pantry.totalHarvests = 1;
@@ -66,7 +69,8 @@ test('seed unlocks use harvest milestones with visit fallback', () => {
     const s3 = V.createState(at(2026, 11, 16));
     s3.pantry.totalHarvests = 2;
     assert.equal(V.isUnlocked(s3, 'sunflower'), false);
-    s3.visitDays = ['2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13'];
+    s3.visitDays = ['garden-1', 'garden-2', 'garden-3', 'garden-4'];
+    s3.daysCompleted = 4;
     assert.equal(V.isUnlocked(s3, 'sunflower'), true);
 });
 
@@ -118,6 +122,7 @@ test('simulateDays performs harvests on ready beds', () => {
     const clock = new V.GameClock({ now: () => at(2026, 11, 16).getTime() });
     for (let i = 0; i < 4; i++) {
         V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, clock.now());
+        V.goToBed(s, clock.now());
         clock.nextDay();
     }
     assert.equal(s.plots[0].stage, 5);

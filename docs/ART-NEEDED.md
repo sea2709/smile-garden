@@ -54,3 +54,40 @@ lantern, birdbath, bench, scarecrow, fairy-lights — natural sizes ~161–249px
 | `mid-left` | 218 | 460 | 0.62 |
 
 Defined in `renderer/art.js` → `decorSpots`. Scale chosen so ~160–250px source art reads beside the beds (~100–120px on backdrop).
+
+## Day clock, seasons, bedtime (v5 — Heily placeholders)
+
+Registered in `renderer/art.js`. Missing files use code fallbacks in `scene.js` / `app.js`.
+
+### HUD garden clock (drawn on garden canvas)
+
+| Path | Size (@2x) | Display | Anchor |
+|------|------------|---------|--------|
+| `ui/clock-frame-day.png` | **320×128** | 160×64 | backdrop centre **(640, 40)** |
+| `ui/clock-frame-night.png` | **320×128** | 160×64 | same |
+| `ui/clock-sun.png` | **64×64** | 32×32 | moves on arc (`ART.clock.arc`) |
+| `ui/clock-moon.png` | **64×64** | 32×32 | same (after ~72% of day) |
+
+### Season overlays (above backdrop, below plants/decor)
+
+| Path | Size | Notes |
+|------|------|--------|
+| `seasons/{spring\|summer\|autumn\|winter}-day.png` | **1280×720** | transparent; aligned to backdrop |
+| `seasons/{spring\|summer\|autumn\|winter}-night.png` | **1280×720** | blended with day using lighting night weight |
+
+### Season particles (above plants, below HTML UI)
+
+| Path | Size (@2x) | Display | Season |
+|------|------------|---------|--------|
+| `seasons/particle-petal.png` | **48×48** | 24×24 | spring drift |
+| `seasons/particle-leaf.png` | **48×48** | 24×24 | autumn drift |
+| `seasons/particle-snow.png` | **48×48** | 24×24 | winter drift |
+
+Summer uses overlay only (no particle sprite).
+
+### Bedtime & morning reveal
+
+| Path | Size | Use |
+|------|------|-----|
+| `ui/bedtime-window-glow.png` | **1280×720** | cottage window glow; faded in during Go to bed |
+| `ui/morning-card.png` | **~700×600** | morning summary (like unlock card); title/body in top ~42% |

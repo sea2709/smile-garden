@@ -27,6 +27,27 @@
         const ctx = canvas.getContext('2d');
         const bgImgs = {};
         for (const [k, src] of Object.entries(ART.backgrounds)) bgImgs[k] = loadImage(src);
+        const seasonOverlayImgs = {};
+        const seasonNames = ['spring', 'summer', 'autumn', 'winter'];
+        if (ART.seasons) {
+            for (const s of seasonNames) {
+                seasonOverlayImgs[s] = {
+                    day: loadImage(ART.seasons.overlaySrc(s, 'day')),
+                    night: loadImage(ART.seasons.overlaySrc(s, 'night')),
+                };
+            }
+        }
+        const particleImgs = {};
+        if (ART.seasons) {
+            for (const k of ['petal', 'leaf', 'snow']) particleImgs[k] = loadImage(ART.seasons.particleSrc(k));
+        }
+        const clockFrameImgs = ART.clock ? {
+            day: loadImage(ART.clock.frameSrc('day')),
+            night: loadImage(ART.clock.frameSrc('night')),
+        } : { day: null, night: null };
+        const clockSunImg = ART.clock ? loadImage(ART.clock.sunSrc) : null;
+        const clockMoonImg = ART.clock ? loadImage(ART.clock.moonSrc) : null;
+        const bedtimeGlowImg = ART.ui && ART.ui.bedtimeWindowGlow ? loadImage(ART.ui.bedtimeWindowGlow) : null;
         const plantImgs = {};
         const pickedImgs = {};
         for (const id of Object.keys(ART.plants)) {
@@ -92,6 +113,14 @@
         let lighting = 'midday';
         let prevLighting = null;
         let lightFade = 1;
+        /** @type {null | Record<string, number>} */
+        let lightWeights = null;
+        let season = 'spring';
+        let daylight = true;
+        let gardenClockMinutes = 360;
+        let bedtimeGlow = 0;
+        const seasonParticles = [];
+        for (let i = 0; i < 28; i++) seasonParticles.push(newSeasonParticle(true));
         let plots = new Array(8).fill(null);   // { plantId, stage, ready?, pickedSprite? }
         let decorPlacements = {}; // spotId -> decorId
         const harvestAnims = []; // { plot, plantId, t0, pull }
@@ -161,10 +190,57 @@
         }
 
         function setLighting(l) {
+            lightWeights = null;
             if (l === lighting) return;
             prevLighting = lighting;
             lighting = l;
             lightFade = 0;
+            daylight = l !== 'night';
+        }
+
+        function setLightingBlend(weights) {
+            const w = Object.assign({ dawn: 0, midday: 0, 'golden-hour': 0, night: 0 }, weights || {});
+            let primary = 'midday';
+            let best = -1;
+            for (const k of ['dawn', 'midday', 'golden-hour', 'night']) {
+                if ((w[k] || 0) > best) { best = w[k]; primary = k; }
+            }
+            if (primary !== lighting) {
+                prevLighting = lighting;
+                lighting = primary;
+                lightFade = 0;
+            }
+            lightWeights = w;
+            daylight = (w.night || 0) < 0.55;
+        }
+
+        function setSeason(s) {
+            season = s || 'spring';
+        }
+
+        function setGardenClock(minutes) {
+            gardenClockMinutes = Number(minutes) || 0;
+        }
+
+        function setBedtimeGlow(alpha) {
+            bedtimeGlow = Math.max(0, Math.min(1, Number(alpha) || 0));
+        }
+
+        function overlayNightWeight() {
+            if (lightWeights) return lightWeights.night || 0;
+            return lighting === 'night' ? 1 : 0;
+        }
+
+        function newSeasonParticle(anywhere) {
+            return {
+                x: rnd() * ART.width,
+                y: anywhere ? rnd() * ART.height * 0.72 : -20,
+                vx: (rnd() - 0.5) * 22,
+                vy: 18 + rnd() * 28,
+                rot: rnd() * TAU,
+                vr: (rnd() - 0.5) * 2.5,
+                ph: rnd() * TAU,
+            };
         }
 
         function setDecor(decorState) {
@@ -182,6 +258,7 @@
                     stage: raw.stage,
                     ready: !!raw.ready,
                     pickedSprite: !!raw.pickedSprite,
+                    tendedToday: !!raw.tendedToday,
                 } : null;
                 const o = plots[i];
                 if (animate && n && (!o || o.plantId !== n.plantId)) {
@@ -338,10 +415,217 @@
                 s.vy = s.vy * (1 - dt * 1.5) + (s.glow ? -6 : 60) * dt;
                 if (s.life > s.max) sparkles.splice(i, 1);
             }
+            updateSeasonParticles(dt, t);
         }
 
         // ------------------------------------------------------------------
+        function drawSeasonOverlay() {
+            const pair = seasonOverlayImgs[season];
+            const nightW = overlayNightWeight();
+            const dayW = 1 - nightW;
+            let drew = false;
+            if (pair) {
+                if (ready(pair.day) && dayW > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = dayW;
+                    ctx.drawImage(pair.day, 0, 0, ART.width, ART.height);
+                    ctx.restore();
+                    drew = true;
+                }
+                if (ready(pair.night) && nightW > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = nightW;
+                    ctx.drawImage(pair.night, 0, 0, ART.width, ART.height);
+                    ctx.restore();
+                    drew = true;
+                }
+            }
+            if (drew) return;
+            const t = performance.now() / 1000;
+            ctx.save();
+            const a = 0.18 * (dayW + nightW * 0.65);
+            if (season === 'spring') {
+                for (let i = 0; i < 14; i++) {
+                    const x = (i * 137.5 + t * 8) % ART.width;
+                    const y = 80 + (i * 41) % 220;
+                    ctx.fillStyle = `rgba(255, 182, 193, ${a})`;
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, 5, 3, 0.3, 0, TAU);
+                    ctx.fill();
+                }
+            } else if (season === 'summer') {
+                for (let i = 0; i < 10; i++) {
+                    const x = (i * 163 + t * 5) % ART.width;
+                    const y = 100 + (i * 37) % 180;
+                    ctx.fillStyle = `rgba(255, 236, 160, ${a * 0.6})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 2.5, 0, TAU);
+                    ctx.fill();
+                }
+            } else if (season === 'autumn') {
+                for (let i = 0; i < 12; i++) {
+                    const x = (i * 151 + t * 14) % ART.width;
+                    const y = 60 + ((i * 53 + t * 18) % 280);
+                    ctx.fillStyle = `rgba(210, 120, 50, ${a})`;
+                    ctx.fillRect(x, y, 6, 3);
+                }
+            } else if (season === 'winter') {
+                for (let i = 0; i < 30; i++) {
+                    const x = (i * 97 + t * 4) % ART.width;
+                    const y = (i * 31 + t * 8) % (ART.height * 0.55);
+                    ctx.fillStyle = `rgba(240, 248, 255, ${a * 0.85})`;
+                    ctx.fillRect(x, y, 2, 2);
+                }
+            }
+            ctx.restore();
+        }
+
+        function updateSeasonParticles(dt, t) {
+            const kind = ART.seasons && ART.seasons.particleKind(season);
+            if (!kind) return;
+            const wind = Math.sin(t * 0.35) * 10;
+            for (let i = 0; i < seasonParticles.length; i++) {
+                const p = seasonParticles[i];
+                p.x += (p.vx + wind) * dt;
+                p.y += p.vy * dt;
+                p.rot += p.vr * dt;
+                if (p.y > ART.height * 0.78 || p.x < -40 || p.x > ART.width + 40) {
+                    seasonParticles[i] = newSeasonParticle(false);
+                }
+            }
+        }
+
+        function drawSeasonParticleFallback(p, kind) {
+            if (kind === 'petal') {
+                ctx.fillStyle = 'rgba(255, 182, 193, 0.75)';
+                ctx.beginPath();
+                ctx.ellipse(p.x, p.y, 5, 3, p.rot, 0, TAU);
+                ctx.fill();
+            } else if (kind === 'leaf') {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot);
+                ctx.fillStyle = 'rgba(200, 110, 45, 0.8)';
+                ctx.fillRect(-4, -2, 8, 4);
+                ctx.restore();
+            } else {
+                ctx.fillStyle = 'rgba(245, 250, 255, 0.9)';
+                ctx.fillRect(p.x, p.y, 2.5, 2.5);
+            }
+        }
+
+        function drawSeasonParticles(t) {
+            const kind = ART.seasons && ART.seasons.particleKind(season);
+            if (!kind) return;
+            const img = particleImgs[kind];
+            const disp = ART.seasons.particleDisplay || 24;
+            const nightW = overlayNightWeight();
+            ctx.save();
+            ctx.globalAlpha = 0.55 + 0.35 * (1 - nightW);
+            for (const p of seasonParticles) {
+                if (ready(img)) {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rot);
+                    ctx.drawImage(img, -disp / 2, -disp / 2, disp, disp);
+                    ctx.restore();
+                } else drawSeasonParticleFallback(p, kind);
+            }
+            ctx.restore();
+        }
+
+        function drawGardenClockHud() {
+            if (!ART.clock) return;
+            const cfg = ART.clock;
+            const { w, h, cx, cy } = cfg.display;
+            const x = cx - w / 2;
+            const y = cy - h / 2;
+            const nightW = overlayNightWeight();
+            const drewFrame = (img, alpha) => {
+                if (!ready(img) || alpha < 0.03) return false;
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                ctx.drawImage(img, x, y, w, h);
+                ctx.restore();
+                return true;
+            };
+            const hasFrame = drewFrame(clockFrameImgs.day, 1 - nightW) || drewFrame(clockFrameImgs.night, nightW);
+            if (!hasFrame) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(120, 95, 60, 0.4)';
+                ctx.lineWidth = 2;
+                const arc = cfg.arc;
+                ctx.beginPath();
+                ctx.arc(arc.cx, arc.cy, arc.r, arc.start, arc.end);
+                ctx.stroke();
+                ctx.restore();
+            }
+            const start = D_DEFAULT_DAY_START();
+            const stop = D_DEFAULT_LATE_NIGHT();
+            const frac = Math.max(0, Math.min(1, (gardenClockMinutes - start) / (stop - start)));
+            const arc = cfg.arc;
+            const angle = arc.start + frac * (arc.end - arc.start);
+            const ix = arc.cx + Math.cos(angle) * arc.r;
+            const iy = arc.cy + Math.sin(angle) * arc.r;
+            const disp = cfg.iconDisplay || 32;
+            const useSun = frac < 0.72;
+            const icon = useSun ? clockSunImg : clockMoonImg;
+            if (ready(icon)) {
+                ctx.drawImage(icon, ix - disp / 2, iy - disp / 2, disp, disp);
+            } else {
+                ctx.fillStyle = useSun ? '#f0b84a' : '#d8dce8';
+                ctx.beginPath();
+                ctx.arc(ix, iy, disp * 0.22, 0, TAU);
+                ctx.fill();
+            }
+        }
+
+        function D_DEFAULT_DAY_START() {
+            return 360;
+        }
+        function D_DEFAULT_LATE_NIGHT() {
+            return 1380;
+        }
+
+        function drawBedtimeGlowLayer() {
+            if (bedtimeGlow <= 0.01) return;
+            if (ready(bedtimeGlowImg)) {
+                ctx.save();
+                ctx.globalAlpha = bedtimeGlow;
+                ctx.drawImage(bedtimeGlowImg, 0, 0, ART.width, ART.height);
+                ctx.restore();
+                return;
+            }
+            ctx.save();
+            const g = ctx.createRadialGradient(420, 260, 20, 420, 260, 220);
+            g.addColorStop(0, `rgba(255, 220, 140, ${0.55 * bedtimeGlow})`);
+            g.addColorStop(1, 'rgba(255, 180, 80, 0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, ART.width, ART.height);
+            ctx.globalAlpha = 0.35 * bedtimeGlow;
+            ctx.fillStyle = 'rgba(5, 12, 40, 0.5)';
+            ctx.fillRect(0, 0, ART.width, ART.height);
+            ctx.restore();
+        }
+
         function drawBackdrop() {
+            if (lightWeights) {
+                ctx.fillStyle = '#e9e0c9';
+                ctx.fillRect(0, 0, ART.width, ART.height);
+                for (const k of ['dawn', 'midday', 'golden-hour', 'night']) {
+                    const alpha = lightWeights[k] || 0;
+                    if (alpha < 0.008) continue;
+                    const img = bgImgs[k];
+                    if (!ready(img)) continue;
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    ctx.drawImage(img, 0, 0, ART.width, ART.height);
+                    ctx.restore();
+                }
+                drawSeasonOverlay();
+                ctx.globalAlpha = 1;
+                return;
+            }
             const cur = bgImgs[lighting];
             const prev = prevLighting ? bgImgs[prevLighting] : null;
             if (prev && ready(prev) && lightFade < 1) {
@@ -355,6 +639,7 @@
                 ctx.fillStyle = '#e9e0c9';
                 ctx.fillRect(0, 0, ART.width, ART.height);
             }
+            drawSeasonOverlay();
             ctx.globalAlpha = 1;
         }
 
@@ -689,6 +974,16 @@
                 }
                 drawReadyLoop(i, t);
                 if (tendPlot === i) drawSelectionRing(i, t);
+                if (pl.tendedToday && tendPlot !== i) {
+                    const p = ART.plots[i];
+                    ctx.save();
+                    ctx.globalAlpha = 0.42 + 0.08 * Math.sin(t * 2 + i);
+                    ctx.fillStyle = 'rgba(168, 210, 148, 0.95)';
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y + 6, 5.5, 0, TAU);
+                    ctx.fill();
+                    ctx.restore();
+                }
                 const an = anims[i];
                 if (an) {
                     const k = (now - an.t0) / an.dur;
@@ -890,6 +1185,7 @@
 
         function drawCritters(t) {
             if (!ART.critters || !C) return;
+            if (!daylight) return;
             const alpha = C.critterDayAlpha(lighting, prevLighting, lightFade);
             if (alpha < 0.02) return;
             const motionScale = C.motionScaleFromReduced(reducedMotion);
@@ -972,16 +1268,19 @@
             drawDecorations(t);
             drawSunShafts(t);
             drawPlants(t);
+            drawSeasonParticles(t);
             drawCritters(t);
             drawEffectSprites(t);
             drawParticles(t);
             drawHarvestAnims();
             drawBasketIcon(t);
+            drawGardenClockHud();
+            drawBedtimeGlowLayer();
             drawLogoHud();
             drawVignette();
         }
 
-        return { resize, update, draw, setLighting, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
+        return { resize, update, draw, setLighting, setLightingBlend, setSeason, setGardenClock, setBedtimeGlow, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
             get lighting() { return lighting; },
             get reducedMotion() { return reducedMotion; },
             setReducedMotion(v) { reducedMotion = !!v; },

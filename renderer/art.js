@@ -83,10 +83,44 @@
         ui: {
             pantryShelf: '../assets/ui/pantry-shelf.png',
             unlockSeedCard: '../assets/ui/unlock-seed-card.png',
+            morningCard: '../assets/ui/morning-card.png',
+            bedtimeWindowGlow: '../assets/ui/bedtime-window-glow.png',
             logoDay: '../assets/ui/logo-day.png',
             logoNight: '../assets/ui/logo-night.png',
             logoFallback: 'Smile Garden',
         },
+        /** Painted HUD clock on the garden canvas (see docs/ART-NEEDED.md). */
+        clock: Object.freeze({
+            frameSrc(kind) {
+                return '../assets/ui/clock-frame-' + (kind === 'night' ? 'night' : 'day') + '.png';
+            },
+            framePixels: Object.freeze([320, 128]),
+            display: Object.freeze({ w: 160, h: 64, cx: 640, cy: 40 }),
+            sunSrc: '../assets/ui/clock-sun.png',
+            moonSrc: '../assets/ui/clock-moon.png',
+            iconPixels: Object.freeze([64, 64]),
+            iconDisplay: 32,
+            arc: Object.freeze({ cx: 640, cy: 52, r: 46, start: Math.PI, end: 0 }),
+        }),
+        /** Full-frame season overlays + drifting particles (see docs/ART-NEEDED.md). */
+        seasons: Object.freeze({
+            overlaySrc(season, kind) {
+                return '../assets/seasons/' + season + '-' + (kind === 'night' ? 'night' : 'day') + '.png';
+            },
+            overlayPixels: Object.freeze([1280, 720]),
+            particleSrc(kind) {
+                return '../assets/seasons/particle-' + kind + '.png';
+            },
+            particlePixels: Object.freeze([48, 48]),
+            particleDisplay: 24,
+            particleKind(season) {
+                if (season === 'spring') return 'petal';
+                if (season === 'autumn') return 'leaf';
+                if (season === 'winter') return 'snow';
+                return null;
+            },
+        }),
+        morningCard: Object.freeze({ w: 700, h: 600, textTop: 0.42 }),
         logoHud: Object.freeze({ x: 20, y: 20, w: 184, h: 49 }),
         critters: Object.freeze({
             dir: '../assets/critters/',
