@@ -37,3 +37,51 @@ test('every plant in the game has 5 painted stages and UI cards exist', () => {
     }
     assert.ok(fs.existsSync(fromRenderer(ART.card)));
 });
+
+test('harvest art: ready loops, per-plant harvest strips, generic fallback, pantry UI', () => {
+    assert.ok(ART.harvest);
+    for (const kind of ['day', 'night']) {
+        assert.ok(fs.existsSync(fromRenderer(ART.readyStripSrc(kind))), `ready ${kind}`);
+        assert.ok(fs.existsSync(fromRenderer(ART.genericHarvestStripSrc(kind))), `generic harvest ${kind}`);
+    }
+    for (const id of ART.harvest.plantIds) {
+        for (const kind of ['day', 'night']) {
+            assert.ok(fs.existsSync(fromRenderer(ART.harvestStripSrc(id, kind))), `${id} ${kind}`);
+        }
+    }
+    assert.ok(fs.existsSync(fromRenderer(ART.produce.basket)));
+    for (const p of L.PLANTS) {
+        assert.ok(fs.existsSync(fromRenderer(ART.produce.src(p.id))), `produce ${p.id}`);
+    }
+    assert.equal(ART.produce.size, 128);
+    assert.ok(ART.pantry && ART.pantry.cubbies.length === 6);
+    assert.ok(fs.existsSync(fromRenderer(ART.pantry.src)));
+    assert.ok(fs.existsSync(fromRenderer(ART.ui.unlockSeedCard)));
+    for (const id of ['tomato', 'mint', 'cucumber', 'apple']) {
+        const src = ART.plantPickedSrc(id);
+        assert.ok(src && fs.existsSync(fromRenderer(src)), `picked ${id}`);
+        assert.ok(!ART.plants[id].picked, `picked uses stage-5 geometry for ${id}`);
+        assert.ok(ART.plants[id].stages[4], `stage-5 meta ${id}`);
+    }
+});
+
+test('decoration art and per-spot scale', () => {
+    for (const id of ART.decor.ids) {
+        for (const kind of ['day', 'night']) {
+            assert.ok(fs.existsSync(fromRenderer(ART.decor.src(id, kind))), `${id} ${kind}`);
+        }
+    }
+    for (const spot of ART.decorSpots) {
+        assert.ok(typeof spot.scale === 'number' && spot.scale > 0 && spot.scale < 2, spot.id);
+    }
+});
+
+test('selection ring art: 8 day/night sprites and backdrop offsets', () => {
+    assert.ok(ART.selection);
+    for (let b = 1; b <= 8; b++) {
+        const key = 'bed' + b;
+        assert.ok(Array.isArray(ART.selection.offsets[key]) && ART.selection.offsets[key].length === 2, key);
+        assert.ok(fs.existsSync(fromRenderer(ART.selection.src('day', b - 1))), `day bed ${b}`);
+        assert.ok(fs.existsSync(fromRenderer(ART.selection.src('night', b - 1))), `night bed ${b}`);
+    }
+});

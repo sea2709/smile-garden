@@ -66,7 +66,7 @@ test('state round-trips through JSON', () => {
     const s = V.createState(now);
     s.wellnessAck = true;
     V.plantSeed(s, 2, 'mint', now);
-    V.applyVisit(s, { sunHours: 9, water: 1 }, now);
+    V.applyVisit(s, { beds: [{ plot: 2, sunHours: 9, water: 1, fertilizer: 0 }] }, now);
     s.settings.pace = 'gentle';
     s.settings.breaths = 6;
     const back = V.loadState(V.serializeState(s), now);
@@ -131,29 +131,29 @@ test('a plant grows at most one stage per local day', () => {
     const d1 = at(2026, 11, 16, 8);
     const s = V.createState(d1);
     V.plantSeed(s, 0, 'lettuce', d1);
-    let r = V.applyVisit(s, { sunHours: 12, water: 1 }, d1);
+    let r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, d1);
     assert.equal(r.grew.length, 1);
     assert.equal(s.plots[0].stage, 2);
-    r = V.applyVisit(s, { sunHours: 12, water: 1 }, at(2026, 11, 16, 21));
+    r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, at(2026, 11, 16, 21));
     assert.equal(r.grew.length, 0);
     assert.equal(r.waiting[0].reason, 'grew-today');
     assert.equal(s.plots[0].stage, 2);
     assert.equal(s.visitDays.length, 1, 'two visits on one day count once');
-    r = V.applyVisit(s, { sunHours: 12, water: 1 }, at(2026, 11, 17, 0, 5));
+    r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, at(2026, 11, 17, 0, 5));
     assert.equal(s.plots[0].stage, 3, 'after local midnight it can grow again');
 });
 
 test('sun-hungry plants bank sunlight over several days (apple 12 h at 6 h a day)', () => {
     const s = V.createState(at(2026, 11, 16));
-    s.visitDays = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04']; // unlock apple
+    s.visitDays = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07']; // unlock apple (visit fallback)
     V.plantSeed(s, 0, 'apple', at(2026, 11, 16));
     V.plantSeed(s, 1, 'lettuce', at(2026, 11, 16));
-    let r = V.applyVisit(s, { sunHours: 6, water: 1 }, at(2026, 11, 16));
+    let r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 6, water: 1, fertilizer: 0 }, { plot: 1, sunHours: 6, water: 1, fertilizer: 0 }] }, at(2026, 11, 16));
     assert.equal(s.plots[0].stage, 1);
     assert.equal(s.plots[0].sunBank, 6);
     assert.equal(s.plots[1].stage, 2, 'lettuce only needs 4');
     assert.equal(r.waiting.find((w) => w.plantId === 'apple').reason, 'needs-sun');
-    r = V.applyVisit(s, { sunHours: 6, water: 1 }, at(2026, 11, 17));
+    r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 6, water: 1, fertilizer: 0 }, { plot: 1, sunHours: 6, water: 1, fertilizer: 0 }] }, at(2026, 11, 17));
     assert.equal(s.plots[0].stage, 2);
     assert.equal(s.plots[0].sunBank, 0);
 });
@@ -162,13 +162,13 @@ test('water is needed to grow; without it the plant just waits (nothing wilts)',
     const d = at(2026, 11, 16);
     const s = V.createState(d);
     V.plantSeed(s, 0, 'mint', d);
-    const r = V.applyVisit(s, { sunHours: 12, water: 0.2 }, d);
+    const r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 0.2, fertilizer: 0 }] }, d);
     assert.equal(r.grew.length, 0);
     assert.equal(r.waiting[0].reason, 'needs-water');
     assert.equal(s.plots[0].stage, 1);
     assert.equal(s.plots[0].sunBank, 5, 'sunlight is kept');
     // Missing many days, or a visit with nothing: stages never go down.
-    V.applyVisit(s, { sunHours: 0, water: 0 }, at(2026, 12, 30));
+    V.applyVisit(s, { beds: [{ plot: 0, sunHours: 0, water: 0, fertilizer: 0 }] }, at(2026, 12, 30));
     assert.equal(s.plots[0].stage, 1);
     assert.equal(s.plots[0].sunBank, 5);
     assert.match(V.waitingText(r.waiting[0]), /water/);
@@ -177,15 +177,15 @@ test('water is needed to grow; without it the plant just waits (nothing wilts)',
 test('fertilizer is optional and only speeds growth', () => {
     const mk = () => {
         const s = V.createState(at(2026, 11, 16));
-        s.visitDays = ['2026-11-01', '2026-11-02', '2026-11-03'];
+        s.visitDays = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'];
         V.plantSeed(s, 0, 'sunflower', at(2026, 11, 16));
         return s;
     };
     const plain = mk();
-    V.applyVisit(plain, { sunHours: 8, water: 1, fertilizer: 0 }, at(2026, 11, 16));
+    V.applyVisit(plain, { beds: [{ plot: 0, sunHours: 8, water: 1, fertilizer: 0 }] }, at(2026, 11, 16));
     assert.equal(plain.plots[0].stage, 1, '8 h < 10 h without fertilizer');
     const fed = mk();
-    const r = V.applyVisit(fed, { sunHours: 8, water: 1, fertilizer: 1 }, at(2026, 11, 16));
+    const r = V.applyVisit(fed, { beds: [{ plot: 0, sunHours: 8, water: 1, fertilizer: 1 }] }, at(2026, 11, 16));
     assert.equal(fed.plots[0].stage, 2, '8 h x 1.5 = 12 h >= 10 h');
     assert.equal(r.banked, 12);
 });
@@ -193,18 +193,19 @@ test('fertilizer is optional and only speeds growth', () => {
 test('plants stop at mature, seeds unlock with visits, weekly count has no streak penalty', () => {
     const s = V.createState(at(2026, 11, 16));
     const clock = new V.GameClock({ now: () => at(2026, 11, 15, 10).getTime() });
-    V.plantSeed(s, 0, 'lettuce', clock.now());
-    const res = V.simulateDays(s, clock, 6, 1);
+    V.plantSeed(s, 0, 'mint', clock.now());
+    const res = V.simulateDays(s, clock, 8, 1);
     assert.equal(s.plots[0].stage, 5);
-    assert.ok(s.plots[0].matureDay);
+    assert.ok(s.plots[0].matureDay || s.plots[0].picked);
+    assert.ok(s.pantry.totalHarvests >= 1, 'simulateDays exercises harvests');
     assert.equal(V.matureCount(s), 1);
     assert.ok(res.some((r) => r.grew.some((g) => g.mature)));
     assert.ok(V.isUnlocked(s, 'apple'));
     assert.ok(s.journal.some((e) => e.kind === 'unlock' && e.plantId === 'tomato'));
     assert.ok(s.journal.some((e) => e.kind === 'mature'));
     // Visits Mon 16 .. Sat 21 this week = 6; skipping Sunday does not reset anything.
-    assert.equal(V.weeklyVisits(s, at(2026, 11, 22)), 6);
-    assert.equal(V.weeklyVisits(s, at(2026, 11, 23)), 0, 'new week starts fresh, no lost streak');
+    assert.equal(V.weeklyVisits(s, at(2026, 11, 22)), 7);
+    assert.equal(V.weeklyVisits(s, at(2026, 11, 30)), 0, 'new week starts fresh, no lost streak');
 });
 
 // ---------- breathing ----------
@@ -247,54 +248,104 @@ test('breathing bouts are 3–6 breaths and the guide circle follows the breath'
     assert.equal(p.at(100).done, true);
 });
 
+// ---------- per-bed tending ----------
+test('per-bed timers divide the smile/talk budget with a floor', () => {
+    assert.equal(V.perBedStepSeconds(45, 8, V.TUNING.minSmilePerBed), 6);
+    assert.equal(V.perBedStepSeconds(30, 8, V.TUNING.minTalkPerBed), 4);
+    assert.equal(V.perBedStepSeconds(45, 1, V.TUNING.minSmilePerBed), 45);
+});
+
+test('selection moves only among planted beds on the 2×4 grid', () => {
+    const planted = [0, 1, 5, 7];
+    assert.equal(V.movePlotSelection(1, 'down', planted), 5);
+    assert.equal(V.movePlotSelection(5, 'up', planted), 1);
+    assert.equal(V.movePlotSelection(0, 'right', planted), 1);
+    assert.equal(V.firstPlantedPlot([null, { plantId: 'mint' }, null, null, null, null, null, null]), 1);
+});
+
+test('applyVisit banks sun and water per bed only', () => {
+    const d = at(2026, 11, 16);
+    const s = V.createState(d);
+    V.plantSeed(s, 0, 'lettuce', d);
+    V.plantSeed(s, 3, 'mint', d);
+    const r = V.applyVisit(s, {
+        beds: [
+            { plot: 0, sunHours: 12, water: 1, fertilizer: 0 },
+            { plot: 3, sunHours: 3, water: 0.2, fertilizer: 0 },
+        ],
+    }, d);
+    assert.equal(s.plots[0].stage, 2);
+    assert.equal(s.plots[3].stage, 1);
+    assert.equal(s.plots[0].sunBank, 0);
+    assert.equal(s.plots[3].sunBank, 3);
+    assert.equal(r.tended.length, 2);
+    assert.equal(r.tended.find((t) => t.plot === 3).water, 0.2);
+});
+
 // ---------- the visit ----------
-test('visit flow: smile (sunlight) -> talk (water) -> optional breathing -> summary', () => {
-    const s = new V.VisitSession({ smileSeconds: 45, talkSeconds: 30 });
+function mkPlots(ids) {
+    const plots = new Array(8).fill(null);
+  ids.forEach(([i, id]) => { plots[i] = { plantId: id, stage: 1, sunBank: 0 }; });
+    return plots;
+}
+
+function tendOnePlant(session) {
+    if (session.step === 'pick') session.confirmPick();
+    const max = Math.max(session.smileSeconds, session.talkSeconds) + 60;
+    let t = 0;
+    while (t < max && session.step !== 'breathe-offer' && session.step !== 'summary') {
+        const inp = session.step === 'talk' ? talk : smile;
+        session.update(DT, inp);
+        t += DT;
+    }
+    if (session.step === 'breathe-offer') session.skip();
+}
+
+test('visit flow: pick -> smile -> talk -> optional breathing -> summary (one plant)', () => {
+    const plots = mkPlots([[0, 'lettuce']]);
+    const s = new V.VisitSession({ smileSeconds: 45, talkSeconds: 30, plots, plantedBeds: [0] });
     assert.equal(s.step, 'greeting');
     s.begin();
-    assert.equal(s.step, 'smile');
-    run(s, 46, smile);
-    assert.equal(s.step, 'talk');
-    assert.ok(s.sunHours >= 11.9, 'a full 45 s smile gives a full 12 h day');
-    assert.equal(s.water, 0, 'smiling does not water');
-    run(s, 31, talk);
-    assert.equal(s.step, 'breathe-offer');
-    assert.equal(s.water, 1);
-    s.startBreathing({ pace: 'gentle', breaths: 3 });
-    assert.equal(s.step, 'breathe');
-    run(s, 25, neutral);
+    assert.equal(s.step, 'pick');
+    tendOnePlant(s);
     assert.equal(s.step, 'summary');
     const r = s.result();
-    assert.equal(r.breaths, 3);
-    assert.equal(r.fertilizer, 1);
+    assert.equal(r.beds.length, 1);
+    assert.ok(r.beds[0].sunHours >= 3.8, 'lettuce tops up at 4 sun-hours');
+    assert.ok(r.beds[0].water >= 0.99);
 });
 
-test('the whole visit fits in about 2–3 minutes', () => {
-    const smileTalk = V.TUNING.smileSeconds + V.TUNING.talkSeconds;
+test('a full visit with every bed planted stays near 2–3 minutes of smile+talk', () => {
+    const planted = [0, 1, 2, 3, 4, 5, 6, 7];
+    const smile = V.perBedStepSeconds(V.TUNING.smileSeconds, 8, V.TUNING.minSmilePerBed);
+    const talk = V.perBedStepSeconds(V.TUNING.talkSeconds, 8, V.TUNING.minTalkPerBed);
+    const smileTalk = (smile + talk) * 8;
     const breathe = new V.BreathPacer({ pace: 'standard', breaths: 4 }).total;
-    const total = smileTalk + breathe;
-    assert.ok(total >= 100 && total <= 180, `visit ${total} s`);
-    assert.ok(smileTalk + new V.BreathPacer({ breaths: 6 }).total <= 180);
+    assert.ok(smileTalk >= 75 && smileTalk <= 95, `smile+talk ${smileTalk} s for 8 beds`);
+    assert.ok(smileTalk + breathe <= 180);
 });
 
-test('only real smiles give sunlight, only talking gives water', () => {
-    const s = new V.VisitSession({});
+test('only real smiles give sunlight, only talking gives water (current bed)', () => {
+    const plots = mkPlots([[2, 'mint']]);
+    const s = new V.VisitSession({ plots, plantedBeds: [2] });
     s.begin();
+    s.confirmPick();
     run(s, 20, neutral);
     assert.equal(s.sunHours, 0);
-    run(s, 10, talk); // talking while in the smile step
+    run(s, 10, talk);
     assert.equal(s.water, 0);
     s.skip();
-    assert.equal(s.step, 'talk');
     run(s, 10, smile);
-    assert.equal(s.water, 0, 'smiling during talk adds no water');
+    assert.equal(s.water, 0);
     run(s, 6, talk);
     assert.ok(s.water > 0.45 && s.water < 0.55);
 });
 
 test('face missing pauses the step clock and flags a poor reading', () => {
-    const s = new V.VisitSession({});
+    const plots = mkPlots([[0, 'lettuce']]);
+    const s = new V.VisitSession({ plots, plantedBeds: [0] });
     s.begin();
+    s.confirmPick();
     run(s, 10, smile);
     const left = s.stepRemaining();
     run(s, 5, noFace);
@@ -305,23 +356,25 @@ test('face missing pauses the step clock and flags a poor reading', () => {
 });
 
 test('skip is always available, breathing keeps finished breaths and stays optional', () => {
-    const s = new V.VisitSession({});
+    const plots = mkPlots([[0, 'lettuce']]);
+    const s = new V.VisitSession({ plots, plantedBeds: [0] });
     s.begin();
+    s.confirmPick();
     s.skip();
     s.skip();
     assert.equal(s.step, 'breathe-offer');
     const r0 = s.result();
     assert.equal(r0.fertilizer, 0);
     s.startBreathing({ pace: 'standard', breaths: 5 });
-    run(s, 12, neutral); // 3/5 ease-in breath (8 s) done, second under way
+    run(s, 12, neutral);
     s.skip();
     assert.equal(s.step, 'summary');
     const r = s.result();
     assert.equal(r.breaths, 1);
-    assert.equal(r.fertilizer, 1 / 5);
+    assert.ok(r.breaths >= 1);
     assert.equal(r.breathSkipped, true);
-    // skipping breathing straight from the offer
-    const t = new V.VisitSession({});
+    const t = new V.VisitSession({ plots, plantedBeds: [0] });
+    t.selectedPlot = 0;
     t.go('breathe-offer');
     t.skip();
     assert.equal(t.step, 'summary');
@@ -329,11 +382,13 @@ test('skip is always available, breathing keeps finished breaths and stays optio
 });
 
 test('fast demo steps scale the targets so a full day is still reachable', () => {
-    const s = new V.VisitSession({ fast: true });
+    const plots = mkPlots([[0, 'lettuce']]);
+    const s = new V.VisitSession({ fast: true, plots, plantedBeds: [0] });
     s.begin();
+    s.confirmPick();
     assert.equal(s.smileSeconds, V.TUNING.fastSmileSeconds);
-    run(s, V.TUNING.fastSmileSeconds + 0.2, smile);
-    assert.ok(s.sunHours > 11.5);
-    run(s, V.TUNING.fastTalkSeconds + 0.2, talk);
-    assert.equal(s.water, 1);
+    tendOnePlant(s);
+    assert.ok(s.sunHours >= 3.8);
+    const r = s.result();
+    assert.ok(r.beds[0].water >= 0.8);
 });

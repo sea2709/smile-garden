@@ -28,14 +28,47 @@
         const bgImgs = {};
         for (const [k, src] of Object.entries(ART.backgrounds)) bgImgs[k] = loadImage(src);
         const plantImgs = {};
+        const pickedImgs = {};
         for (const id of Object.keys(ART.plants)) {
             plantImgs[id] = [null];
             for (let s = 1; s <= 5; s++) plantImgs[id].push(loadImage(ART.plantSrc(id, s)));
+            const ps = ART.plantPickedSrc(id);
+            if (ps) pickedImgs[id] = loadImage(ps);
+        }
+
+        const decorImgs = {};
+        if (ART.decor) for (const id of ART.decor.ids) {
+            decorImgs[id] = { day: loadImage(ART.decor.src(id, 'day')), night: loadImage(ART.decor.src(id, 'night')) };
+        }
+        const readyStrips = { day: null, night: null };
+        const harvestStrips = {};
+        const genericHarvest = { day: null, night: null };
+        const produceImgs = {};
+        const basketImg = (ART.produce && ART.produce.basket) ? loadImage(ART.produce.basket) : null;
+        if (ART.harvest) {
+            readyStrips.day = loadImage(ART.readyStripSrc('day'));
+            readyStrips.night = loadImage(ART.readyStripSrc('night'));
+            genericHarvest.day = loadImage(ART.genericHarvestStripSrc('day'));
+            genericHarvest.night = loadImage(ART.genericHarvestStripSrc('night'));
+            for (const id of ART.harvest.plantIds) {
+                harvestStrips[id] = {
+                    day: loadImage(ART.harvestStripSrc(id, 'day')),
+                    night: loadImage(ART.harvestStripSrc(id, 'night')),
+                };
+                if (ART.produce) produceImgs[id] = loadImage(ART.produce.src(id));
+            }
         }
 
         const fxImgs = {};
         if (ART.effects) for (const n of ART.effects.names) fxImgs[n] = loadImage(ART.effectSrc(n));
-        // one-shot absorb plays per plot: { kind, t0 }
+        const ringImgs = { day: [], night: [] };
+        if (ART.selection) {
+            for (let b = 1; b <= 8; b++) {
+                ringImgs.day[b] = loadImage(ART.selection.src('day', b - 1));
+                ringImgs.night[b] = loadImage(ART.selection.src('night', b - 1));
+            }
+        }
+        // one-shot absorb plays per plot: { kind, t0, i }
         const absorbs = [];
         const SPRITE_KINDS = { sun: 'sun', water: 'water', fert: 'fertilizer' };
         const fxWasOn = { sun: false, water: false, fert: false };
@@ -46,11 +79,17 @@
         let lighting = 'midday';
         let prevLighting = null;
         let lightFade = 1;
-        let plots = new Array(8).fill(null);   // { plantId, stage }
+        let plots = new Array(8).fill(null);   // { plantId, stage, ready?, pickedSprite? }
+        let decorPlacements = {}; // spotId -> decorId
+        const harvestAnims = []; // { plot, plantId, t0, pull }
+        let basketFlash = 0;
         const anims = new Array(8).fill(null); // stage / plant transitions
         const swayPhase = ART.plots.map((_, i) => i * 1.7 + 0.4);
         let highlight = null;   // plot index (picker target)
         let hover = null;
+        let tendPlot = null;    // selected bed during a visit
+        let tendRingPulse = false;
+        let effectPlot = null;  // bed receiving sun/water/fert FX
         const fx = { sun: 0, sunTarget: 0, water: 0, waterTarget: 0, fert: 0, fertTarget: 0, breath: 0 };
 
         const motes = [];
@@ -115,12 +154,22 @@
             lightFade = 0;
         }
 
-        /** plotsState: array of null | { plantId, stage } (from SmileVisit state). */
+        function setDecor(decorState) {
+            decorPlacements = (decorState && decorState.placements) ? Object.assign({}, decorState.placements) : {};
+        }
+
+        /** plotsState: array of null | { plantId, stage, ready?, pickedSprite? }. */
         function setPlots(plotsState, opts) {
             const animate = !(opts && opts.instant);
             const now = performance.now() / 1000;
             for (let i = 0; i < 8; i++) {
-                const n = plotsState[i] ? { plantId: plotsState[i].plantId, stage: plotsState[i].stage } : null;
+                const raw = plotsState[i];
+                const n = raw ? {
+                    plantId: raw.plantId,
+                    stage: raw.stage,
+                    ready: !!raw.ready,
+                    pickedSprite: !!raw.pickedSprite,
+                } : null;
                 const o = plots[i];
                 if (animate && n && (!o || o.plantId !== n.plantId)) {
                     anims[i] = { kind: 'plant', t0: now, dur: 1.4, from: null, to: n.stage };
@@ -157,15 +206,18 @@
             }
         }
 
-        function playAbsorb(kind) {
+        function playAbsorb(kind, plot) {
             const t0 = performance.now() / 1000;
-            for (let i = 0; i < 8; i++) if (plots[i]) absorbs.push({ kind, i, t0 });
+            const i = plot === null || plot === undefined ? effectPlot : plot;
+            if (i === null || i === undefined) return;
+            if (plots[i]) absorbs.push({ kind, i, t0 });
         }
         function setEffects(e) {
+            if ('plot' in e) effectPlot = e.plot === null || e.plot === undefined ? null : e.plot;
             for (const k of ['sun', 'water', 'fert']) {
                 if (!(k in e)) continue;
                 const on = clamp(e[k]) > 0.05;
-                if (fxWasOn[k] && !on) playAbsorb(k);
+                if (fxWasOn[k] && !on) playAbsorb(k, effectPlot);
                 fxWasOn[k] = on;
             }
             if ('sun' in e) fx.sunTarget = clamp(e.sun);
@@ -177,6 +229,11 @@
 
         function setHighlight(i) { highlight = i === null || i === undefined ? null : i; }
         function setHover(i) { hover = i; }
+        function setTendSelection(plot, opts) {
+            const o = opts || {};
+            tendPlot = plot === null || plot === undefined ? null : plot;
+            tendRingPulse = !!o.pulse;
+        }
 
         function toArt(clientX, clientY) {
             const r = canvas.getBoundingClientRect();
@@ -224,8 +281,8 @@
                 }
             }
             // water drops while talking
-            if (fx.water > 0.05 && rnd() < fx.water * dt * 30) {
-                const i = Math.floor(rnd() * 8);
+            if (fx.water > 0.05 && effectPlot !== null && rnd() < fx.water * dt * 30) {
+                const i = effectPlot;
                 const p = ART.plots[i];
                 drops.push({ x: p.x + (rnd() - 0.5) * p.w * 0.7, y: p.y - 260 - rnd() * 120, vy: 60 + rnd() * 40, ty: p.y - 4 + (rnd() - 0.5) * 10, r: 2.2 + rnd() * 1.8, sway: rnd() * TAU });
             }
@@ -244,8 +301,8 @@
                 if (ripples[i].life > ripples[i].max) ripples.splice(i, 1);
             }
             // fertilizer flecks while breathing (spawn mostly on the out-breath)
-            if (fx.fert > 0.05 && rnd() < fx.fert * dt * 16 * (0.4 + (1 - fx.breath))) {
-                const i = Math.floor(rnd() * 8);
+            if (fx.fert > 0.05 && effectPlot !== null && rnd() < fx.fert * dt * 16 * (0.4 + (1 - fx.breath))) {
+                const i = effectPlot;
                 const p = ART.plots[i];
                 flecks.push({ x: p.x + (rnd() - 0.5) * p.w * 0.9, y: p.y - 120 - rnd() * 60, ty: p.y - 2, vy: 16 + rnd() * 10, ph: rnd() * TAU, r: 1.8 + rnd() * 1.8, rot: rnd() * TAU, hue: rnd() });
             }
@@ -321,9 +378,78 @@
             c.closePath();
         }
 
+        function resolveSprite(id, stage) {
+            if (stage === 'picked') {
+                const pi = pickedImgs[id];
+                const stages = ART.plants[id] && ART.plants[id].stages;
+                const meta = stages && stages[4];
+                if (ready(pi) && meta) return { img: pi, meta };
+                return { img: plantImgs[id] && plantImgs[id][4], meta };
+            }
+            return { img: plantImgs[id] && plantImgs[id][stage], meta: ART.plants[id] && ART.plants[id].stages[stage - 1] };
+        }
+
+        function harvestStripFrameCount(img) {
+            const H = ART.harvest;
+            if (!H) return 12;
+            return (ready(img) && img.naturalWidth > 0)
+                ? Math.floor(img.naturalWidth / H.frameW)
+                : H.defaultHarvestCount;
+        }
+
+        function resolveHarvestStrip(plantId, kind) {
+            const pack = harvestStrips[plantId];
+            const perPlant = pack && pack[kind];
+            if (ready(perPlant)) return { img: perPlant, generic: false };
+            const gen = genericHarvest[kind];
+            if (ready(gen)) return { img: gen, generic: true };
+            return { img: null, generic: false };
+        }
+
+        function harvestLocalToWorld(plot, lx, ly) {
+            const H = ART.harvest;
+            const p = ART.plots[plot];
+            const s = p.w / 180;
+            return {
+                x: p.x + (lx - H.frameW / 2) * s,
+                y: p.y - 4 + (ly - H.soilY) * s,
+            };
+        }
+
+        function harvestAnimFrame(anim, now) {
+            const H = ART.harvest;
+            if (!H || !anim) return -1;
+            return Math.floor((now - anim.t0) * H.fps);
+        }
+
+        function activeHarvestAnim(plot) {
+            const now = performance.now() / 1000;
+            const kind = lighting === 'night' ? 'night' : 'day';
+            for (const a of harvestAnims) {
+                if (a.plot !== plot) continue;
+                const f = harvestAnimFrame(a, now);
+                const { img } = resolveHarvestStrip(a.plantId, kind);
+                const maxF = harvestStripFrameCount(img);
+                if (f >= 0 && f < maxF) return a;
+            }
+            return null;
+        }
+
+        function drawHarvestFrame(i, frame, img, alpha) {
+            const H = ART.harvest;
+            if (!ready(img) || !H || alpha <= 0.01) return;
+            const p = ART.plots[i];
+            const s = p.w / 180;
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, alpha);
+            ctx.translate(p.x, p.y - 4);
+            ctx.scale(s, s);
+            ctx.drawImage(img, frame * H.frameW, 0, H.frameW, H.frameH, -H.frameW / 2, -H.soilY, H.frameW, H.frameH);
+            ctx.restore();
+        }
+
         function drawSprite(id, stage, i, t, alpha, scaleMul) {
-            const img = plantImgs[id] && plantImgs[id][stage];
-            const meta = ART.plants[id] && ART.plants[id].stages[stage - 1];
+            const { img, meta } = resolveSprite(id, stage);
             if (!ready(img) || !meta) return;
             const p = ART.plots[i];
             const s = p.scale * (scaleMul || 1);
@@ -356,15 +482,187 @@
             'golden-hour': 'sepia(0.20) saturate(1.08) brightness(0.98)',
             night: 'brightness(0.58) saturate(0.62) hue-rotate(8deg) contrast(0.95)',
         };
+        function drawReadyLoop(i, t) {
+            const pl = plots[i];
+            if (!pl || !pl.ready || activeHarvestAnim(i)) return;
+            const H = ART.harvest;
+            const kind = lighting === 'night' ? 'night' : 'day';
+            const img = readyStrips[kind];
+            if (ready(img) && H) {
+                const frame = Math.floor(t * H.fps + i * 2) % H.readyCount;
+                drawHarvestFrame(i, frame, img, 1);
+                return;
+            }
+            const p = ART.plots[i];
+            const tw = 0.55 + 0.45 * Math.sin(t * 3.2 + i * 0.7);
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            const g = ctx.createRadialGradient(p.x, p.y - 40, 2, p.x, p.y - 50, p.w * 0.9);
+            g.addColorStop(0, `rgba(255, 248, 180, ${0.35 * tw})`);
+            g.addColorStop(0.5, `rgba(255, 220, 120, ${0.18 * tw})`);
+            g.addColorStop(1, 'rgba(255, 220, 120, 0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.ellipse(p.x, p.y - 36, p.w * 0.85, p.h * 1.1, 0, 0, TAU);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function drawDecorations(t) {
+            if (!ART.decorSpots) return;
+            const night = lighting === 'night';
+            for (const spot of ART.decorSpots) {
+                const id = decorPlacements[spot.id];
+                if (!id) continue;
+                const pack = decorImgs[id];
+                const img = pack && (night ? pack.night : pack.day);
+                const w = 88;
+                let h = ART.decor.placeholderH;
+                const drawPlaceholder = !ready(img);
+                ctx.save();
+                ctx.translate(spot.x, spot.y);
+                if (drawPlaceholder) {
+                    ctx.fillStyle = night ? 'rgba(180, 170, 140, 0.75)' : 'rgba(120, 100, 70, 0.65)';
+                    ctx.beginPath();
+                    ctx.ellipse(0, -h * 0.4, w * 0.35, h * 0.12, 0, 0, TAU);
+                    ctx.fill();
+                    ctx.fillStyle = night ? 'rgba(220, 210, 180, 0.9)' : 'rgba(90, 70, 50, 0.85)';
+                    roundRect(ctx, -w / 2, -h, w, h * 0.85, 8);
+                    ctx.fill();
+                    ctx.font = '600 13px Nunito, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillStyle = night ? '#fff8e8' : '#f7eed8';
+                    ctx.fillText(id.replace(/-/g, ' '), 0, -h * 0.45);
+                } else {
+                    const sc = spot.scale || 0.55;
+                    const iw = img.naturalWidth * sc;
+                    const ih = img.naturalHeight * sc;
+                    ctx.drawImage(img, -iw / 2, -ih, iw, ih);
+                    h = ih;
+                }
+                const def = (window.SmileVisit && window.SmileVisit.DECOR_UNLOCKS || []).find((d) => d.id === id);
+                if (night && def && def.nightGlow) {
+                    ctx.globalCompositeOperation = 'lighter';
+                    const pulse = 0.6 + 0.4 * Math.sin(t * 2.1 + spot.x * 0.01);
+                    glowDot(0, -h * 0.72, 18, [255, 220, 140], 0.22 * pulse);
+                    glowDot(0, -h * 0.72, 8, [255, 250, 220], 0.35 * pulse);
+                }
+                ctx.restore();
+            }
+        }
+
+        function produceColor(id) {
+            return (ART.produce && ART.produce.placeholder && ART.produce.placeholder[id]) || '#c4a574';
+        }
+
+        function playHarvestAnim(plot, plantId, opts) {
+            const o = opts || {};
+            const pull = o.pull === true;
+            harvestAnims.push({ plot, plantId, t0: performance.now() / 1000, pull });
+            basketFlash = 1;
+        }
+
+        function drawHarvestProduceFly(a, f) {
+            const H = ART.harvest;
+            const pi = produceImgs[a.plantId];
+            if (!ready(pi) || !H) return;
+            const startF = 4;
+            const endF = Math.min(harvestStripFrameCount(genericHarvest[lighting === 'night' ? 'night' : 'day']) - 1, 10);
+            if (f < startF || f > endF) return;
+            const t = (f - startF) / Math.max(1, endF - startF);
+            const [bx, by] = H.basketInFrame;
+            const lx = 100 + (bx - 100) * t;
+            const ly = 140 + (by - 140) * t;
+            const w = harvestLocalToWorld(a.plot, lx, ly);
+            const bed = ART.plots[a.plot];
+            const sz = (ART.produce.size || 128) * (bed.w / 180) * 0.38;
+            ctx.save();
+            ctx.drawImage(pi, w.x - sz / 2, w.y - sz / 2, sz, sz);
+            ctx.restore();
+        }
+
+        function drawHarvestAnims() {
+            const H = ART.harvest;
+            if (!H) return;
+            const now = performance.now() / 1000;
+            const kind = lighting === 'night' ? 'night' : 'day';
+            for (let n = harvestAnims.length - 1; n >= 0; n--) {
+                const a = harvestAnims[n];
+                const f = harvestAnimFrame(a, now);
+                const { img, generic } = resolveHarvestStrip(a.plantId, kind);
+                const maxF = harvestStripFrameCount(img);
+                if (f >= maxF) { harvestAnims.splice(n, 1); continue; }
+                if (f < 0) continue;
+                if (ready(img)) {
+                    drawHarvestFrame(a.plot, f, img, 1);
+                    if (generic) drawHarvestProduceFly(a, f);
+                }
+            }
+            if (basketFlash > 0) basketFlash = Math.max(0, basketFlash - 0.04);
+        }
+
+        function drawBasketIcon(t) {
+            const b = ART.basketHud;
+            const pulse = basketFlash > 0 ? basketFlash : 0.1;
+            if (ready(basketImg)) {
+                const w = b.w || 36;
+                ctx.save();
+                ctx.globalAlpha = 0.85 + 0.15 * pulse;
+                ctx.drawImage(basketImg, b.x - w / 2, b.y - w / 2, w, w);
+                ctx.restore();
+                return;
+            }
+            ctx.save();
+            ctx.translate(b.x, b.y);
+            ctx.fillStyle = 'rgba(90, 60, 30, 0.85)';
+            ctx.beginPath();
+            ctx.arc(0, 0, 14, 0, TAU);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        function plantSpriteStage(pl, plotIndex) {
+            const H = ART.harvest;
+            const anim = activeHarvestAnim(plotIndex);
+            if (anim && H) {
+                const f = harvestAnimFrame(anim, performance.now() / 1000);
+                if (f >= H.swapFrame) {
+                    if (anim.pull) return null;
+                    return 'picked';
+                }
+            }
+            if (pl.pickedSprite) return 'picked';
+            return pl.stage;
+        }
+
+        function drawSelectionRing(i, t) {
+            if (!ART.selection || tendPlot !== i) return;
+            const bed = i + 1;
+            const kind = lighting === 'night' ? 'night' : 'day';
+            const img = ringImgs[kind][bed];
+            const off = ART.selection.offsets['bed' + bed];
+            if (!ready(img) || !off) return;
+            const pulse = tendRingPulse ? 0.75 + 0.25 * (0.5 + 0.5 * Math.sin(t * Math.PI)) : 1;
+            ctx.save();
+            ctx.globalAlpha = pulse;
+            ctx.drawImage(img, off[0], off[1]);
+            ctx.restore();
+        }
+
         function drawPlants(t) {
             const now = performance.now() / 1000;
             ctx.filter = SPRITE_FILTER[lighting] || 'none';
             const order = [0, 1, 2, 3, 4, 5, 6, 7];
             for (const i of order) {
                 const pl = plots[i];
-                if (i === highlight && !pl) drawPlotGlow(i, t, true);
+                if (i === highlight && !pl && tendPlot === null) drawPlotGlow(i, t, true);
                 else if (i === hover && !pl && highlight !== null) drawPlotGlow(i, t, false);
-                if (!pl) continue;
+                if (!pl) {
+                    if (tendPlot === i) drawSelectionRing(i, t);
+                    continue;
+                }
+                drawReadyLoop(i, t);
+                if (tendPlot === i) drawSelectionRing(i, t);
                 const an = anims[i];
                 if (an) {
                     const k = (now - an.t0) / an.dur;
@@ -390,7 +688,8 @@
                     }
                     continue;
                 }
-                drawSprite(pl.plantId, pl.stage, i, t, 1, 1);
+                const st = plantSpriteStage(pl, i);
+                if (st != null) drawSprite(pl.plantId, st, i, t, 1, 1);
             }
             ctx.filter = 'none';
         }
@@ -531,10 +830,10 @@
             if (!E) return;
             const loopFrame = Math.floor(t * E.fps) % E.count;
             const levels = { sun: fx.sun, water: fx.water, fert: fx.fert };
-            for (let i = 0; i < 8; i++) {
-                if (!plots[i]) continue;
+            const fxI = effectPlot;
+            if (fxI !== null && plots[fxI]) {
                 for (const k of ['water', 'fert', 'sun']) {
-                    if (levels[k] > 0.03) drawFxFrame(k, 'loop', i, (loopFrame + i * 3) % E.count, levels[k] * FX_GAIN[k]);
+                    if (levels[k] > 0.03) drawFxFrame(k, 'loop', fxI, (loopFrame + fxI * 3) % E.count, levels[k] * FX_GAIN[k]);
                 }
             }
             const now = performance.now() / 1000;
@@ -560,14 +859,17 @@
             ctx.clearRect(0, 0, view.cssW, view.cssH);
             ctx.setTransform(view.dpr * view.s, 0, 0, view.dpr * view.s, view.dpr * view.ox, view.dpr * view.oy);
             drawBackdrop();
+            drawDecorations(t);
             drawSunShafts(t);
             drawPlants(t);
             drawEffectSprites(t);
             drawParticles(t);
+            drawHarvestAnims();
+            drawBasketIcon(t);
             drawVignette();
         }
 
-        return { resize, update, draw, setLighting, setPlots, playGrowth, playAbsorb, setEffects, setHighlight, setHover, plotAt, plotClient,
+        return { resize, update, draw, setLighting, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
             get lighting() { return lighting; }, images: { bgImgs, plantImgs } };
     }
 
