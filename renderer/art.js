@@ -224,17 +224,34 @@
         }),
         cameraCheck: Object.freeze({
             scale2x: true,
-            frame: '../assets/ui/camera-check/frame.png',
-            checkPass: '../assets/ui/camera-check/check-pass.png',
-            icons: Object.freeze({
-                smile: '../assets/ui/camera-check/icon-smile.png',
-                talk: '../assets/ui/camera-check/icon-talk.png',
-                breath: '../assets/ui/camera-check/icon-breath.png',
-                stretch: '../assets/ui/camera-check/icon-stretch.png',
+            backdrop: '../assets/ui/camera-check/backdrop.png',
+            windowFrame: '../assets/ui/camera-check/window-frame.png',
+            sill: '../assets/ui/camera-check/sill.png',
+            /** Game check key → packet filename stem (breath → breathe). */
+            packetStem: Object.freeze({ smile: 'smile', talk: 'talk', breath: 'breathe', stretch: 'stretch' }),
+            /** Display layout on the 1280×720 stage (art assets @2×). */
+            layout: Object.freeze({
+                stageW: 1280,
+                stageH: 720,
+                preview: Object.freeze({ w: 560, h: 420, cx: 640, top: 56 }),
+                windowFrame: Object.freeze({ w: 640, h: 500, cx: 640, cy: 266 }),
+                sill: Object.freeze({ top: 520, bottom: 600 }),
+                packet: Object.freeze({ w: 110, h: 150, bottom: 600 }),
+                packetCenters: Object.freeze({ smile: 400, talk: 560, breath: 720, stretch: 880 }),
+                label: Object.freeze({ top: 610, bottom: 650 }),
+                footerY: 680,
+                skipLeft: 96,
+                startRight: 96,
             }),
-            iconPixels: Object.freeze([64, 64]),
-            checkPixels: Object.freeze([44, 44]),
-            framePixels: Object.freeze([640, 480]),
+            backdropPixels: Object.freeze([1280, 720]),
+            windowFramePixels: Object.freeze([640, 500]),
+            sillPixels: Object.freeze([1280, 80]),
+            packetPixels: Object.freeze([110, 150]),
+            packetSrc(checkKey, sprouted) {
+                const stem = this.packetStem[checkKey] || checkKey;
+                const state = sprouted ? 'sprouted' : 'closed';
+                return `../assets/ui/camera-check/packet-${stem}-${state}.png`;
+            },
         }),
         stretch: Object.freeze({
             scale2x: true,

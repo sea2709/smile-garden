@@ -159,13 +159,19 @@ test('breath UI art: manifest pills, icons, dots and breath-ui.css', () => {
     assert.ok(fs.existsSync(path.join(root, 'docs', 'breath-mockup.png')));
 });
 
-test('camera check art: manifest paths, css, and art spec doc', () => {
+test('camera check art: potting-shed manifest, layout, and art spec doc', () => {
     assert.ok(ART.cameraCheck);
-    assert.ok(ART.cameraCheck.frame.includes('camera-check'));
-    for (const key of ['smile', 'talk', 'breath', 'stretch']) {
-        assert.ok(ART.cameraCheck.icons[key].includes(key), key);
-    }
-    assert.ok(ART.cameraCheck.checkPass.includes('check'));
+    assert.ok(ART.cameraCheck.backdrop.includes('backdrop'));
+    assert.ok(ART.cameraCheck.windowFrame.includes('window-frame'));
+    assert.ok(ART.cameraCheck.sill.includes('sill'));
+    assert.equal(ART.cameraCheck.packetStem.breath, 'breathe');
+    const layout = ART.cameraCheck.layout;
+    assert.equal(layout.preview.w, 560);
+    assert.equal(layout.preview.h, 420);
+    assert.equal(layout.packetCenters.smile, 400);
+    assert.equal(layout.packetCenters.stretch, 880);
+    assert.ok(ART.cameraCheck.packetSrc('smile', true).includes('packet-smile-sprouted'));
+    assert.ok(ART.cameraCheck.packetSrc('breath', false).includes('packet-breathe-closed'));
     assert.ok(fs.existsSync(path.join(root, 'renderer', 'camera-check-ui.css')));
     assert.ok(fs.existsSync(path.join(root, 'docs', 'ART-CAMERA-CHECK.md')));
     assert.ok(fs.existsSync(path.join(root, 'game', 'camera-check.js')));

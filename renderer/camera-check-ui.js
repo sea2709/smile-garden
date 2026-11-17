@@ -1,86 +1,112 @@
-// renderer/camera-check-ui.js — Camera check overlay rendering (no game logic).
+// renderer/camera-check-ui.js — Potting-shed camera check (1280×720 stage layout).
 (function () {
     'use strict';
 
+    const CHECKS = Object.freeze(['smile', 'talk', 'breath', 'stretch']);
+
     const LABELS = Object.freeze({
-        smile: { title: 'Smile', sub: 'Happy expression above game threshold ~2 s' },
-        talk: { title: 'Talk', sub: 'Face.talking detected ~2 s' },
-        breath: { title: 'Breathing', sub: 'Stable breath rate (often 20–30 s)' },
+        smile: { title: 'Smile', sub: 'Hold a happy smile ~2 s' },
+        talk: { title: 'Talk', sub: 'Talk to the garden ~2 s' },
+        breath: { title: 'Breathe', sub: 'Stable breath (~20–30 s)' },
         stretch: { title: 'Neck stretch', sub: 'Tilt each side ~2 s' },
     });
 
     const FALLBACK_ICON = Object.freeze({ smile: '☀', talk: '💬', breath: '🍃', stretch: '🌻' });
 
-    function imgOrFallback(src, alt, cls, fallback) {
-        const img = document.createElement('img');
-        img.className = cls;
-        img.alt = alt;
-        img.src = src;
-        img.onerror = () => {
-            const span = document.createElement('span');
-            span.className = cls + '-fallback';
-            span.textContent = fallback;
-            img.replaceWith(span);
-        };
-        return img;
-    }
-
-    function mountTestGrid(container, ART, artUrl, handlers) {
+    function mountPackets(container, ART, artUrl, handlers) {
         container.textContent = '';
-        const checks = ['smile', 'talk', 'breath', 'stretch'];
-        const cc = ART.cameraCheck || {};
-        for (const key of checks) {
+        const centers = (ART.cameraCheck && ART.cameraCheck.layout && ART.cameraCheck.layout.packetCenters) || {};
+        for (const key of CHECKS) {
+            const cx = centers[key] || 400;
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'cc-test';
+            btn.className = 'cc-packet';
             btn.dataset.check = key;
-            const iconSrc = cc.icons && cc.icons[key] ? artUrl(cc.icons[key]) : '';
-            if (iconSrc) btn.appendChild(imgOrFallback(iconSrc, '', 'cc-test-icon', FALLBACK_ICON[key]));
-            else {
-                const span = document.createElement('span');
-                span.className = 'cc-test-icon-fallback';
-                span.textContent = FALLBACK_ICON[key];
-                btn.appendChild(span);
-            }
-            const body = document.createElement('div');
-            body.className = 'cc-test-body';
-            const t = document.createElement('div');
-            t.className = 'cc-test-title';
-            t.textContent = LABELS[key].title;
-            const sub = document.createElement('div');
-            sub.className = 'cc-test-sub';
-            sub.textContent = LABELS[key].sub;
-            body.append(t, sub);
-            btn.appendChild(body);
-            const checkSrc = cc.checkPass ? artUrl(cc.checkPass) : '';
-            if (checkSrc) {
-                btn.appendChild(imgOrFallback(checkSrc, 'Passed', 'cc-check', '✓'));
-            } else {
-                const ch = document.createElement('span');
-                ch.className = 'cc-check';
-                ch.textContent = '✓';
-                btn.appendChild(ch);
-            }
+            btn.style.left = `${cx}px`;
+            btn.title = LABELS[key].title;
+            const img = document.createElement('img');
+            img.dataset.role = 'packet';
+            img.alt = '';
+            img.src = artUrl(ART.cameraCheck.packetSrc(key, false));
+            img.onerror = () => {
+                const fb = document.createElement('span');
+                fb.className = 'cc-packet-fallback';
+                fb.textContent = FALLBACK_ICON[key];
+                img.replaceWith(fb);
+            };
+            btn.appendChild(img);
             btn.addEventListener('click', () => handlers.onSelect(key));
-            const skip = document.createElement('button');
-            skip.type = 'button';
-            skip.className = 'btn btn-ghost btn-small';
-            skip.textContent = 'Skip';
-            skip.addEventListener('click', (e) => { e.stopPropagation(); handlers.onSkip(key); });
+            btn.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                handlers.onSkip(key);
+            });
+            const lab = document.createElement('div');
+            lab.className = 'cc-packet-label';
+            lab.dataset.check = key;
+            lab.style.left = `${cx}px`;
+            lab.textContent = LABELS[key].title;
             container.appendChild(btn);
-            btn.addEventListener('contextmenu', (e) => { e.preventDefault(); handlers.onSkip(key); });
-            // skip visible on focus row via detail panel instead
-            void skip;
+            container.appendChild(lab);
         }
     }
 
-    function renderTests(container, snap, active) {
-        container.querySelectorAll('.cc-test').forEach((btn) => {
+    function labelText(key, snap, active, extras) {
+        if (snap.passed[key]) return '✓ Sprouted';
+        if (snap.skipped[key]) return 'Skipped';
+        if (active !== key) return LABELS[key].title;
+        if (key === 'smile') {
+            const pct = Math.round((snap.smileMeter || 0) * 100);
+            return pct > 0 ? `Smile ${pct}%` : LABELS.smile.sub;
+        }
+        if (key === 'talk') {
+            const pct = Math.round((snap.talkMeter || 0) * 100);
+            return pct > 0 ? `Talking ${pct}%` : LABELS.talk.sub;
+        }
+        if (key === 'breath') {
+            return (extras && extras.breathLabel) || 'Listening…';
+        }
+        if (key === 'stretch' && snap.stretchSnap) {
+            if (snap.stretchSnap.complete) return '✓ Both sides';
+            const side = snap.stretchSnap.activeSide;
+            if (side === 'left') return 'Hold left tilt…';
+            if (side === 'right') return 'Hold right tilt…';
+            return LABELS.stretch.sub;
+        }
+        return LABELS[key].sub;
+    }
+
+    function renderPackets(container, snap, active, ART, artUrl, extras) {
+        if (!container) return;
+        const cc = ART.cameraCheck || {};
+        container.querySelectorAll('.cc-packet').forEach((btn) => {
             const k = btn.dataset.check;
-            const passed = snap.passed[k] || snap.skipped[k];
-            btn.classList.toggle('done', passed);
-            btn.classList.toggle('passed', !!snap.passed[k]);
+            const passed = !!(snap.passed && snap.passed[k]);
+            const done = passed || !!(snap.skipped && snap.skipped[k]);
             btn.classList.toggle('on', k === active);
+            btn.classList.toggle('done', done);
+            btn.classList.toggle('passed', passed);
+            const img = btn.querySelector('img[data-role="packet"]');
+            if (img && cc.packetSrc) {
+                img.src = artUrl(cc.packetSrc(k, passed));
+            }
+        });
+        container.querySelectorAll('.cc-packet-label').forEach((lab) => {
+            const k = lab.dataset.check;
+            const text = labelText(k, snap, active, extras);
+            lab.textContent = '';
+            if (active === k && (k === 'smile' || k === 'talk')) {
+                const cap = document.createElement('span');
+                cap.textContent = text.replace(/ \d+%$/, '') + ' ';
+                const meter = document.createElement('div');
+                meter.className = 'cc-meter';
+                const fill = document.createElement('i');
+                const frac = k === 'smile' ? snap.smileMeter : snap.talkMeter;
+                fill.style.width = `${Math.round((frac || 0) * 100)}%`;
+                meter.appendChild(fill);
+                lab.append(cap, meter);
+            } else {
+                lab.textContent = text;
+            }
         });
     }
 
@@ -100,57 +126,11 @@
         }
     }
 
-    function renderDetail(detailEl, key, snap, hooks) {
-        detailEl.hidden = !key;
-        if (!key) {
-            detailEl.textContent = '';
-            return;
-        }
-        detailEl.textContent = '';
-        const head = document.createElement('div');
-        head.className = 'cc-detail-head';
-        const title = document.createElement('strong');
-        title.textContent = LABELS[key].title;
-        const skip = document.createElement('button');
-        skip.type = 'button';
-        skip.className = 'btn btn-ghost btn-small';
-        skip.textContent = 'Skip this test';
-        skip.addEventListener('click', () => hooks.onSkip(key));
-        head.append(title, skip);
-        detailEl.appendChild(head);
-        const hint = document.createElement('p');
-        hint.className = 'note';
-        hint.style.margin = '0 0 0.35rem';
-        hint.textContent = LABELS[key].sub;
-        detailEl.appendChild(hint);
-        if (key === 'smile' || key === 'talk') {
-            const meter = document.createElement('div');
-            meter.className = 'cc-meter';
-            const fill = document.createElement('i');
-            const frac = key === 'smile' ? snap.smileMeter : snap.talkMeter;
-            fill.style.width = `${Math.round(frac * 100)}%`;
-            meter.appendChild(fill);
-            detailEl.appendChild(meter);
-        }
-        if (key === 'breath') {
-            const note = document.createElement('p');
-            note.className = 'note';
-            note.textContent = 'Watch the breath rate pill (center): warming → settling → stable. This can take about 20–30 seconds.';
-            detailEl.appendChild(note);
-        }
-        if (key === 'stretch') {
-            const note = document.createElement('p');
-            note.className = 'note';
-            note.textContent = 'Follow the sunflower: tilt toward each shoulder and hold.';
-            detailEl.appendChild(note);
-        }
-    }
-
     window.SmileCameraCheckUI = Object.freeze({
+        CHECKS,
         LABELS,
-        mountTestGrid,
-        renderTests,
+        mountPackets,
+        renderPackets,
         renderStatus,
-        renderDetail,
     });
 })();

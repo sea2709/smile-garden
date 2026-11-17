@@ -1,41 +1,60 @@
-# Camera check screen — art spec (Heily)
+# Camera check — potting-shed window (Heily)
 
-Pre-game **Camera check** overlay (`#screen-camera-check`). Code supplies fallbacks (emoji, CSS oval, stretch guide reuse). All paths are relative to repo root; manifest in `renderer/art.js` → `cameraCheck`.
+Pre-game **Camera check** (`#screen-camera-check`). Full-screen stage **1280×720 display px** (all painted assets @2×). Code positions from `renderer/art.js` → `cameraCheck.layout` with CSS fallbacks.
 
-## Frame & preview
+## Theme
 
-| Asset | Path | Design px (1×) | Export @2× |
+Potting-shed interior: wooden **window** looking out at the live camera, **sill** with four **seed packets** (mini-tests), shed **backdrop** on the wall.
+
+## Asset list
+
+| Asset | Path | Design px (1×) | @2× export |
 |-------|------|----------------|------------|
-| Preview frame | `assets/ui/camera-check/frame.png` | 640 × 480 | 1280 × 960 |
+| Shed backdrop | `assets/ui/camera-check/backdrop.png` | 1280 × 720 | 2560 × 1440 |
+| Window frame | `assets/ui/camera-check/window-frame.png` | 640 × 500 | 1280 × 1000 |
+| Sill | `assets/ui/camera-check/sill.png` | 1280 × 80 | 2560 × 160 |
+| Packet smile closed | `assets/ui/camera-check/packet-smile-closed.png` | 110 × 150 | 220 × 300 |
+| Packet smile sprouted | `assets/ui/camera-check/packet-smile-sprouted.png` | 110 × 150 | 220 × 300 |
+| Packet talk closed | `assets/ui/camera-check/packet-talk-closed.png` | 110 × 150 | 220 × 300 |
+| Packet talk sprouted | `assets/ui/camera-check/packet-talk-sprouted.png` | 110 × 150 | 220 × 300 |
+| Packet breathe closed | `assets/ui/camera-check/packet-breathe-closed.png` | 110 × 150 | 220 × 300 |
+| Packet breathe sprouted | `assets/ui/camera-check/packet-breathe-sprouted.png` | 110 × 150 | 220 × 300 |
+| Packet stretch closed | `assets/ui/camera-check/packet-stretch-closed.png` | 110 × 150 | 220 × 300 |
+| Packet stretch sprouted | `assets/ui/camera-check/packet-stretch-sprouted.png` | 110 × 150 | 220 × 300 |
 
-Soft parchment / vine corners around the live preview; centre is **transparent** so video shows through. Face oval may be painted faintly inside the frame or left to CSS `.cc-face-oval`.
+**Sprouted** = that check **passed** (not merely skipped). **Closed** = default. Code swaps on `passed[key]`; skipped packets stay closed (label shows “Skipped”).
 
-## Test icons (tile buttons)
+Face outline: faint oval in the frame art and/or CSS `.cc-face-oval`.
 
-| Key | Path | Design px | @2× |
-|-----|------|-----------|-----|
-| smile | `assets/ui/camera-check/icon-smile.png` | 64 × 64 | 128 × 128 |
-| talk | `assets/ui/camera-check/icon-talk.png` | 64 × 64 | 128 × 128 |
-| breath | `assets/ui/camera-check/icon-breath.png` | 64 × 64 | 128 × 128 |
-| stretch | `assets/ui/camera-check/icon-stretch.png` | 64 × 64 | 128 × 128 |
+## Layout (display px on 1280×720 stage)
 
-Friendly line icons matching needs-meter palette (sun yellow, water blue, leaf green, sunflower gold). Fallback emoji in UI: ☀ 💬 🍃 🌻.
+Coordinates are **backdrop / stage space**, origin top-left.
 
-## Pass check mark
+| Element | Position |
+|---------|----------|
+| **Camera preview** | 4:3, **560 × 420**; horizontal center **x = 640**; **top y = 56** (left edge **x = 360**) |
+| **Window frame** | **640 × 500**, centered on preview center (**cx = 640**, **cy = 266** → left **320**, top **16**); transparent opening for video |
+| **Sill** | Vertical span **y = 520 … 600** (80px band, full stage width in art) |
+| **Seed packets** (smile, talk, breathe, neck stretch) | Each **110 × 150**; horizontal centers **x = 400, 560, 720, 880**; **bottom y = 600** (top **y = 450**) |
+| **Packet labels** (live meter / hint) | Under each packet, **y = 610 … 650** (40px tall strip, centered on packet **cx**) |
+| **“Start my garden”** | Primary button, **bottom-right**, baseline near **y ≈ 680** |
+| **“Skip for now”** | Text link, **bottom-left**, baseline near **y ≈ 680** |
 
-| Asset | Path | Design px | @2× |
-|-------|------|-----------|-----|
-| check | `assets/ui/camera-check/check-pass.png` | 44 × 44 | 88 × 88 |
+Status lines (**Face found**, **Lighting OK**, camera errors): code places a compact row just below the preview opening (~**y = 480**, centered).
 
-Soft green vine tick; fallback: ✓ in CSS.
+## Live UI / stretch & breath
 
-## Stretch mini-test
+- Active **smile** or **talk**: label shows hold **meter** (0–100%).
+- Active **breathe**: label mirrors breath pill text (warming → settling → stable); center **breath guide** still used when active.
+- Active **neck stretch**: label + existing **sunflower stretch guide** when active.
 
-Reuses existing stretch guide art (`ART.stretch.guideSunflower*`); no new sunflower required unless a smaller variant is desired (`guideDisplay` 96px).
+## Code fallbacks
+
+Missing PNGs: painted shed colors in CSS, emoji packet tiles (☀ 💬 🍃 🌻), CSS face oval.
 
 ## Screenshots (capture)
 
-- `camera-check-initial.png` — first open, no tests passed  
-- `camera-check-midway.png` — smile + talk passed, breath warming  
-- `camera-check-all-passed.png` — all four checks (or skips) marked  
-- `camera-check-denied.png` — permission / no-face error state  
+- `camera-check-initial.png`
+- `camera-check-midway.png`
+- `camera-check-all-passed.png`
+- `camera-check-denied.png`

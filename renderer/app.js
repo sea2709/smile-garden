@@ -20,7 +20,7 @@
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
         'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-sunflower', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-plant-name', 'needs-icons', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'needs-tag-img', 'needs-tag-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
-        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-note', 'cc-tests', 'cc-detail', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'cc-preview-frame', 'btn-cc-start',
+        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-note', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -189,8 +189,9 @@
     // ------------------------------------------------------------------
     let cameraCheckGridMounted = false;
     function mountCameraCheckGrid() {
-        if (cameraCheckGridMounted || !CCUI || !els.ccTests) return;
-        CCUI.mountTestGrid(els.ccTests, ART, artUrl, {
+        if (cameraCheckGridMounted || !CCUI || !els.ccPackets) return;
+        const cc = ART.cameraCheck || {};
+        CCUI.mountPackets(els.ccPackets, ART, artUrl, {
             onSelect(key) {
                 if (!cameraCheckSession) return;
                 cameraCheckSession.select(key);
@@ -203,12 +204,19 @@
                 renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
             },
         });
-        cameraCheckGridMounted = true;
-        if (ART.cameraCheck && ART.cameraCheck.frame && els.ccPreviewFrame) {
-            els.ccPreviewFrame.src = artUrl(ART.cameraCheck.frame);
-            els.ccPreviewFrame.hidden = false;
-            els.ccPreviewFrame.onerror = () => { els.ccPreviewFrame.hidden = true; };
+        if (els.ccBackdrop && cc.backdrop) {
+            els.ccBackdrop.src = artUrl(cc.backdrop);
+            els.ccBackdrop.onerror = () => { els.ccBackdrop.dataset.fallback = '1'; };
         }
+        if (els.ccWindowFrame && cc.windowFrame) {
+            els.ccWindowFrame.src = artUrl(cc.windowFrame);
+            els.ccWindowFrame.onerror = () => { els.ccWindowFrame.hidden = true; };
+        }
+        if (els.ccSill && cc.sill) {
+            els.ccSill.src = artUrl(cc.sill);
+            els.ccSill.onerror = () => { els.ccSill.dataset.fallback = '1'; };
+        }
+        cameraCheckGridMounted = true;
     }
 
     function buildCameraCheckInput() {
@@ -241,20 +249,16 @@
             }
         }
         if (CCUI) {
-            CCUI.renderTests(els.ccTests, snap, cameraCheckSession && cameraCheckSession.active);
-            CCUI.renderStatus(els.ccStatusFace, els.ccStatusLight, els.ccStatusCamera, snap);
             const active = cameraCheckSession && cameraCheckSession.active;
             els.breathGuide.hidden = active !== 'breath';
             els.stretchGuide.hidden = active !== 'stretch';
             if (active === 'breath') renderBreathRate();
-            if (active === 'stretch') renderStretchHudFromSnap(snap.stretchSnap);
-            CCUI.renderDetail(els.ccDetail, active, snap, {
-                onSkip(key) {
-                    if (!cameraCheckSession) return;
-                    cameraCheckSession.skip(key);
-                    renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-                },
-            });
+            if (active === 'stretch') renderStretchHud();
+            const breathLabel = active === 'breath' && els.breathRate && !els.breathRate.hidden
+                ? els.breathRate.textContent
+                : '';
+            CCUI.renderStatus(els.ccStatusFace, els.ccStatusLight, els.ccStatusCamera, snap);
+            CCUI.renderPackets(els.ccPackets, snap, active, ART, artUrl, { breathLabel });
         }
     }
 
@@ -1861,6 +1865,7 @@
     els.btnWellnessOk.addEventListener('click', ackWellness);
     function ackWellness() { state.wellnessAck = true; save(); afterWellnessOrResume(); }
     if (els.btnCcStart) els.btnCcStart.addEventListener('click', finishCameraCheckFlow);
+    if (els.btnCcSkipNow) els.btnCcSkipNow.addEventListener('click', finishCameraCheckFlow);
     els.btnGreetPlant.addEventListener('click', () => openPicker());
     els.btnBegin.addEventListener('click', beginVisit);
     els.btnPickerClose.addEventListener('click', closePicker);

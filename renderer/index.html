@@ -155,31 +155,27 @@
     <div id="toast" class="toast" hidden></div>
 
     <!-- Camera check (first launch / settings) --------------------------- -->
-    <section id="screen-camera-check" class="overlay camera-check" hidden>
-        <div class="card parchment cc-card">
-            <h1>Camera check</h1>
-            <p class="note">Optional mini-tests help Smile Garden read your smile, voice, breath, and gentle neck stretches. You can skip any test — <b>Start my garden</b> is always available.</p>
-            <p id="cc-note" class="cc-note" hidden></p>
-            <div class="cc-layout">
-                <div>
-                    <div id="cc-preview-wrap" class="cc-preview-wrap">
-                        <div id="cc-mock-slot" class="cc-mock-placeholder" hidden>Demo camera preview</div>
-                        <div class="cc-face-oval" aria-hidden="true"></div>
-                        <img id="cc-preview-frame" class="cc-preview-frame" alt="" hidden>
-                    </div>
-                    <div class="cc-status" id="cc-status">
-                        <div id="cc-status-face" class="cc-status-row"></div>
-                        <div id="cc-status-light" class="cc-status-row"></div>
-                        <div id="cc-status-camera" class="cc-status-row" hidden></div>
-                    </div>
+    <section id="screen-camera-check" class="overlay camera-check" hidden aria-label="Camera check">
+        <div class="cc-stage-wrap">
+            <div id="cc-stage" class="cc-stage">
+                <img id="cc-backdrop" class="cc-backdrop" alt="">
+                <div id="cc-preview-wrap" class="cc-preview-wrap">
+                    <div id="cc-mock-slot" class="cc-mock-placeholder" hidden>Demo camera</div>
+                    <div class="cc-face-oval" aria-hidden="true"></div>
                 </div>
-                <div>
-                    <div id="cc-tests" class="cc-tests"></div>
-                    <div id="cc-detail" class="cc-detail" hidden></div>
+                <img id="cc-window-frame" class="cc-window-frame" alt="">
+                <img id="cc-sill" class="cc-sill" alt="">
+                <div class="cc-status" id="cc-status">
+                    <div id="cc-status-face" class="cc-status-row"></div>
+                    <div id="cc-status-light" class="cc-status-row"></div>
+                    <div id="cc-status-camera" class="cc-status-row" hidden></div>
                 </div>
-            </div>
-            <div class="cc-actions">
-                <button id="btn-cc-start" class="btn btn-primary" type="button">Start my garden</button>
+                <div id="cc-packets" class="cc-packets"></div>
+                <p id="cc-note" class="cc-note" hidden></p>
+                <footer class="cc-footer">
+                    <button id="btn-cc-skip-now" type="button">Skip for now</button>
+                    <button id="btn-cc-start" class="btn btn-primary" type="button">Start my garden</button>
+                </footer>
             </div>
         </div>
     </section>
