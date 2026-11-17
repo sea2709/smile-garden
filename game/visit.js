@@ -11,7 +11,7 @@
 //   * VisitSession: greeting -> smile (~45 s) -> talk (~30 s) -> optional
 //     guided breathing -> summary. Smiling (HAPPY) fills sunlight, talking
 //     (face.talking) fills water, finished guided breaths add fertilizer.
-//   * BreathPacer: soft nose breathing, no holds, 3–6 breaths per bout.
+//   * BreathPacer: soft nose breathing, no holds, 3–6 breaths per bout (default 40 s).
 //
 // Nothing ever dies or wilts. A plant that did not get enough today simply
 // waits, and keeps the sunlight it already banked.
@@ -714,7 +714,9 @@
             this.noFace = 0;
             this.poorReading = false;
             if (step === 'breathe') {
-                this.pacer = new BreathPacer({ pace: this.pace, breaths: this.breathCount });
+                // Default bout is 40 s at standard pace (4 × 4/6). Skip ease-in so
+                // the bout length stays predictable for SmartSpectra rate warm-up.
+                this.pacer = new BreathPacer({ pace: this.pace, breaths: this.breathCount, easeIn: false });
                 this.breathT = 0;
                 this.breathsDone = 0;
                 this.breathSkipped = false;

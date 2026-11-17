@@ -1,10 +1,12 @@
 // renderer/mock-source.js — simulated player for demo mode (no SDK, no camera).
 //
 // Emits the same events as sdk-source.js (status, validation, expression,
-// talking). The renderer tells it which visit step is running with
+// talking, breathing). The renderer tells it which visit step is running with
 // setPhase(step); the simulated player then smiles in waves (smile step),
 // chats in bursts (talk step) or rests (breathing). At night it once has a
 // dim, hard-to-read moment so the "turn on a light" hint can show.
+// Breathing rate warms up across the visit (like the real SDK) and becomes
+// stable during the breathe step.
 //
 // Keyboard fallback: setKeys({ smile, talk, hide }) switches to manual input
 // (hold S / Space to smile, T to talk, F to leave the frame). setAuto(true)
@@ -40,6 +42,7 @@
         let auto = opts.auto !== false;
         const keys = { smile: false, talk: false, hide: false };
         let h = 0.1;
+        let visitT = 0;
         const nowS = () => performance.now() / 1000;
 
         function setValidation(code, hint) {
@@ -110,6 +113,21 @@
                 em.emit('noface', {});
             }
             em.emit('mockFace', { face, happiness: value, talking });
+
+            // Synthetic breathing rate: appears after ~25 s of visit time, settles
+            // near ~6 breaths/min (matches the guided standard pace).
+            visitT += dt;
+            if (visitT > 25) {
+                const settling = visitT < 35 && phase !== 'breathe';
+                const rate = 5.6 + Math.sin(visitT * 0.35) * 0.35 + (noise() - 0.5) * 0.15;
+                const confidence = settling ? 30 + (visitT - 25) : 55 + Math.min(20, visitT - 35);
+                em.emit('breathing', {
+                    rate,
+                    confidence: Math.min(100, confidence),
+                    stable: !settling && confidence >= 45,
+                    t: nowS(),
+                });
+            }
         }
 
         return {
@@ -120,6 +138,7 @@
                 em.emit('status', 'Starting');
                 await new Promise((r) => setTimeout(r, 200));
                 lastTick = nowS();
+                visitT = 0;
                 timer = setInterval(tick, 1000 / 30);
                 em.emit('status', 'Running');
             },

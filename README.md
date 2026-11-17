@@ -28,8 +28,8 @@ talking metrics), with a keyboard/demo fallback so it runs without a camera or A
    it). Gentle prompts rotate ("What made you smile today?"). Drops fall and ripple on the soil.
 5. **Breathe (optional) → fertilizer.** Soft nose breathing guided by a glowing orb, with **no holds**:
    * default **4 s in / 6 s out** (6 breaths a minute), or the **gentler 3 s in / 5 s out**;
-   * with the default pace the first breath uses the gentler timing, so you ease into it;
-   * **3–6 breaths** per bout (default 4, about 38 s); fertilizer = finished breaths ÷ planned;
+   * **3–6 breaths** per bout (default 4, **40 s**); fertilizer = finished breaths ÷ planned;
+   * SmartSpectra **breathing rate** is shown as feedback when available (display only; not used for scoring);
    * **Skip** is always visible, and the note says to stop and breathe normally if you feel dizzy.
    Fertilizer only speeds growth (+50 % banked sunlight at 100 %). It is never required.
 6. **Summary.** Sun-hours, water and fertilizer; each bed that grew blooms in turn with a floating label;
@@ -113,7 +113,7 @@ settings, demo day offset). The screenshot run uses a throwaway profile and neve
 
 | Variable | Effect |
 |---|---|
-| `SMARTSPECTRA_API_KEY` | Your API key (real mode). Read from the environment only |
+| `SMARTSPECTRA_API_KEY` | Your API key (real mode). From `.env` or the environment |
 | `SMILE_GARDEN_MOCK=1` | Demo mode (same as `--mock`) |
 | `SMILE_GARDEN_FAST=1` | Demo mode only: short smile/talk steps (same as `--fast`) |
 | `SMARTSPECTRA_TELEMETRY=0` | Opt out of SDK telemetry |
@@ -121,15 +121,23 @@ settings, demo day offset). The screenshot run uses a throwaway profile and neve
 
 ### API key
 
-Register for a free key at <https://physiology.presagetech.com/auth/register> and export
-`SMARTSPECTRA_API_KEY`. Your key must be enabled for **face** metrics.
+Register for a free key at <https://physiology.presagetech.com/auth/register>. Your key must be
+enabled for **face** metrics. Then either:
+
+```bash
+cp .env.example .env
+# edit .env and set SMARTSPECTRA_API_KEY=...
+npm start
+```
+
+or export `SMARTSPECTRA_API_KEY` in your shell. Values already set in the environment override `.env`.
 
 ## How it works
 
 * `main.js`: the Electron main process owns the native SmartSpectra pipeline (`bindSmartSpectraIpc`), grants
   camera-only permission to our own page, and hands config to the renderer. `contextIsolation` and `sandbox` are on.
-* `renderer/sdk-source.js`: the SDK adapter (bundled by esbuild), emitting `expression` (HAPPY 0–1), `talking`
-  and `validation` events. `renderer/mock-source.js` emits the same events from a simulated or keyboard player.
+* `renderer/sdk-source.js`: the SDK adapter (bundled by esbuild), emitting `expression` (HAPPY 0–1), `talking`,
+  `breathing` (rate) and `validation` events. `renderer/mock-source.js` emits the same events from a simulated or keyboard player.
 * `game/logic.js`: the plant table with real sun hours and sources, smile smoothing and hysteresis, `SmileTrace`.
 * `game/visit.js`: the daily loop (pure, unit-tested): time of day, day/week keys, `GameClock` (with a demo
   offset), state load/save/sanitize, planting, `applyVisit`, `BreathPacer`, `VisitSession`.
@@ -143,10 +151,11 @@ Register for a free key at <https://physiology.presagetech.com/auth/register> an
 | `bindSmartSpectraIpc(win)` from `@smartspectra/node-sdk/main` | main.js | docs/nodejs.md, "Electron integration"; electron-quickstart `main.js` |
 | `SMARTSPECTRA_CAPI_PATH` for packaged builds | main.js | electron-quickstart `main.js` |
 | `require('@smartspectra/node-sdk/preload')` | preload-sdk.js | docs/nodejs.md, "Electron integration" |
-| `new SmartSpectraSDK({ apiKey, requestedMetrics: [...faceMetrics], enableAccumulatedOutput: false, enableTelemetry })` | sdk-source.js | docs/nodejs/metrics.md, "Metric Bundles" + "Advanced" (face = FACE_LANDMARKS, BLINKING, TALKING, EXPRESSIONS; cardio = PULSE_RATE, ARTERIAL_PRESSURE_TRACE, HRV) |
+| `new SmartSpectraSDK({ apiKey, requestedMetrics: [...faceMetrics, ...breathingMetrics], enableAccumulatedOutput: false, enableTelemetry })` | sdk-source.js | docs/nodejs/metrics.md, "Metric Bundles" + "Advanced" (face + breathing rate / chest / abdomen; optional cardio) |
 | `sdk.on('metrics', (buf, timestampUs))` + `decodeMetrics(buf)` from `@smartspectra/node-sdk/messages` | sdk-source.js | docs/nodejs/metrics.md, "Read Metrics"; electron-quickstart `renderer.js` |
 | `face.expression[] → { stable, scores: [{ type, confidence 0–100 }] }`, `ExpressionType.HAPPY = 5` | sdk-source.js, logic.js | docs/nodejs/metrics.md "Advanced"; docs/data-types.md#expression, #expressionscore |
 | `face.talking[] → DetectionStatus { detected, stable }` | sdk-source.js | docs/nodejs/metrics.md ("`metrics.face?.talking?.at(-1)?.detected`"); docs/data-types.md#face |
+| `breathing.rate[] → MeasurementWithConfidence` (display-only during breathe) | sdk-source.js | docs/nodejs/metrics.md "Breathing and Pulse"; docs/data-types.md#breathing |
 | `face.landmarks[] → { value: Point2dFloat[], stable }` (decoded, not drawn in v3) | sdk-source.js | docs/nodejs/metrics.md "Advanced"; docs/data-types.md#landmarks |
 | `sdk.on('validationStatus', (code, ts, hint))` + `ValidationCode` | sdk-source.js | docs/nodejs.md; API reference |
 | `sdk.on('processingStatus')`, `sdk.on('error', (code, message, retryable))`, `SmartSpectraErrorCode` | sdk-source.js | docs/nodejs.md; API reference |
@@ -206,13 +215,12 @@ docs/                      screenshots
 ## Known gaps (prototype)
 
 * The **night backdrop** still shows the painted bee and butterflies (fireflies are added on top).
-* Breathing is **guided, not measured**: fertilizer counts finished guided breaths. SmartSpectra's breathing
-  metrics need ~30 s and a still chest, so they are not used here.
+* Breathing **fertilizer** is still guided (finished breaths ÷ planned). SmartSpectra breathing rate is
+  requested for the whole visit so it can warm up during smile/talk, then shown during the breathe step.
 * Thresholds (smile 0.50/0.42, 30 s of smiling = 12 h, 12 s of talking = full can) are starting guesses; tune
   them on real cameras.
-* The SDK `TODO(sdk)` questions from v0.2 still apply: whether a face-only `requestedMetrics` is accepted
-  (add `...breathingMetrics` in `renderer/sdk-source.js` if `start()` fails with `kConfigurationFailed`), key
-  authorization for face metrics, and the meaning of `Expression.stable`.
+* The SDK `TODO(sdk)` questions from v0.2 still apply for key authorization and the meaning of
+  `Expression.stable`.
 * No reminder notifications yet, and no seasons; the "Visit again" path lets you visit more than once a day,
   but plants still grow at most once.
 * The v0.2 calm check (pulse/HRV) and flower crown were removed in favour of the daily loop

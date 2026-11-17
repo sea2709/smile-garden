@@ -20,6 +20,11 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+
+// Load repo-root `.env` before any process.env reads. Existing shell env wins
+// over values in the file (dotenv's default). Never commit `.env`.
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
 const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
 
 const MOCK = process.argv.includes('--mock') || process.env.SMILE_GARDEN_MOCK === '1';
@@ -46,7 +51,7 @@ if (CAPTURE_DIR) {
 // SMARTSPECTRA_TELEMETRY=0.
 const ENABLE_TELEMETRY = process.env.SMARTSPECTRA_TELEMETRY !== '0';
 
-// Read the key from the environment only. Never hardcode it.
+// Read the key from the environment / `.env`. Never hardcode it.
 const API_KEY = (process.env.SMARTSPECTRA_API_KEY || '').trim();
 
 let bindSmartSpectraIpc = null;
