@@ -194,7 +194,8 @@
             },
             pos(bedIndex) {
                 const key = 'bed' + (Math.max(1, Math.min(8, Math.round(Number(bedIndex) || 0) + 1)));
-                const spot = ART.needs.soilBeds[key];
+                const needs = window.SmileArt && window.SmileArt.needs;
+                const spot = needs && needs.soilBeds && needs.soilBeds[key];
                 return spot ? spot.pos.slice() : [0, 0];
             },
         }),

@@ -5,8 +5,8 @@
     left: 50%;
     bottom: 108px;
     transform: translateX(-50%);
-    width: min(480px, 94vw);
-    padding: 18px 20px 16px;
+    width: min(480px, 96vw);
+    padding: 18px 20px 18px;
     z-index: 32;
     box-shadow: 0 12px 36px rgba(48, 32, 12, 0.18);
 }
@@ -39,6 +39,10 @@
     font-weight: 600;
     color: var(--ink);
     min-height: 1.2em;
+    line-height: 1.45;
+    padding: 0 4px 4px;
+    text-align: center;
+    white-space: normal;
 }
 
 .stretch-care-actions {
@@ -57,40 +61,25 @@
     pointer-events: none;
 }
 
-.stretch-rings {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    margin-bottom: 10px;
-}
-
-.stretch-ring {
-    position: relative;
-    width: 100px;
-    height: 118px;
-    text-align: center;
-}
-
-.stretch-ring canvas {
-    width: 100px;
-    height: 100px;
-    display: block;
-    margin: 0 auto;
-}
-
-.stretch-ring label {
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--ink-soft);
-    margin-top: 4px;
-}
-
 .stretch-guide-box {
     position: relative;
     width: 160px;
     height: 220px;
     margin: 0 auto;
+    background: transparent;
+    overflow: visible;
+}
+
+/* One vine ring behind the guide (stake-manifest placeOverGuide: −20,12 in 160×220 box). */
+.stretch-ring-over-guide {
+    position: absolute;
+    left: -20px;
+    top: 12px;
+    width: 200px;
+    height: 200px;
+    z-index: 0;
+    pointer-events: none;
+    background: transparent;
 }
 
 .stretch-guide-stem {

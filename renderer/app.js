@@ -17,7 +17,7 @@
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-card-bg', 'needs-card-fallback', 'needs-plant-name', 'needs-rows', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-card-bg', 'needs-card-fallback', 'needs-plant-name', 'needs-rows', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -241,7 +241,7 @@
         const label = `Day ${state.dayNumber} · ${seasonLabel} · ${D.formatGardenTime(state.gardenMinutes)}`;
         scene.setGardenClock(state.gardenMinutes, label);
         if (els.gardenClock) els.gardenClock.hidden = true;
-        document.body.dataset.gardenV = '5';
+        document.body.dataset.gardenV = state.version >= 6 ? '6' : '5';
     }
 
     function syncHudChipClamp() {
@@ -495,7 +495,7 @@
             else if (!tendable.length && !ready) msg = 'Every plant is tended for today. Rest, harvest, or go to bed when ready.';
         }
         els.idleText.textContent = msg;
-        els.btnVisit.hidden = state.version >= 6;
+        els.btnVisit.hidden = state.version >= 6 || document.body.dataset.captureTags === '1';
         if (!els.btnVisit.hidden) {
             els.btnVisit.textContent = tendable.length ? 'Tend your plants' : (ready ? 'Tend (harvest)' : 'Tend your plants');
         }
@@ -1024,11 +1024,11 @@
         const night = lighting === 'night';
         const frames = night ? stretchRingArt.framesNight : stretchRingArt.framesDay;
         const p = done ? 1 : Math.max(0, Math.min(1, progress));
-        const frame = Math.round(p * (STRETCH_RING_FRAMES - 1));
+        const frame = Math.max(1, Math.round(p * (STRETCH_RING_FRAMES - 1)));
         const frameImg = frames && frames[frame];
         if (frameImg && frameImg.naturalWidth > 0) {
             ctx.drawImage(frameImg, 0, 0, w, h);
-        } else {
+        } else if (!frames) {
             ctx.strokeStyle = 'rgba(150, 120, 80, 0.35)';
             ctx.lineWidth = 6;
             ctx.beginPath();
@@ -1108,8 +1108,10 @@
                 hintR.style.opacity = '0';
             }
         }
-        drawStretchRing(els.stretchRingLeft, snap.leftProgress, snap.leftDone);
-        drawStretchRing(els.stretchRingRight, snap.rightProgress, snap.rightDone);
+        const ringSide = snap.activeSide === 'right' ? 'right' : 'left';
+        const ringProg = ringSide === 'right' ? snap.rightProgress : snap.leftProgress;
+        const ringDone = ringSide === 'right' ? snap.rightDone : snap.leftDone;
+        drawStretchRing(els.stretchRing, ringProg, ringDone);
         if (snap.needsFaceHint) {
             els.hint.hidden = false;
             els.hintTitle.textContent = 'Face the camera';
@@ -1121,8 +1123,8 @@
         }
         const side = snap.activeSide;
         const live = snap.complete ? 'Lovely — your plant is staked for harvest.'
-            : side === 'left' ? 'Hold toward your left shoulder…'
-                : side === 'right' ? 'Hold toward your right shoulder…'
+            : side === 'left' ? 'Hold toward your left shoulder and keep a gentle stretch.'
+                : side === 'right' ? 'Hold toward your right shoulder and keep a gentle stretch.'
                     : 'Tip each ear toward a shoulder and hold gently.';
         els.stepLive.textContent = live;
         if (els.stretchCareLive) els.stretchCareLive.textContent = live;
@@ -2147,29 +2149,49 @@
         setNeedsCardDemo(plot, progress) {
             const i = Number(plot);
             if (!(i >= 0 && i < state.plots.length && state.plots[i] && state.plots[i].plantId)) return null;
-            if (!session) {
-                session = new V.VisitSession({
-                    fast: config.fast,
-                    pace: state.settings.pace,
-                    breaths: state.settings.breaths,
-                    plots: state.plots,
-                    today: gardenTodayKey(),
-                    gardenDay: state.dayNumber,
-                    dailyTends: state.dailyTends,
-                    tendBeds: V.tendableForState(state, clock.now()),
-                });
-                session.phase = 'tend';
-                session.plantRound = 0;
-            }
+            const planted = state.plots.map((p, idx) => (p ? idx : -1)).filter((idx) => idx >= 0);
+            if (!planted.includes(i)) planted.push(i);
+            session = new V.VisitSession({
+                fast: config.fast,
+                pace: state.settings.pace,
+                breaths: state.settings.breaths,
+                plots: state.plots,
+                today: gardenTodayKey(),
+                gardenDay: state.dayNumber,
+                dailyTends: state.dailyTends,
+                tendBeds: planted,
+            });
+            session.phase = 'tend';
+            session.plantRound = planted.indexOf(i);
             session.go('care-hub');
-            session.setSelectedPlot(i);
-            if (progress) session.setCareProgress(i, progress);
+            session.selectedPlot = i;
+            session.setCareProgress(i, Object.assign(C.emptyProgress(), progress));
             show('visit');
             onStep('care-hub');
+            els.needsCard.hidden = false;
             renderNeedsCard();
+            refreshLighting();
             renderHud();
             plotsForScene({ instant: true });
             return i;
+        },
+        clearCaptureVisit() {
+            session = null;
+            stretchHudDemoLock = false;
+            stretchDemoSnap = null;
+            syncTendRing();
+            plotsForScene({ instant: true });
+            show('idle');
+        },
+        captureRedraw() {
+            plotsForScene({ instant: true });
+            renderHud();
+            try {
+                scene.draw(performance.now() / 1000);
+            } catch (e) {
+                console.error('[captureRedraw] scene.draw failed', e);
+            }
+            return document.body.dataset.planted;
         },
         /** Mock capture: garden tag/soil states without a live visit session. */
         unlockSeedsForCapture() {
@@ -2205,8 +2227,10 @@
             renderHud();
             return state.plots.filter(Boolean).length;
         },
-        prepTagGardenDemo(mode) {
-            window.__smileGarden.prepCaptureGarden();
+        applyTagGardenDemo(mode) {
+            session = null;
+            document.body.dataset.captureTags = '1';
+            if (els.btnVisit) els.btnVisit.hidden = true;
             const day = state.dayNumber;
             if (!state.dailyTends) state.dailyTends = {};
             const setBed = (plot, cfg) => {
@@ -2215,16 +2239,15 @@
                 const needs = L.plantNeeds(p.plantId);
                 state.plots[plot].staked = !!cfg.staked;
                 state.plots[plot].tagResting = !!cfg.resting;
-                state.dailyTends[plot] = {
-                    day,
-                    allMet: !!cfg.allMet,
-                    progress: cfg.progress || {
-                        sun: cfg.allMet ? needs.sun : 0,
-                        water: cfg.allMet ? needs.water : 0,
-                        fertilizer: cfg.allMet ? needs.fertilizer : 0,
-                        stake: cfg.staked && needs.stake,
-                    },
+                const prog = cfg.progress || {
+                    sun: cfg.allMet ? needs.sun : 0,
+                    water: cfg.allMet ? needs.water : 0,
+                    fertilizer: cfg.allMet ? needs.fertilizer : 0,
+                    stake: cfg.staked && needs.stake,
                 };
+                state.dailyTends[plot] = Object.assign({ day, allMet: !!cfg.allMet }, prog, {
+                    stake: !!cfg.staked || !!prog.stake,
+                });
             };
             if (mode === 'complete') {
                 setBed(2, { allMet: true, staked: true, resting: false });
@@ -2239,8 +2262,40 @@
                 setBed(6, { allMet: false, progress: { sun: 3, water: 2, fertilizer: 1, stake: false } });
             }
             save();
+            show('idle');
             plotsForScene({ instant: true });
+            renderHud();
             return mode;
+        },
+        prepTagGardenDemo(mode) {
+            if (state.plots.filter(Boolean).length < 4) prepCaptureGarden();
+            return applyTagGardenDemo(mode);
+        },
+        prepStakedTomatoCapture() {
+            session = null;
+            stretchHudDemoLock = false;
+            stretchDemoSnap = null;
+            syncTendRing();
+            show('idle');
+            state.plots = new Array(state.plots.length).fill(null);
+            const res = V.plantSeed(state, 2, 'tomato', clock.now());
+            if (res.ok && state.plots[2]) {
+                state.plots[2].stage = 4;
+                state.plots[2].staked = true;
+                state.plots[2].tagResting = false;
+            }
+            if (!state.dailyTends) state.dailyTends = {};
+            state.dailyTends[2] = {
+                day: state.dayNumber,
+                sun: 2,
+                water: 1,
+                fertilizer: 0,
+                stake: true,
+                allMet: false,
+            };
+            save();
+            plotsForScene({ instant: true });
+            renderHud();
         },
         completeCareNeedForCapture(needKey) {
             if (!session || session.selectedPlot == null) return null;
@@ -2288,7 +2343,6 @@
             show(state.wellnessAck ? 'idle' : 'wellness');
         },
         setGardenTime(m) {
-            state.version = 5;
             state.gardenMinutes = D.clampMinutes(m);
             gardenClock.pause();
             refreshLighting();
@@ -2354,7 +2408,7 @@
         },
         setStretchHudDemo(mode) {
             const modes = {
-                'left-hold': { leftProgress: 0.68, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -21, activeSide: 'left', complete: false, needsFaceHint: false },
+                'left-hold': { leftProgress: 0.68, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -22, activeSide: 'left', complete: false, needsFaceHint: false },
                 'right-hold': { leftProgress: 1, rightProgress: 0.72, leftDone: true, rightDone: false, rollDeg: 19, activeSide: 'right', complete: false, needsFaceHint: false },
                 done: { leftProgress: 1, rightProgress: 1, leftDone: true, rightDone: true, rollDeg: 2, activeSide: null, complete: true, needsFaceHint: false },
             };
@@ -2368,7 +2422,9 @@
         els.stepPanel.hidden = true;
         if (els.stretchCareLive) {
             const snap = stretchDemoSnap;
-            els.stretchCareLive.textContent = snap.activeSide === 'left' ? 'Hold toward your left shoulder…' : 'Hold toward your right shoulder…';
+            els.stretchCareLive.textContent = snap.activeSide === 'left'
+                ? 'Hold toward your left shoulder and keep a gentle stretch.'
+                : 'Hold toward your right shoulder and keep a gentle stretch.';
         }
         const back = mkBtn('Back to needs', 'btn btn-ghost', () => clearStretchHudDemo());
         if (els.stretchCareActions) {

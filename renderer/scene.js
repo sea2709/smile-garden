@@ -351,6 +351,9 @@
         function setPlots(plotsState, opts) {
             const animate = !(opts && opts.instant);
             const now = performance.now() / 1000;
+            if (!animate) {
+                for (let i = 0; i < 8; i++) anims[i] = null;
+            }
             for (let i = 0; i < 8; i++) {
                 const raw = plotsState[i];
                 const n = raw ? {
@@ -1710,7 +1713,11 @@
             };
         }
 
-        return { resize, update, draw, setLighting, setLightingBlend, setSeason, setGardenClock, setBedtimeGlow, setBedtimeDark, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
+        function plotSnap() {
+            return plots.map((p, i) => (p ? { i, plantId: p.plantId, stage: p.stage, anim: anims[i] && anims[i].kind } : null)).filter(Boolean);
+        }
+
+        return { resize, update, draw, setLighting, setLightingBlend, setSeason, setGardenClock, setBedtimeGlow, setBedtimeDark, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient, plotSnap,
             waitForHudArt, hudArtReady, sampleBackdrop, probeClockSunToken, probeClockMoonToken,
             get lighting() { return lighting; },
             get reducedMotion() { return reducedMotion; },

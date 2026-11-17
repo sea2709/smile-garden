@@ -8,39 +8,120 @@
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { app } = require('electron');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function waitTagPixels(wc, spotKey) {
-    const spot = await wc.executeJavaScript(`(() => {
-        const ART = window.SmileArt;
-        const s = ART && ART.needs && ART.needs.tagSpots['${spotKey}'];
-        return s ? { x: s.anchor[0], y: s.anchor[1] } : null;
-    })()`, true);
-    if (!spot) throw new Error('tag spot missing');
-    const buf = await wc.capturePage();
+function probeBitmap(buf) {
     const { nativeImage } = require('electron');
     const img = nativeImage.createFromBuffer(buf.toPNG());
     const { width: w, height: h } = img.getSize();
-    const data = img.toBitmap();
-    const sx = Math.round((w / 1280) * spot.x);
-    const sy = Math.round((h / 720) * spot.y);
-    let nonWood = 0;
-    for (let dy = -8; dy <= 8; dy++) {
-        for (let dx = -8; dx <= 8; dx++) {
-            const x = sx + dx;
-            const y = sy + dy;
-            if (x < 0 || y < 0 || x >= w || y >= h) continue;
-            const off = (y * w + x) * 4;
-            const b = data[off];
-            const g = data[off + 1];
-            const r = data[off + 2];
-            if (r + g + b > 55 && !(r > 175 && g > 130 && b < 110)) nonWood++;
+    return { w, h, data: img.toBitmap() };
+}
+
+function sampleRgb(data, w, h, ax, ay) {
+    const x = Math.round(ax);
+    const y = Math.round(ay);
+    if (x < 0 || y < 0 || x >= w || y >= h) return [0, 0, 0];
+    const off = (y * w + x) * 4;
+    return [data[off + 2], data[off + 1], data[off]];
+}
+
+async function assertPlanted(wc, min) {
+    const n = await wc.executeJavaScript(`Number(document.body.dataset.planted || 0)`, true);
+    if (n < min) throw new Error(`expected planted >= ${min}, got ${n}`);
+    return n;
+}
+
+async function assertLighting(wc, expected) {
+    const list = Array.isArray(expected) ? expected : [expected];
+    const lit = await wc.executeJavaScript(`document.body.dataset.lighting || ''`, true);
+    if (!list.includes(lit)) throw new Error(`expected lighting ${list.join('|')}, got ${lit}`);
+}
+
+async function waitNeedsCard(wc) {
+    const meta = await wc.executeJavaScript(`(() => {
+        const el = document.getElementById('needs-card');
+        const bg = document.getElementById('needs-card-bg');
+        const name = document.getElementById('needs-plant-name')?.textContent || '';
+        return {
+            visible: el && !el.hidden,
+            bgReady: bg && !bg.hidden && bg.naturalWidth > 0,
+            name,
+            lit: document.body.dataset.lighting || '',
+        };
+    })()`, true);
+    if (!meta.visible) throw new Error('needs card hidden');
+    if (!/tomato/i.test(meta.name)) throw new Error(`needs card plant wrong: ${meta.name}`);
+    const buf = await wc.capturePage();
+    const { w, h, data } = probeBitmap(buf);
+    const sx = Math.round((w / 1280) * 1000);
+    const sy = Math.round((h / 720) * 200);
+    let cardPx = 0;
+    for (let dy = -24; dy <= 24; dy++) {
+        for (let dx = -24; dx <= 24; dx++) {
+            const [r, g, b] = sampleRgb(data, w, h, sx + dx, sy + dy);
+            const dayCream = r > 195 && g > 175 && b > 140 && r - b < 90;
+            const nightCard = r > 55 && r < 120 && g > 45 && g < 100 && b > 75 && b < 130;
+            if (dayCream || nightCard) cardPx++;
         }
     }
-    if (nonWood < 6) throw new Error(`tag pixels weak at ${spotKey} (${nonWood})`);
-    return nonWood;
+    if (cardPx < 40 && !meta.bgReady) throw new Error(`needs card art weak (px=${cardPx}, bg=${meta.bgReady})`);
+    return { cardPx, name: meta.name, lit: meta.lit };
+}
+
+async function waitPlantSprite(wc, ax, ay, minPlanted) {
+    await assertPlanted(wc, minPlanted == null ? 4 : minPlanted);
+    const buf = await wc.capturePage();
+    const { w, h, data } = probeBitmap(buf);
+    const sx = Math.round((w / 1280) * ax);
+    const sy = Math.round((h / 720) * ay);
+    let foliage = 0;
+    for (let dy = -22; dy <= 22; dy++) {
+        for (let dx = -22; dx <= 22; dx++) {
+            const [r, g, b] = sampleRgb(data, w, h, sx + dx, sy + dy);
+            const sum = r + g + b;
+            const soil = r > 95 && g < 95 && b < 85;
+            const plant = sum > 110 && !soil && (g > 55 || (r > 70 && g > 35));
+            if (plant) foliage++;
+        }
+    }
+    if (foliage < 10) throw new Error(`plant foliage weak at (${ax},${ay}) (${foliage})`);
+    return foliage;
+}
+
+async function waitTagFacePaint(wc, spotKey, opts) {
+    const o = opts || {};
+    const spot = await wc.executeJavaScript(`(() => {
+        const ART = window.SmileArt;
+        const s = ART && ART.needs && ART.needs.tagSpots['${spotKey}'];
+        const fb = ART && ART.needs && ART.needs.tag && ART.needs.tag.faceBox;
+        return s ? { x: s.anchor[0], y: s.anchor[1], faceDy: fb ? (fb[1] + fb[3]) / 2 - 120 : -70 } : null;
+    })()`, true);
+    if (!spot) throw new Error('tag spot missing');
+    await assertPlanted(wc, o.minPlanted || 4);
+    const buf = await wc.capturePage();
+    const { w, h, data } = probeBitmap(buf);
+    const sx = Math.round((w / 1280) * spot.x);
+    const sy = Math.round((h / 720) * (spot.y + (o.faceDy != null ? o.faceDy : spot.faceDy)));
+    let painted = 0;
+    let bloom = 0;
+    for (let dy = -12; dy <= 12; dy++) {
+        for (let dx = -12; dx <= 12; dx++) {
+            const [r, g, b] = sampleRgb(data, w, h, sx + dx, sy + dy);
+            const sum = r + g + b;
+            if (sum < 70) continue;
+            if (r > 175 && g > 130 && b < 120) continue; /* bare soil */
+            if (r > 210 && g > 210 && b > 205) continue; /* wooden tag */
+            painted++;
+            if (g > 120 && r > 140 && b < 110) bloom++;
+            if (g > 150 && r < 120) bloom++; /* resting leaf */
+        }
+    }
+    if (painted < (o.minPainted || 10)) throw new Error(`tag face weak at ${spotKey} (${painted})`);
+    if (o.requireBloom && bloom < (o.minBloom || 4)) throw new Error(`tag bloom/rest weak at ${spotKey} (${bloom})`);
+    return { painted, bloom };
 }
 
 async function runTimeArt(win, outDir) {
@@ -195,11 +276,19 @@ async function runTagsArt(win, outDir) {
         }
         throw new Error(`timeout waiting for ${desc}`);
     }
-    const shot = async (name) => {
-        await sleep(450);
+    const tagShotHashes = new Set();
+    const shot = async (name, { uniqueTag } = {}) => {
+        await sleep(500);
+        await G('g.captureRedraw()');
         const img = await wc.capturePage();
-        fs.writeFileSync(path.join(outDir, name), img.toPNG());
-        console.log('[capture] wrote', name, img.getSize());
+        const png = img.toPNG();
+        const hash = crypto.createHash('md5').update(png).digest('hex');
+        if (uniqueTag) {
+            if (tagShotHashes.has(hash)) throw new Error(`duplicate tag garden png hash for ${name} (${hash})`);
+            tagShotHashes.add(hash);
+        }
+        fs.writeFileSync(path.join(outDir, name), png);
+        console.log('[capture] wrote', name, img.getSize(), hash.slice(0, 8));
     };
     const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(1400); };
     await waitFor('ready', (d) => d.ready === '1');
@@ -209,34 +298,62 @@ async function runTagsArt(win, outDir) {
     await lightingTo('midday');
     const planted = await G('g.prepCaptureGarden()');
     if (!planted || planted < 3) throw new Error(`prepCaptureGarden planted ${planted}`);
-    await sleep(1600);
-    await G(`g.prepTagGardenDemo('partial')`);
-    await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
-    await sleep(600);
+    await sleep(1400);
+    await assertPlanted(wc, 4);
+
+    await G(`g.applyTagGardenDemo('partial')`);
+  await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
+    await sleep(900);
+    await waitNeedsCard(wc);
     await shot('needs-card-tomato-partial-day.png');
-    await G(`g.show('idle')`);
-    await G(`g.prepTagGardenDemo('complete')`);
-    await sleep(1400);
-    await waitTagPixels(wc, 'bed3');
-    await shot('needs-tag-complete-soil-day.png');
-    await G(`g.prepTagGardenDemo('resting')`);
-    await sleep(1000);
-    await waitTagPixels(wc, 'bed3');
-    await shot('needs-tag-resting-morning-day.png');
-    await lightingTo('night');
-    await G(`g.prepTagGardenDemo('complete')`);
+
+    await G(`g.clearCaptureVisit()`);
+    await G(`g.prepCaptureGarden()`);
+    await G(`g.applyTagGardenDemo('complete')`);
     await sleep(1200);
-    await waitTagPixels(wc, 'bed3');
-    await shot('needs-tag-night.png');
+    await waitPlantSprite(wc, 761, 300);
+    await waitTagFacePaint(wc, 'bed3', { minPainted: 14 });
+    await shot('needs-tag-complete-soil-day.png', { uniqueTag: true });
+
+    await G(`g.setGardenTime(420)`);
+    await G(`g.prepCaptureGarden()`);
+    await G(`g.applyTagGardenDemo('resting')`);
+    await sleep(1200);
+    await waitPlantSprite(wc, 761, 300);
+    await waitTagFacePaint(wc, 'bed3', { minPainted: 10, faceDy: -55 });
+    await shot('needs-tag-resting-morning-day.png', { uniqueTag: true });
+
+    await lightingTo('night');
+    await G('g.setGardenTime(22 * 60)');
+    await assertLighting(wc, 'night');
+    await G(`g.prepCaptureGarden()`);
+    await G(`g.applyTagGardenDemo('complete')`);
+    await sleep(1200);
+    await assertLighting(wc, 'night');
+    await waitPlantSprite(wc, 761, 300);
+    await waitTagFacePaint(wc, 'bed3', { minPainted: 14 });
+    await shot('needs-tag-night.png', { uniqueTag: true });
+
+    await lightingTo('night');
+    await G('g.setGardenTime(22 * 60)');
+    await G(`g.clearCaptureVisit()`);
     await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
-    await sleep(600);
+    await sleep(900);
+    await waitNeedsCard(wc);
+    await assertLighting(wc, 'night');
     await shot('needs-card-tomato-partial-night.png');
-    await G(`g.show('idle')`);
+
+    await G(`g.clearCaptureVisit()`);
     await lightingTo('midday');
-    await G(`g.prepTagGardenDemo('garden')`);
-    await sleep(1400);
-    await waitTagPixels(wc, 'bed3');
-    await shot('needs-garden-tags-midday.png');
+    await G('g.setGardenTime(12 * 60)');
+    await G(`g.prepCaptureGarden()`);
+    await G(`g.applyTagGardenDemo('garden')`);
+    await sleep(1200);
+    await waitPlantSprite(wc, 761, 300);
+    await waitPlantSprite(wc, 347, 300);
+    await waitTagFacePaint(wc, 'bed3', { minPainted: 8 });
+    await waitTagFacePaint(wc, 'bed1', { minPainted: 8 });
+    await shot('needs-garden-tags-midday.png', { uniqueTag: true });
 }
 
 async function runStakeArt(win, outDir) {
@@ -246,7 +363,8 @@ async function runStakeArt(win, outDir) {
     const G = (expr) => js(`(() => { const g = window.__smileGarden; return ${expr}; })()`);
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const shot = async (name) => {
-        await sleep(350);
+        await sleep(500);
+        await G('g.captureRedraw()');
         const img = await wc.capturePage();
         fs.writeFileSync(path.join(outDir, name), img.toPNG());
         console.log('[capture] wrote', name, img.getSize());
@@ -267,21 +385,29 @@ async function runStakeArt(win, outDir) {
     await G(`g.setStretchHudDemo('left-hold')`);
     await sleep(1200);
     const ringSum = await js(`(() => {
-        const c = document.getElementById('stretch-ring-left');
+        const c = document.getElementById('stretch-ring');
         if (!c) return 0;
         const ctx = c.getContext('2d');
-        const d = ctx.getImageData(80, 80, 40, 40).data;
+        const d = ctx.getImageData(88, 20, 24, 24).data;
         let sum = 0;
         for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2];
         return sum;
     })()`);
-    if (ringSum < 800) throw new Error(`stretch vine ring empty (sum=${ringSum})`);
+    if (ringSum < 400) throw new Error(`stretch vine ring fill weak (sum=${ringSum})`);
+    const leftOnly = await js(`(() => {
+        const row = document.querySelector('.stretch-rings');
+        const rings = document.querySelectorAll('#stretch-ring').length;
+        return { oldRow: !!(row && row.offsetParent), rings };
+    })()`, true);
+    if (leftOnly.oldRow) throw new Error('legacy dual ring row still visible');
     await shot('stake-guide-tilted.png');
     await shot('stake-ring-midfill.png');
     await G('g.clearStretchHudDemo()');
     await G(`g.show('idle')`);
-    await G('g.setStakedBed(2, true)');
-    await sleep(1200);
+    await G('g.prepStakedTomatoCapture()');
+    await sleep(1400);
+    await assertPlanted(wc, 1);
+    await waitPlantSprite(wc, 761, 300, 1);
     await shot('garden-staked-tomato.png');
     await G('g.setStakedBed(6, true)');
     await sleep(1200);
