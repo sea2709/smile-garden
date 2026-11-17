@@ -558,7 +558,15 @@
                         : step === 'pick' ? 'smile'
                             : step);
         if (idx < 0) idx = 0;
+        const stretchTrack = els.stepTrack.querySelector('[data-step="stretch"]');
+        const showStretchTrack = session && typeof session.selectedPlantNeedsStake === 'function'
+            && session.selectedPlantNeedsStake();
+        if (stretchTrack) stretchTrack.hidden = !showStretchTrack;
         els.stepTrack.querySelectorAll('span').forEach((s, i) => {
+            if (s.dataset.step === 'stretch' && s.hidden) {
+                s.classList.remove('on', 'done');
+                return;
+            }
             s.classList.toggle('on', i === idx);
             s.classList.toggle('done', i < idx);
         });
@@ -764,10 +772,24 @@
                 fb.textContent = '🌻';
                 img.replaceWith(fb);
             };
-            if (!img.src) img.src = artUrl(ART.stretch.guideSunflower);
+            const stemEl = document.getElementById('stretch-sunflower-stem');
+            const headSrc = ART.stretch.guideSunflowerHead;
+            const stemSrc = ART.stretch.guideSunflowerStem;
+            const pv = ART.stretch.guidePivot || { x: 0.5, y: 0.75 };
+            if (img) {
+                img.style.transformOrigin = `${pv.x * 100}% ${pv.y * 100}%`;
+                if (!img.src) img.src = artUrl(headSrc || ART.stretch.guideSunflower);
+            }
+            if (stemEl && stemSrc && !stemEl.dataset.fallback) {
+                stemEl.onerror = () => { stemEl.dataset.fallback = '1'; stemEl.hidden = true; };
+                if (!stemEl.src) stemEl.src = artUrl(stemSrc);
+                stemEl.hidden = false;
+            }
         }
         const flowerEl = document.querySelector('.stretch-flower-fallback') || img;
-        if (flowerEl) flowerEl.style.transform = `rotate(${Math.max(-32, Math.min(32, roll * 1.4))}deg)`;
+        if (flowerEl && flowerEl.tagName !== 'DIV') {
+            flowerEl.style.transform = `rotate(${Math.max(-32, Math.min(32, roll * 1.4))}deg)`;
+        }
         drawStretchRing(els.stretchRingLeft, snap.leftProgress, snap.leftDone);
         drawStretchRing(els.stretchRingRight, snap.rightProgress, snap.rightDone);
         if (snap.needsFaceHint) {

@@ -92,7 +92,10 @@
 
     <!-- Breathing guide (center) ----------------------------------------- -->
     <div id="stretch-guide" class="stretch-guide" hidden>
-        <img id="stretch-sunflower" class="stretch-sunflower" width="96" height="96" alt="">
+        <div class="stretch-flower-pivot" id="stretch-flower-pivot">
+            <img id="stretch-sunflower-stem" class="stretch-sunflower-stem" width="96" height="96" alt="" hidden>
+            <img id="stretch-sunflower" class="stretch-sunflower" width="96" height="96" alt="">
+        </div>
         <div class="stretch-rings">
             <div class="stretch-ring"><canvas id="stretch-ring-left" width="60" height="60"></canvas><label>Left</label></div>
             <div class="stretch-ring"><canvas id="stretch-ring-right" width="60" height="60"></canvas><label>Right</label></div>
@@ -150,7 +153,7 @@
                 <li><span class="dot dot-sun"></span><b>Smile</b> for about <span id="plan-smile">45</span> s: sunlight</li>
                 <li><span class="dot dot-water"></span><b>Talk</b> to your plants for about <span id="plan-talk">30</span> s: water</li>
                 <li><span class="dot dot-fert"></span><b>Breathe</b> calmly, if you like: fertilizer (optional)</li>
-                <li><span class="dot dot-stretch"></span><b>Stretch</b> your neck, if you like: stakes the plant for a richer harvest (optional)</li>
+                <li><span class="dot dot-stretch"></span><b>Stretch</b> your neck on tall plants, if you like: stakes them for a richer harvest (optional)</li>
             </ol>
             <p id="greet-note" class="note"></p>
             <div class="actions">

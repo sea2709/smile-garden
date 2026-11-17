@@ -294,7 +294,7 @@ async function run(win, outDir) {
     await sleep(2500);
     await G(`g.show('idle')`);
     await shot('09-golden-hour-garden.png');
-    await G('g.setStakedBed(4, true)');
+    await G('g.setStakedBed(2, true)');
     await sleep(800);
     await shot('09b-staked-plant-bed.png');
     await G('g.setStakedBed(4, false)');

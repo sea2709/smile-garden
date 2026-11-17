@@ -162,7 +162,11 @@ test('breath UI art: manifest pills, icons, dots and breath-ui.css', () => {
 test('stretch UI art: manifest paths, css, and art spec doc', () => {
     assert.ok(ART.stretch);
     assert.ok(ART.stretch.guideSunflower.includes('stretch/'));
-    assert.ok(ART.stretch.stake.includes('stake'));
+    assert.ok(ART.stretch.stakeDay.includes('stake-day'));
+    assert.ok(ART.stretch.stakeNight.includes('stake-night'));
+    assert.ok(ART.stretch.guideSunflowerHead.includes('head'));
+    assert.ok(ART.plantStakeSrc('day').includes('stake-day'));
+    assert.ok(ART.plantStakeLoopSrc('night').includes('stake-loop'));
     assert.ok(fs.existsSync(path.join(root, 'renderer', 'stretch-ui.css')));
     assert.ok(fs.existsSync(path.join(root, 'docs', 'ART-STRETCH.md')));
     assert.ok(fs.existsSync(path.join(root, 'game', 'stretch.js')));

@@ -17,6 +17,18 @@ function run(session, seconds, input) {
 }
 const face = (h, talking) => ({ happiness: h, talking: talking === undefined ? false : talking, faceVisible: true });
 
+test('plant needs.stake: tall climbers only', () => {
+    assert.equal(L.plantNeedsStake('lettuce'), false);
+    assert.equal(L.plantNeedsStake('mint'), false);
+    assert.equal(L.plantNeedsStake('tomato'), true);
+    assert.equal(L.plantNeedsStake('cucumber'), true);
+    assert.equal(L.plantNeedsStake('sunflower'), true);
+    assert.equal(L.plantNeedsStake('apple'), true);
+    for (const p of L.PLANTS) {
+        assert.ok(p.needs && typeof p.needs.stake === 'boolean', `${p.id} has needs.stake`);
+    }
+});
+
 test('normalizeConfidence converts SDK percentages to 0..1 and clamps', () => {
     assert.equal(L.normalizeConfidence(0), 0);
     assert.equal(L.normalizeConfidence(50), 0.5);

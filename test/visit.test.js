@@ -382,9 +382,7 @@ test('skip is always available, breathing keeps finished breaths and stays optio
     s.startBreathing({ pace: 'standard', breaths: 5 });
     run(s, 12, neutral);
     s.skip();
-    assert.equal(s.step, 'stretch-offer');
-    s.skip();
-    assert.equal(s.step, 'summary');
+    assert.equal(s.step, 'summary', 'lettuce skips stretch silently after breathing');
     const r = s.result();
     assert.equal(r.breaths, 1);
     assert.ok(r.breaths >= 1);
@@ -392,8 +390,6 @@ test('skip is always available, breathing keeps finished breaths and stays optio
     const t = new V.VisitSession({ plots, plantedBeds: [0] });
     t.selectedPlot = 0;
     t.go('breathe-offer');
-    t.skip();
-    assert.equal(t.step, 'stretch-offer');
     t.skip();
     assert.equal(t.step, 'summary');
     assert.equal(t.result().breathTaken, false);

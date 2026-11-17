@@ -187,18 +187,40 @@
         basketHud: Object.freeze({ x: 1195, y: 68, w: 36, h: 36 }),
         stretch: Object.freeze({
             scale2x: true,
+            /** Combined guide (fallback); Heily ships head + stem separately. */
             guideSunflower: '../assets/ui/stretch/guide-sunflower.png',
+            guideSunflowerHead: '../assets/ui/stretch/guide-sunflower-head.png',
+            guideSunflowerStem: '../assets/ui/stretch/guide-sunflower-stem.png',
+            /** Normalized pivot on guide frame (stem base); head rotates around this. */
+            guidePivot: Object.freeze({ x: 0.5, y: 0.75 }),
             guidePixels: Object.freeze([192, 192]),
             guideDisplay: 96,
             vineRingEmpty: '../assets/ui/stretch/vine-ring-empty.png',
             vineRingFull: '../assets/ui/stretch/vine-ring-full.png',
             vinePixels: Object.freeze([120, 120]),
             vineDisplay: 60,
-            stake: '../assets/plants/stake.png',
+            stake: '../assets/plants/stake-day.png',
+            stakeDay: '../assets/plants/stake-day.png',
+            stakeNight: '../assets/plants/stake-night.png',
+            /** Soil anchor on stake sprite (normalized from bottom-left of frame). */
+            stakeAnchor: Object.freeze({ x: 0.5, y: 1 }),
             stakePixels: Object.freeze([80, 200]),
             stakeDisplay: Object.freeze({ w: 20, h: 50 }),
             stakeOffset: Object.freeze([14, -8]),
+            stakeAbsorbStripDay: '../assets/effects/stake-absorb-day-strip.png',
+            stakeAbsorbStripNight: '../assets/effects/stake-absorb-night-strip.png',
+            stakeLoopStripDay: '../assets/effects/stake-loop-day-strip.png',
+            stakeLoopStripNight: '../assets/effects/stake-loop-night-strip.png',
         }),
-        plantStakeSrc() { return this.stretch.stake; },
+        plantStakeSrc(lighting) {
+            const kind = lighting === 'night' ? 'night' : 'day';
+            return kind === 'night' ? this.stretch.stakeNight : this.stretch.stakeDay;
+        },
+        plantStakeAbsorbSrc(lighting) {
+            return lighting === 'night' ? this.stretch.stakeAbsorbStripNight : this.stretch.stakeAbsorbStripDay;
+        },
+        plantStakeLoopSrc(lighting) {
+            return lighting === 'night' ? this.stretch.stakeLoopStripNight : this.stretch.stakeLoopStripDay;
+        },
     });
 })();

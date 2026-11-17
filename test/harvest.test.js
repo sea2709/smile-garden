@@ -14,6 +14,7 @@ test('computeYield: base 1, +1 full water, +1 fertilizer, +1 staked, never below
     assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0, matureFert: 0 }), 1);
     assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0.5, matureFert: 0 }), 1);
     assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0, matureFert: 0, staked: true }), 2);
+    assert.equal(H.computeYield({ plantId: 'lettuce', matureWater: 0, matureFert: 0, staked: true }), 1, 'low plants ignore stray staked flag');
 });
 
 test('harvestPlot pull clears bed and grants spare seed', () => {

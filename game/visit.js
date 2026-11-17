@@ -575,7 +575,7 @@
             for (const b of bedResults) {
                 const p = state.plots[b.plot];
                 if (!p) continue;
-                if (b.stretchStaked) p.staked = true;
+                if (b.stretchStaked && L.plantNeedsStake(p.plantId)) p.staked = true;
                 const kind = L.plantById(p.plantId);
                 if (b.sunHours > 0 || b.water > 0 || b.fertilizer > 0) {
                     tended.push({ plot: b.plot, plantId: p.plantId, name: kind.name, sunHours: b.sunHours, water: b.water, fertilizer: b.fertilizer });
@@ -772,6 +772,18 @@
             if (!p) return { cost: TUNING.maxSunHours };
             const kind = L.plantById(p.plantId);
             return { cost: kind ? kind.cost : TUNING.maxSunHours, plantId: p.plantId };
+        }
+
+        selectedPlantNeedsStake() {
+            const plot = this.selectedPlot;
+            if (plot == null) return false;
+            const p = this.plots[plot];
+            return L.plantNeedsStake(p && p.plantId);
+        }
+
+        /** After breathing (or skipping it), offer stretch only for climbing/tall crops. */
+        _goAfterBreathing() {
+            return this.selectedPlantNeedsStake() ? this.go('stretch-offer') : this.advanceToNextPlant();
         }
 
         _syncLiveFromTally() {
@@ -982,12 +994,12 @@
             if (this.step === 'pick') return this.confirmPick();
             if (this.step === 'smile') return this.go('talk');
             if (this.step === 'talk') return this.go('breathe-offer');
-            if (this.step === 'breathe-offer') return this.go('stretch-offer');
+            if (this.step === 'breathe-offer') return this._goAfterBreathing();
             if (this.step === 'breathe') {
                 this.breathSkipped = true;
                 this.live.breathSkipped = true;
                 this._saveLiveToTally();
-                return this.go('stretch-offer');
+                return this._goAfterBreathing();
             }
             if (this.step === 'stretch-offer') return this.advanceToNextPlant();
             if (this.step === 'stretch') {
@@ -1005,6 +1017,7 @@
         }
 
         startStretch() {
+            if (!this.selectedPlantNeedsStake()) return this.advanceToNextPlant();
             return this.go('stretch');
         }
 
@@ -1053,7 +1066,7 @@
                 this.live.breathsDone = this.breathsDone;
                 if (this.breathT >= this.pacer.total) {
                     this._saveLiveToTally();
-                    this.go('stretch-offer');
+                    this._goAfterBreathing();
                 }
             } else if (this.step === 'stretch' && this.stretchFlow) {
                 const snap = this.stretchFlow.update(step, input && input.stretch ? input.stretch : {});

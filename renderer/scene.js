@@ -13,6 +13,7 @@
 (function () {
     'use strict';
     const ART = window.SmileArt;
+    const L = window.SmileLogic;
     const TAU = Math.PI * 2;
 
     function loadImage(src) {
@@ -82,7 +83,11 @@
         const genericHarvest = { day: null, night: null };
         const produceImgs = {};
         const basketImg = (ART.produce && ART.produce.basket) ? loadImage(ART.produce.basket) : null;
-        const stakeImg = ART.stretch ? loadImage(resolveArt(ART.stretch.stake)) : null;
+        const stakeImgs = { day: null, night: null };
+        if (ART.stretch) {
+            stakeImgs.day = loadImage(resolveArt(ART.plantStakeSrc('day')));
+            stakeImgs.night = loadImage(resolveArt(ART.plantStakeSrc('night')));
+        }
         const logoDayImg = (ART.ui && ART.ui.logoDay) ? loadImage(resolveArt(ART.ui.logoDay)) : null;
         const logoNightImg = (ART.ui && ART.ui.logoNight) ? loadImage(resolveArt(ART.ui.logoNight)) : null;
         let logoOnCanvas = false;
@@ -1135,14 +1140,20 @@
         function drawStake(i) {
             const pl = plots[i];
             if (!pl || !pl.staked || !ART.stretch) return;
+            if (L.plantNeedsStake && !L.plantNeedsStake(pl.plantId)) return;
             const bed = ART.plots[i];
             const off = ART.stretch.stakeOffset || [14, -8];
             const disp = ART.stretch.stakeDisplay || { w: 20, h: 50 };
             const x = bed.x + off[0];
             const y = bed.y + off[1];
+            const stakeImg = stakeImgs[lighting === 'night' ? 'night' : 'day'] || stakeImgs.day;
             if (ready(stakeImg)) {
                 const sp = ART.stretch.stakePixels || [80, 200];
-                ctx.drawImage(stakeImg, 0, 0, sp[0], sp[1], x - disp.w / 2, y - disp.h, disp.w, disp.h);
+                const ax = (ART.stretch.stakeAnchor && ART.stretch.stakeAnchor.x) || 0.5;
+                const ay = (ART.stretch.stakeAnchor && ART.stretch.stakeAnchor.y) || 1;
+                const dx = x - disp.w * ax;
+                const dy = y - disp.h * ay;
+                ctx.drawImage(stakeImg, 0, 0, sp[0], sp[1], dx, dy, disp.w, disp.h);
             } else {
                 ctx.save();
                 ctx.fillStyle = '#c4a574';

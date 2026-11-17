@@ -596,9 +596,16 @@
         nextPickDelay: 0.7,   // after a plant matures, auto-replant last / next
     });
 
+    /**
+     * Per-plant care hints (stake today; sun/water/fertilizer dot levels 1–3 later).
+     * @typedef {{ stake?: boolean, sun?: 1|2|3, water?: 1|2|3, fertilizer?: 1|2|3 }} PlantNeeds
+     */
+    const DEFAULT_PLANT_NEEDS = Object.freeze({ stake: false });
+
     const PLANTS = Object.freeze([
         Object.freeze({
             id: 'lettuce', name: 'Lettuce', emoji: '🥬',
+            needs: Object.freeze({ stake: false }),
             sunHours: 4, sunHoursLabel: '4 hours',
             cost: 4, difficulty: 'easy', difficultyLabel: 'Easy',
             blurb: 'Leafy lettuce is happy with about 4 hours of sun. Keep the soil moist so the leaves stay sweet, not bitter.',
@@ -607,6 +614,7 @@
         }),
         Object.freeze({
             id: 'mint', name: 'Mint', emoji: '🌿',
+            needs: Object.freeze({ stake: false }),
             sunHours: 5, sunHoursLabel: '4–6 hours',
             cost: 5, difficulty: 'easy', difficultyLabel: 'Easy',
             blurb: 'Mint likes 4–6 hours of sun, or a little shade. It spreads, so give it its own plot and keep the soil moist.',
@@ -615,6 +623,7 @@
         }),
         Object.freeze({
             id: 'cucumber', name: 'Cucumber', emoji: '🥒',
+            needs: Object.freeze({ stake: true }),
             sunHours: 7, sunHoursLabel: '6–8 hours',
             cost: 7, difficulty: 'medium', difficultyLabel: 'Medium',
             blurb: 'Cucumbers want 6–8 hours of direct sun and steady water. Give the vine room to climb.',
@@ -623,6 +632,7 @@
         }),
         Object.freeze({
             id: 'tomato', name: 'Tomato', emoji: '🍅',
+            needs: Object.freeze({ stake: true }),
             sunHours: 8, sunHoursLabel: '7–8 hours',
             cost: 8, difficulty: 'medium', difficultyLabel: 'Medium',
             blurb: 'Tomatoes are sun lovers: 7–8 hours if you can. Warmth and regular water help the fruit ripen.',
@@ -631,6 +641,7 @@
         }),
         Object.freeze({
             id: 'sunflower', name: 'Sunflower', emoji: '🌻',
+            needs: Object.freeze({ stake: true }),
             sunHours: 8, sunHoursLabel: '6–8+ hours',
             cost: 10, difficulty: 'hard', difficultyLabel: 'Hard',
             blurb: 'Sunflowers thrive in full sun, 6–8 hours or more. Plant them where they can stretch tall and drink the light.',
@@ -639,6 +650,7 @@
         }),
         Object.freeze({
             id: 'apple', name: 'Apple tree', emoji: '🍎',
+            needs: Object.freeze({ stake: true }),
             sunHours: 8, sunHoursLabel: '8 hours',
             cost: 12, difficulty: 'hard', difficultyLabel: 'Hard',
             blurb: 'Apple trees need a full 8 hours of sun. A tree takes patience — more smiles to reach the fruit.',
@@ -651,6 +663,15 @@
 
     function plantById(id) {
         return PLANTS_BY_ID[id] || null;
+    }
+
+    function plantNeeds(id) {
+        const p = plantById(id);
+        return (p && p.needs) ? p.needs : DEFAULT_PLANT_NEEDS;
+    }
+
+    function plantNeedsStake(id) {
+        return !!plantNeeds(id).stake;
     }
 
     /** Stage for a 0..1 fill: { index, key, label, at, next, toNext, progress }. */
@@ -1078,6 +1099,9 @@
         levelFor,
         stageFor,
         plantById,
+        plantNeeds,
+        plantNeedsStake,
+        DEFAULT_PLANT_NEEDS,
         scorePlots,
         mulberry32,
         SmileDetector,

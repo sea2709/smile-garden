@@ -140,6 +140,20 @@
         return new Date(y, m - 1, d, 0, 0, 0, 0);
     }
 
+    function logicNeedsStake(plantId) {
+        try {
+            if (typeof require === 'function') {
+                const L = require('./logic.js');
+                return L.plantNeedsStake(plantId);
+            }
+        } catch (_) { /* browser bundle */ }
+        const root = typeof self !== 'undefined' ? self : typeof global !== 'undefined' ? global : null;
+        if (root && root.SmileLogic && root.SmileLogic.plantNeedsStake) {
+            return root.SmileLogic.plantNeedsStake(plantId);
+        }
+        return false;
+    }
+
     function computeYield(p) {
         const cfg = plantHarvestCfg(p.plantId);
         let y = cfg.baseYield || 1;
@@ -147,7 +161,7 @@
         const f = p.matureFert == null ? 0 : p.matureFert;
         if (w >= WATER_FULL) y += 1;
         if (f > 0) y += 1;
-        if (p.staked) y += 1;
+        if (p.staked && logicNeedsStake(p.plantId)) y += 1;
         return y;
     }
 

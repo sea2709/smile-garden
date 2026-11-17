@@ -56,6 +56,17 @@ test('setSeason unchanged leaves stretch flow positions (visit session) stable',
     assert.ok(session.stretchSnap.leftProgress > snap0.leftProgress);
 });
 
+test('visit offers stretch only for plants that need a stake', () => {
+    const lettuce = new V.VisitSession({ plots: [{ plantId: 'lettuce', stage: 2, sunBank: 0 }], plantedBeds: [0] });
+    lettuce.selectedPlot = 0;
+    lettuce.go('breathe-offer');
+    assert.equal(lettuce.skip(), 'summary');
+    const tomato = new V.VisitSession({ plots: [{ plantId: 'tomato', stage: 2, sunBank: 0 }], plantedBeds: [0] });
+    tomato.selectedPlot = 0;
+    tomato.go('breathe-offer');
+    assert.equal(tomato.skip(), 'stretch-offer');
+});
+
 test('lighting-style refresh without season change keeps stretch sample positions', () => {
     const flow = S.createStretchFlow();
     flow.update(0.02, { rollRadOverride: 0.25, faceVisible: true });

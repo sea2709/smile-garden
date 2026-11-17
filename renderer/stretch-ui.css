@@ -9,6 +9,17 @@
     pointer-events: none;
     z-index: 28;
 }
+.stretch-flower-pivot {
+    position: relative;
+    width: 96px;
+    height: 96px;
+}
+.stretch-sunflower-stem {
+    position: absolute;
+    left: 0;
+    top: 0;
+    pointer-events: none;
+}
 .stretch-guide img,
 .stretch-guide .stretch-flower-fallback {
     width: 96px;
