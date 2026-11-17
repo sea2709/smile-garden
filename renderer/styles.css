@@ -39,6 +39,10 @@ button { font-family: inherit; }
 }
 
 /* ---------- top bar ---------- */
+:root {
+    --hud-logo-width: 184px;
+    --hud-logo-gap: 12px;
+}
 .topbar {
     position: absolute; top: 0; left: 0; right: 0; height: 56px; z-index: 20;
     display: flex; align-items: center; gap: 16px; padding: 0 18px;
@@ -59,8 +63,17 @@ body[data-canvas-logo="1"][data-lighting="night"] .brand-logo-night { display: b
 .brand-fallback { color: var(--ink); transition: opacity 0.35s ease; }
 /* v5: painted logo on the garden canvas; show serif text only if art failed to load */
 body[data-garden-v="5"] .brand-fallback { display: none; }
-body[data-garden-v="5"] .brand { min-width: 200px; width: 200px; flex: 0 0 200px; overflow: visible; pointer-events: none; position: relative; z-index: 22; }
-body[data-garden-v="5"] .chips { margin-left: 4px; }
+body[data-garden-v="5"] .brand,
+body[data-canvas-logo="1"] .brand:has(.brand-logo) {
+    min-width: var(--hud-logo-width); width: var(--hud-logo-width); flex: 0 0 var(--hud-logo-width);
+    overflow: visible; pointer-events: none; position: relative; z-index: 22;
+}
+body[data-garden-v="5"] .chips,
+body[data-canvas-logo="1"] .brand:has(.brand-logo) + .chips {
+    margin-left: var(--hud-logo-gap);
+    flex: 1;
+    min-width: 0;
+}
 body[data-garden-v="5"][data-canvas-logo="1"] .brand-fallback { display: none; }
 /* Only if painted logos fail to load after the canvas had a chance to draw them */
 body[data-garden-v="5"][data-canvas-logo="0"] .brand-fallback {
@@ -68,7 +81,10 @@ body[data-garden-v="5"][data-canvas-logo="0"] .brand-fallback {
 }
 body[data-garden-v="5"][data-canvas-logo="0"] .brand { min-width: 120px; width: auto; flex: 0 0 auto; }
 body[data-canvas-logo="1"] .brand-fallback { opacity: 0; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
-body[data-canvas-logo="1"] .brand { min-width: 0; width: 0; flex: 0 0 auto; overflow: visible; pointer-events: none; }
+body[data-canvas-logo="1"] .brand:not(:has(.brand-logo)) {
+    min-width: 0; width: 0; flex: 0 0 auto; overflow: visible; pointer-events: none;
+}
+body[data-painted-clock="1"] .chip-day { display: none; }
 .btn-bed .btn-bed-icon { width: 28px; height: 28px; margin-right: 6px; vertical-align: middle; }
 body[data-painted-clock="1"] .chip-day #day-chip-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
 .chips { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }

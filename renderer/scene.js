@@ -1434,21 +1434,21 @@
             const cfg = ART.clock;
             const CARC = window.SmileClockArc;
             const tok = CARC.clockTokenState(gardenClockMinutes);
-            const disp = (cfg.tokenDisplay || 32) * 1.2;
+            const disp = cfg.tokenDisplay || 32;
             const upper = (deg) => CARC.tokenFrameXY(deg).y < cfg.arc.centerY - 1;
             const paint = (img, deg, alpha, sun) => {
-                if (alpha < 0.03) return;
+                if (alpha < 0.03 || !upper(deg)) return;
                 const fr = CARC.tokenFrameXY(deg);
                 const p = clockPointFromFrame(fr.x, fr.y);
                 ctx.save();
                 ctx.globalAlpha = alpha;
                 ctx.shadowColor = sun ? 'rgba(255, 210, 90, 0.65)' : 'rgba(210, 220, 255, 0.45)';
-                ctx.shadowBlur = sun ? 8 : 5;
+                ctx.shadowBlur = sun ? 6 : 4;
                 if (ready(img)) ctx.drawImage(img, p.x - disp / 2, p.y - disp / 2, disp, disp);
                 else {
                     ctx.fillStyle = sun ? '#f0b84a' : '#d8dce8';
                     ctx.beginPath();
-                    ctx.arc(p.x, p.y, disp * 0.24, 0, TAU);
+                    ctx.arc(p.x, p.y, disp * 0.28, 0, TAU);
                     ctx.fill();
                 }
                 ctx.restore();

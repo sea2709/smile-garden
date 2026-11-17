@@ -1599,6 +1599,7 @@
             localStorage.removeItem(STORE_KEY);
             hudSeasonOverride = false;
             state = V.createState(new Date());
+            gardenClock.state = state;
             clock.offsetDays = 0;
             plotsForScene({ instant: true });
             scene.setSeason(state.season);

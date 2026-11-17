@@ -59,7 +59,7 @@ async function runTimeArt(win, outDir) {
         await sleep(120);
     }
     await G('g.reset()');
-    await G('gardenClock.pause()');
+    await G('g.gardenClock.pause()');
     await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
     await sleep(800);
     await waitHud();
@@ -69,6 +69,7 @@ async function runTimeArt(win, outDir) {
         await G(`g.show('idle')`);
     });
     await shot('clock-dawn.png');
+    await shotTopBar2x('topbar-dawn-6am-2x.png');
     await frame(async () => { await G('g.setGardenTime(12 * 60)'); });
     await shot('clock-noon.png');
     await shotTopBar2x('topbar-noon-2x.png');
@@ -76,8 +77,10 @@ async function runTimeArt(win, outDir) {
     await shot('clock-dusk.png');
     await frame(async () => { await G('g.setGardenTime(18 * 60)'); });
     await shot('clock-sunset-6pm.png');
+    await shotTopBar2x('topbar-dusk-6pm-2x.png');
     await frame(async () => { await G('g.setGardenTime(22 * 60)'); });
     await shot('clock-night.png');
+    await shotTopBar2x('topbar-night-2x.png');
     for (const [season, name] of [['spring', 'season-spring.png'], ['summer', 'season-summer.png'], ['autumn', 'season-autumn.png'], ['winter', 'season-winter.png']]) {
         await frame(async () => {
             await G(`g.setSeason('${season}')`);

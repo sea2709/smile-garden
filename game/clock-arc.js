@@ -48,7 +48,8 @@ function clockTokenState(gardenMinutes) {
         sunAlpha = 1 - t;
         moonAlpha = t;
     } else {
-        moonDeg = endDeg;
+        const t = Math.min(1, (hour - 18) / 12);
+        moonDeg = startDeg + (endDeg - startDeg) * t;
         moonAlpha = 1;
     }
 
