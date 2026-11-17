@@ -188,14 +188,42 @@ test('stake art matches assets/stake-manifest.json', () => {
     }
 });
 
+test('tags art matches assets/tags-manifest.json', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'tags-manifest.json'), 'utf8'));
+    assert.equal(JSON.stringify(ART.needs.tagPixels), JSON.stringify(manifest.tag.px));
+    assert.equal(JSON.stringify(ART.needs.tagAnchor), JSON.stringify(manifest.tag.anchor));
+    assert.equal(JSON.stringify(ART.needs.faceBox), JSON.stringify(manifest.tag.faceBox));
+    assert.equal(ART.needs.cardPixels[0], manifest.card.px[0]);
+    assert.equal(ART.needs.cardDisplay[0], manifest.card.display[0]);
+    assert.ok(fs.existsSync(path.join(root, 'assets', manifest.tag.day)));
+    assert.ok(fs.existsSync(path.join(root, 'assets', manifest.tag.night)));
+    assert.ok(fs.existsSync(path.join(root, 'assets', manifest.card.file)));
+    for (let b = 1; b <= 8; b++) {
+        const key = 'bed' + b;
+        assert.equal(JSON.stringify(ART.needs.tagSpots[key].anchor), JSON.stringify(manifest.tag.beds[key].anchor));
+        assert.equal(ART.needs.tagSpots[key].scale, manifest.tag.beds[key].scale);
+        assert.equal(JSON.stringify(ART.needs.soilBeds[key].pos), JSON.stringify(manifest.soil.beds[key].pos));
+        assert.ok(fs.existsSync(path.join(root, 'assets', `scene/soil/soil-day-bed${b}.png`)), key);
+        assert.ok(fs.existsSync(path.join(root, 'assets', `scene/soil/soil-night-bed${b}.png`)), key);
+        const buf = fs.readFileSync(path.join(root, 'assets', `scene/soil/soil-day-bed${b}.png`));
+        assert.equal(buf.readUInt32BE(16), manifest.soil.beds[key].px[0], `${key} soil w`);
+        assert.equal(buf.readUInt32BE(20), manifest.soil.beds[key].px[1], `${key} soil h`);
+    }
+    for (const key of ['sun', 'water', 'fertilizer', 'stake']) {
+        assert.ok(fs.existsSync(path.join(root, 'assets', manifest.icons[key].file)), key);
+    }
+    assert.ok(fs.existsSync(path.join(root, 'assets', manifest.icons.bloom.file)));
+    assert.ok(fs.existsSync(path.join(root, 'assets', manifest.icons.resting.file)));
+});
+
 test('stretch UI art: manifest paths, css, and art spec doc', () => {
     assert.ok(ART.needs);
-    assert.ok(ART.needs.plantTag.includes('needs/'));
-    assert.ok(ART.needs.bloomStamp.includes('bloom'));
+    assert.ok(ART.needs.plantTagDay.includes('ui/tag/plant-tag-day'));
+    assert.ok(ART.needs.bloomStamp.includes('bloom-stamp'));
     assert.ok(ART.needs.restingLeaf.includes('resting-leaf'));
     assert.ok(ART.tendedSoil);
-    assert.ok(ART.plantTendedSoilSrc('day', 0).includes('tended-soil-day-bed1'));
-    assert.ok(ART.plantTendedSoilSrc('night', 7).includes('tended-soil-night-bed8'));
+    assert.ok(ART.plantTendedSoilSrc('day', 0).includes('scene/soil/soil-day-bed1'));
+    assert.ok(ART.plantTendedSoilSrc('night', 7).includes('scene/soil/soil-night-bed8'));
     assert.ok(fs.existsSync(path.join(root, 'renderer', 'needs-ui.css')));
     assert.ok(ART.stretch);
     assert.ok(ART.stretch.guideStem.includes('guide-stem'));
@@ -205,7 +233,7 @@ test('stretch UI art: manifest paths, css, and art spec doc', () => {
     assert.ok(ART.plantStakeSrc('sunflower', 4).includes('stake-tall-day'));
     assert.ok(ART.plantStakeSrc('lettuce', 2).includes('stake-short-day'));
     assert.equal(ART.stakeOffsetXForPlant('tomato'), -56);
-    assert.ok(ART.needs.iconStake.includes('care/stake-icon'));
+    assert.ok(ART.needs.iconStake.includes('care/icon-stake'));
     assert.ok(fs.existsSync(path.join(root, 'renderer', 'stretch-ui.css')));
     assert.ok(fs.existsSync(path.join(root, 'docs', 'ART-NEEDS.md')));
     assert.ok(fs.existsSync(path.join(root, 'game', 'stretch.js')));

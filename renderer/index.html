@@ -93,17 +93,17 @@
     </section>
 
     <!-- Standalone stretch / stake care (not chained to smile/talk/breath) -->
-    <section id="needs-card" class="needs-card parchment" hidden aria-label="Plant needs">
-        <div class="needs-card-head">
-            <img id="needs-tag-img" class="needs-tag-img" width="40" height="48" alt="" hidden>
-            <div id="needs-tag-fallback" class="needs-tag-fallback" aria-hidden="true"></div>
+    <section id="needs-card" class="needs-card" hidden aria-label="Plant needs">
+        <img id="needs-card-bg" class="needs-card-bg" width="360" height="280" alt="" hidden>
+        <div id="needs-card-fallback" class="needs-card-fallback parchment" aria-hidden="true"></div>
+        <div class="needs-card-body">
             <span id="needs-plant-name" class="needs-plant-name"></span>
-            <img id="needs-bloom-stamp" class="needs-bloom" width="36" height="36" alt="All needs met today" hidden>
-            <img id="needs-resting-stamp" class="needs-resting" width="28" height="28" alt="Resting until today's needs are met" hidden>
+            <img id="needs-bloom-stamp" class="needs-bloom" width="64" height="64" alt="All needs met today" hidden>
+            <img id="needs-resting-stamp" class="needs-resting" width="32" height="32" alt="Resting until today's needs are met" hidden>
             <span id="needs-resting-fallback" class="needs-resting-fallback" aria-hidden="true" hidden>🌿</span>
+            <div id="needs-rows" class="needs-rows"></div>
         </div>
-        <div id="needs-icons" class="needs-icons"></div>
-        <button id="btn-needs-done" class="btn btn-primary btn-small" type="button">Done tending for now</button>
+        <button id="btn-needs-done" class="btn btn-primary btn-small needs-done" type="button">Done tending for now</button>
     </section>
 
     <section id="stretch-care-panel" class="stretch-care-panel parchment" hidden aria-label="Neck stretch care">

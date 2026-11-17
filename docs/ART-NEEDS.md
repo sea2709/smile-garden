@@ -1,6 +1,6 @@
-# Per-plant needs & neck stretch — art spec for Heily
+# Per-plant needs & neck stretch — art spec (Heily)
 
-All source art **2×**; game displays at **1×** unless noted. Paths and anchors are registered in `renderer/art.js` (`needs` and `stretch` blocks) with code fallbacks until assets land.
+Authoritative layout: **`assets/tags-manifest.json`** (tags, needs card, care icons, damp soil) and **`assets/stake-manifest.json`** (stake meter, stretch guide, plant stakes, stake FX). Code fallbacks remain until every asset is loaded. UI art is **2×** (draw at half PNG size); soil overlays are **1×** backdrop (1280×720).
 
 ## Unit lengths (game logic)
 
@@ -11,124 +11,77 @@ All source art **2×**; game displays at **1×** unless noted. Paths and anchors
 | Fertilizer | ~15 s guided breath |
 | Stake | one completed neck stretch (persists until harvest) |
 
-## Tended soil (damp bed, all needs met today)
-
-Shown when a bed’s **tag is complete** for the garden day (`dailyTends[plot].allMet` or live session progress). **Clears each morning** when `dailyTends` resets at bedtime. Plants never change sprite for incomplete care; **no withering** on season change.
-
-| Asset | Path pattern |
-|-------|----------------|
-| Day, beds 1–8 | `assets/plots/tended-soil-day-bed{N}.png` |
-| Night, beds 1–8 | `assets/plots/tended-soil-night-bed{N}.png` |
-
-- **Anchor (`tendedSoil.anchor` in `art.js`):** **(0.5, 1)** — bottom-centre on `ART.plots[i].x` / `.y` (soil centroid, same as plant stake line).
-- **Display width:** match `ART.plots[i].box` width (backdrop px); height scales from painted aspect.
-- **Source (2×):** width = `2 × (box[2] − box[0])`, height = `2 × (box[3] − box[1])` per bed (see `art.js` `plots[]` boxes).
-- **Clip region (code fallback):** `plots[i].box` rounded rect; darker **multiply** + soft gloss; no red, no droop.
-
-Example bed 1 box clip: x 266–435, y 338–396 (1280×720).
-
 ---
 
 ## Wooden plant tag
 
 | Asset | Path |
 |-------|------|
-| Tag | `assets/ui/needs/plant-tag.png` |
+| Day | `assets/ui/tag/plant-tag-day.png` |
+| Night | `assets/ui/tag/plant-tag-night.png` |
 
-- **Source:** 80×96 px (2×).
-- **Display:** 40×48 CSS px beside the needs card and as a bed marker in the scene.
-- **Anchor (`tagAnchor`):** **(0.5, 1)** — bottom-center on the soil-adjacent point.
-- **Bed offset (`tagOffset`):** **(0, −42)** px from plot centre (1×).
+- **Source:** 224×227 px (2×).
+- **Display:** 112×113.5 px at scale 1 (× row scale: back beds **0.5** → 56×57, front **0.62** → ~69×70).
+- **Anchor:** bottom-centre **(112, 227)** in PNG px — stake foot on the ground.
+- **`faceBox`:** `[14, 13, 209, 116]` — code-drawn icons (48 px @ 0.75× icon), dots (16 px), bloom, or resting leaf.
+- **Placement:** per-bed anchors in manifest `tag.beds.bed1..bed8` (backdrop px); draw after plants with depth order (back plants → back tags → front plants → front tags; selected bed tag on top).
+
+---
 
 ## Needs card
 
 | Asset | Path |
 |-------|------|
-| Card panel | `assets/ui/needs/needs-card-bg.png` |
+| Card (day only; no night sheet) | `assets/ui/tag/needs-card.png` |
 
-- **Source:** 560×420 px (2×) parchment / wood trim panel.
-- **Display:** ~280×210 CSS px (`#needs-card`).
-
-## Need icons (tap to start care)
-
-| Icon | Path |
-|------|------|
-| Sun | `assets/ui/needs/icon-sun.png` |
-| Water | `assets/ui/needs/icon-water.png` |
-| Fertilizer | `assets/ui/needs/icon-fertilizer.png` |
-| Stake | `assets/ui/needs/icon-stake.png` |
-
-- **Source:** 64×64 px (2×) each.
-- **Display:** 32×32 CSS px on icon buttons; **dots** render in HTML (filled/empty) with optional sprites below.
-
-## Dot sprites (optional; CSS dots are fallback)
-
-| State | Paths |
-|-------|-------|
-| Empty | `assets/ui/needs/dot-empty.png` |
-| Full sun / water / fert | `dot-full-sun.png`, `dot-full-water.png`, `dot-full-fert.png` |
-
-- **Source:** 14×14 px (2×) per dot.
-
-## Bloom stamp (all needs met today)
-
-| Asset | Path |
-|-------|------|
-| Stamp | `assets/ui/needs/bloom-stamp.png` |
-
-- **Source:** 72×72 px (2×).
-- **Display:** 36×36 CSS px on tag header when `allMet`; scene draws a small wooden tag + ✿ fallback on the bed.
-
-## Resting leaf (did not grow overnight)
-
-| Asset | Path |
-|-------|------|
-| Resting icon | `assets/ui/needs/resting-leaf.png` |
-
-- **Source:** 56×56 px (2×), soft green leaf — calm, **not** wilted or red.
-- **Display:** 28×28 CSS px on the tag header when `plot.tagResting` (cleared when that day’s needs are all met, or at the next bedtime).
-- **Scene fallback:** wooden tag micro-badge with 🌿 (same anchor as bloom stamp).
-- **State:** `tagResting` on plot (save v6+); set after bedtime when an in-season, growing plant does not advance stage; cleared at start of bedtime then recomputed for the new morning.
+- **Source:** 720×560 px (2×).
+- **Display:** 360×280 CSS px (`#needs-card`).
+- **Rows (PNG px, halve for CSS):** sun y=190–276, water 276–362, fertilizer 362–448, stake 448–534 (86 px tall each). **Omit stake row** for lettuce/mint. Night visit: same day card, slightly dimmed (`brightness(0.94)`).
+- **Bloom stamp region:** `[584, 72, 712, 200]` on the card art.
 
 ---
 
-## Guide sunflower (split head + stem)
+## Care icons & dots (`assets/ui/care/`)
 
-| Asset | Path |
-|-------|------|
-| Head (tilts with player) | `assets/ui/stretch/guide-sunflower-head.png` |
-| Stem (static) | `assets/ui/stretch/guide-sunflower-stem.png` |
-| Combined fallback | `assets/ui/stretch/guide-sunflower.png` |
+| Item | Size (2×) | Display |
+|------|-----------|---------|
+| `icon-{sun,water,fertilizer,stake}` (+ `-night`) | 64×64 | 32×32 |
+| `need-dot-{empty,filled}` (+ `-night`) | 28×28 | 14×14 |
+| `need-done` (+ `-night`) | 28×28 | row check |
+| `bloom-stamp` (+ `-night`) | 128×128 | 64×64 |
+| `resting-leaf` (+ `-night`) | 64×64 | 32×32 |
 
-- **Source:** 192×192 px (2×) per layer, aligned so stem base meets head disk.
-- **Display:** 96×96 CSS px total composition.
-- **Pivot (`guidePivot` in `art.js`):** normalized **(0.5, 0.75)** — stem base / rotation axis; only the **head** layer rotates ±30° in code.
+Stake meter still uses `ui/care/stake-icon*.png` at 128 px (64 px display) from the staking set.
 
-## Vine progress rings
+---
 
-- `assets/ui/stretch/vine-ring-empty.png` — 120×120 px (2×).
-- `assets/ui/stretch/vine-ring-full.png` — same size.
-- **Display:** 60×60 px; left / right shoulder progress.
+## Tended soil (damp bed)
 
-## Bamboo stake + twine (day / night)
+When a bed’s needs are **all met** for the day (`soilTended`), show painted damp soil. **Clears each morning.** Fade in **~1.2 s** when the tag completes.
 
-| Asset | Path |
-|-------|------|
-| Day stake | `assets/plants/stake-day.png` |
-| Night stake | `assets/plants/stake-night.png` |
+| Asset | Path pattern |
+|-------|----------------|
+| Per bed | `assets/scene/soil/soil-{day\|night}-bed{N}.png` |
+| Full frame (alt.) | `assets/scene/soil/soil-{day\|night}-all.png` |
 
-- **Source:** 80×200 px (2×).
-- **Display:** 20×50 px per bed (`stakeDisplay`).
-- **Placement:** offset **(14, −8)** from soil (`stakeOffset`); anchor **(0.5, 1)**.
-- Visible when plant `needs.stake` and `plot.staked` after stretch.
+- **Draw:** `drawImage(img, pos[0], pos[1])` at manifest `soil.beds.bedN.pos` — **no scaling**.
+- **Order:** after backdrop, **before** plants; day/night crossfade matches backdrop weights.
 
-### Stake effect strips
+---
 
-| Effect | Day | Night |
-|--------|-----|-----|
-| Loop | `assets/effects/stake-loop-day-strip.png` | `assets/effects/stake-loop-night-strip.png` |
-| Absorb | `assets/effects/stake-absorb-day-strip.png` | `assets/effects/stake-absorb-night-strip.png` |
+## Resting leaf
 
-## Fallbacks (until art lands)
+Shown on tag face when `plot.tagResting` (did not grow overnight). Cleared when all needs met that day or recomputed at bedtime. Not wilted / red.
 
-Emoji/icons, CSS dots, brown tag rect, 🌻 stake guide, SVG vine arcs, and rectangle stake — nothing blocks play or tests.
+---
+
+## Neck stretch (stake need)
+
+See **`assets/stake-manifest.json`** and staking section in `renderer/art.js` (`stretch`). Guide stem/head, vine rings, plant stakes, stake FX strips.
+
+---
+
+## Tests & captures
+
+- `npm test` — `tags art matches assets/tags-manifest.json`
+- `npm run screenshots:tags` — tag/card/soil doc shots (tomato partial, complete + soil, resting leaf, night)

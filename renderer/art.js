@@ -185,15 +185,18 @@
             return '../assets/effects/harvest-' + kind + '-strip.png';
         },
         basketHud: Object.freeze({ x: 1195, y: 68, w: 36, h: 36 }),
+        /** Authoritative: assets/tags-manifest.json */
         tendedSoil: Object.freeze({
-            /** Per-bed damp soil overlay (day/night); anchor on plot soil centroid (plots[].x/y). */
+            fadeSec: 1.2,
             src(kind, bedIndex) {
                 const b = Math.max(1, Math.min(8, Math.round(Number(bedIndex) || 0) + 1));
-                return '../assets/plots/tended-soil-' + (kind === 'night' ? 'night' : 'day') + '-bed' + b + '.png';
+                return '../assets/scene/soil/soil-' + (kind === 'night' ? 'night' : 'day') + '-bed' + b + '.png';
             },
-            /** Bottom-centre of overlay aligns to ART.plots[i].x / .y (same as plant soil anchor). */
-            anchor: Object.freeze({ x: 0.5, y: 1 }),
-            /** Clip to plots[i].box when using code fallback (backdrop px). */
+            pos(bedIndex) {
+                const key = 'bed' + (Math.max(1, Math.min(8, Math.round(Number(bedIndex) || 0) + 1)));
+                const spot = ART.needs.soilBeds[key];
+                return spot ? spot.pos.slice() : [0, 0];
+            },
         }),
         plantTendedSoilSrc(lighting, bedIndex) {
             const kind = lighting === 'night' ? 'night' : 'day';
@@ -201,28 +204,96 @@
         },
         needs: Object.freeze({
             scale2x: true,
-            plantTag: '../assets/ui/needs/plant-tag.png',
-            needsCard: '../assets/ui/needs/needs-card-bg.png',
-            iconSun: '../assets/ui/needs/icon-sun.png',
-            iconWater: '../assets/ui/needs/icon-water.png',
-            iconFertilizer: '../assets/ui/needs/icon-fertilizer.png',
-            iconStake: '../assets/ui/care/stake-icon.png',
-            iconStakeNight: '../assets/ui/care/stake-icon-night.png',
-            dotEmpty: '../assets/ui/needs/dot-empty.png',
-            dotFullSun: '../assets/ui/needs/dot-full-sun.png',
-            dotFullWater: '../assets/ui/needs/dot-full-water.png',
-            dotFullFert: '../assets/ui/needs/dot-full-fert.png',
-            bloomStamp: '../assets/ui/needs/bloom-stamp.png',
-            restingLeaf: '../assets/ui/needs/resting-leaf.png',
-            tagPixels: Object.freeze([80, 96]),
-            tagAnchor: Object.freeze({ x: 0.5, y: 1 }),
-            cardPixels: Object.freeze([560, 420]),
-            iconPixels: Object.freeze([64, 64]),
-            bloomPixels: Object.freeze([72, 72]),
-            restingPixels: Object.freeze([56, 56]),
-            restingDisplay: 28,
-            tagOffset: Object.freeze([0, -42]),
+            plantTagDay: '../assets/ui/tag/plant-tag-day.png',
+            plantTagNight: '../assets/ui/tag/plant-tag-night.png',
+            needsCard: '../assets/ui/tag/needs-card.png',
+            tagPixels: Object.freeze([224, 227]),
+            tagAnchor: Object.freeze([112, 227]),
+            faceBox: Object.freeze([14, 13, 209, 116]),
+            cardPixels: Object.freeze([720, 560]),
+            cardDisplay: Object.freeze([360, 280]),
+            cardStamp: Object.freeze([584, 72, 712, 200]),
+            cardTitle: Object.freeze([150, 124, 570, 178]),
+            cardRows: Object.freeze([
+                { key: 'sun', row: [48, 190, 672, 276], icon: [64, 201, 128, 265], dots: [[492, 233], [548, 233], [604, 233]], dotSize: 28, status: [640, 219, 668, 247] },
+                { key: 'water', row: [48, 276, 672, 362], icon: [64, 287, 128, 351], dots: [[492, 319], [548, 319], [604, 319]], dotSize: 28, status: [640, 305, 668, 333] },
+                { key: 'fertilizer', row: [48, 362, 672, 448], icon: [64, 373, 128, 437], dots: [[492, 405], [548, 405], [604, 405]], dotSize: 28, status: [640, 391, 668, 419] },
+                { key: 'stake', row: [48, 448, 672, 534], icon: [64, 459, 128, 523], dots: [[492, 491], [548, 491], [604, 491]], dotSize: 28, status: [640, 477, 668, 505] },
+            ]),
+            tagSpots: Object.freeze({
+                bed1: Object.freeze({ anchor: [278, 419], scale: 0.5 }),
+                bed2: Object.freeze({ anchor: [492, 422], scale: 0.5 }),
+                bed3: Object.freeze({ anchor: [706, 424], scale: 0.5 }),
+                bed4: Object.freeze({ anchor: [924, 423], scale: 0.5 }),
+                bed5: Object.freeze({ anchor: [189, 566], scale: 0.62 }),
+                bed6: Object.freeze({ anchor: [449, 581], scale: 0.62 }),
+                bed7: Object.freeze({ anchor: [714, 582], scale: 0.62 }),
+                bed8: Object.freeze({ anchor: [984, 583], scale: 0.62 }),
+            }),
+            soilBeds: Object.freeze({
+                bed1: Object.freeze({ pos: [257, 331] }),
+                bed2: Object.freeze({ pos: [471, 333] }),
+                bed3: Object.freeze({ pos: [678, 334] }),
+                bed4: Object.freeze({ pos: [875, 335] }),
+                bed5: Object.freeze({ pos: [163, 440] }),
+                bed6: Object.freeze({ pos: [424, 446] }),
+                bed7: Object.freeze({ pos: [685, 448] }),
+                bed8: Object.freeze({ pos: [914, 445] }),
+            }),
+            iconSun: '../assets/ui/care/icon-sun.png',
+            iconSunNight: '../assets/ui/care/icon-sun-night.png',
+            iconWater: '../assets/ui/care/icon-water.png',
+            iconWaterNight: '../assets/ui/care/icon-water-night.png',
+            iconFertilizer: '../assets/ui/care/icon-fertilizer.png',
+            iconFertilizerNight: '../assets/ui/care/icon-fertilizer-night.png',
+            iconStake: '../assets/ui/care/icon-stake.png',
+            iconStakeNight: '../assets/ui/care/icon-stake-night.png',
+            dotEmpty: '../assets/ui/care/need-dot-empty.png',
+            dotEmptyNight: '../assets/ui/care/need-dot-empty-night.png',
+            dotFilled: '../assets/ui/care/need-dot-filled.png',
+            dotFilledNight: '../assets/ui/care/need-dot-filled-night.png',
+            needDone: '../assets/ui/care/need-done.png',
+            needDoneNight: '../assets/ui/care/need-done-night.png',
+            bloomStamp: '../assets/ui/care/bloom-stamp.png',
+            bloomStampNight: '../assets/ui/care/bloom-stamp-night.png',
+            restingLeaf: '../assets/ui/care/resting-leaf.png',
+            restingLeafNight: '../assets/ui/care/resting-leaf-night.png',
+            iconDisplay: Object.freeze([32, 32]),
+            dotDisplay: Object.freeze([14, 14]),
+            bloomDisplay: Object.freeze([64, 64]),
+            restingDisplay: Object.freeze([32, 32]),
+            tagFaceIconPx: 48,
+            tagFaceDotPx: 16,
+            nightTagBlend: 0.42,
+            nightCardDim: 0.94,
         }),
+        plantTagSrc(lighting) {
+            const day = lighting !== 'night';
+            return day ? this.needs.plantTagDay : this.needs.plantTagNight;
+        },
+        needsIconSrc(key, lighting) {
+            const n = this.needs;
+            const night = lighting === 'night';
+            if (key === 'sun') return night ? n.iconSunNight : n.iconSun;
+            if (key === 'water') return night ? n.iconWaterNight : n.iconWater;
+            if (key === 'fertilizer') return night ? n.iconFertilizerNight : n.iconFertilizer;
+            if (key === 'stake') return night ? n.iconStakeNight : n.iconStake;
+            return n.iconSun;
+        },
+        needsDotSrc(filled, lighting) {
+            const n = this.needs;
+            if (filled) return lighting === 'night' ? n.dotFilledNight : n.dotFilled;
+            return lighting === 'night' ? n.dotEmptyNight : n.dotEmpty;
+        },
+        needsDoneSrc(lighting) {
+            return lighting === 'night' ? this.needs.needDoneNight : this.needs.needDone;
+        },
+        needsBloomSrc(lighting) {
+            return lighting === 'night' ? this.needs.bloomStampNight : this.needs.bloomStamp;
+        },
+        needsRestingSrc(lighting) {
+            return lighting === 'night' ? this.needs.restingLeafNight : this.needs.restingLeaf;
+        },
         /** Authoritative: assets/stake-manifest.json */
         stretch: Object.freeze({
             scale2x: true,

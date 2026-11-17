@@ -1,0 +1,640 @@
+{
+ "note": "Plant tags, needs card, care icons, need dots, bloom/resting, damp soil. UI art is 2x (draw at half the PNG pixel size). Soil overlays are 1x backdrop pixels (1280x720 art space).",
+ "tag": {
+  "day": "ui/tag/plant-tag-day.png",
+  "night": "ui/tag/plant-tag-night.png",
+  "px": [
+   224,
+   227
+  ],
+  "anchor": [
+   112,
+   227
+  ],
+  "anchorNote": "bottom-centre of the stake (where it meets the ground)",
+  "faceBox": [
+   14,
+   13,
+   209,
+   116
+  ],
+  "faceBoxNote": "empty wooden face, safe area for code-drawn icons/dots/text (PNG px, x0,y0,x1,y1)",
+  "scale": "draw size = PNG px * plot.scale / 2  ->  back row (0.5): 56x57, front row (0.62): 69x70 display px",
+  "beds": {
+   "bed1": {
+    "anchor": [
+     278,
+     419
+    ],
+    "scale": 0.5
+   },
+   "bed2": {
+    "anchor": [
+     492,
+     422
+    ],
+    "scale": 0.5
+   },
+   "bed3": {
+    "anchor": [
+     706,
+     424
+    ],
+    "scale": 0.5
+   },
+   "bed4": {
+    "anchor": [
+     924,
+     423
+    ],
+    "scale": 0.5
+   },
+   "bed5": {
+    "anchor": [
+     189,
+     566
+    ],
+    "scale": 0.62
+   },
+   "bed6": {
+    "anchor": [
+     449,
+     581
+    ],
+    "scale": 0.62
+   },
+   "bed7": {
+    "anchor": [
+     714,
+     582
+    ],
+    "scale": 0.62
+   },
+   "bed8": {
+    "anchor": [
+     984,
+     583
+    ],
+    "scale": 0.62
+   }
+  },
+  "bedsNote": "backdrop px (1280x720), on the lawn just in front of each bed's front-left rim corner; draw after plants (in front of the rim). Formula: soil-quad bottom-left + 13% along the front edge, +22 px (back) / +30 px (front) down past the rim.",
+  "drawOrder": "depth-sort by row: back-row plants -> back-row tags -> front-row plants -> front-row tags (a back tag can be partly behind a tall front plant; lift the hovered/selected bed's tag to the top). Tag face content: up to 4 care icons at 0.75x (48 PNG px) along the top of faceBox, need dots at 16 PNG px under each; complete = bloom-stamp fitted to faceBox height; resting = resting-leaf fitted to faceBox.",
+  "nightNote": "night tint matches stake/decor night (blend 42% toward #34405F). At dawn/golden-hour use day."
+ },
+ "card": {
+  "file": "ui/tag/needs-card.png",
+  "px": [
+   720,
+   560
+  ],
+  "display": [
+   360,
+   280
+  ],
+  "body": [
+   3,
+   68,
+   716,
+   556
+  ],
+  "eyelet": [
+   356,
+   108
+  ],
+  "title": [
+   150,
+   124,
+   570,
+   178
+  ],
+  "stamp": [
+   584,
+   72,
+   712,
+   200
+  ],
+  "rows": [
+   {
+    "row": [
+     48,
+     190,
+     672,
+     276
+    ],
+    "icon": [
+     64,
+     201,
+     128,
+     265
+    ],
+    "label": [
+     148,
+     209,
+     440,
+     257
+    ],
+    "dots": [
+     [
+      492,
+      233
+     ],
+     [
+      548,
+      233
+     ],
+     [
+      604,
+      233
+     ]
+    ],
+    "dotSize": 28,
+    "status": [
+     640,
+     219,
+     668,
+     247
+    ]
+   },
+   {
+    "row": [
+     48,
+     276,
+     672,
+     362
+    ],
+    "icon": [
+     64,
+     287,
+     128,
+     351
+    ],
+    "label": [
+     148,
+     295,
+     440,
+     343
+    ],
+    "dots": [
+     [
+      492,
+      319
+     ],
+     [
+      548,
+      319
+     ],
+     [
+      604,
+      319
+     ]
+    ],
+    "dotSize": 28,
+    "status": [
+     640,
+     305,
+     668,
+     333
+    ]
+   },
+   {
+    "row": [
+     48,
+     362,
+     672,
+     448
+    ],
+    "icon": [
+     64,
+     373,
+     128,
+     437
+    ],
+    "label": [
+     148,
+     381,
+     440,
+     429
+    ],
+    "dots": [
+     [
+      492,
+      405
+     ],
+     [
+      548,
+      405
+     ],
+     [
+      604,
+      405
+     ]
+    ],
+    "dotSize": 28,
+    "status": [
+     640,
+     391,
+     668,
+     419
+    ]
+   },
+   {
+    "row": [
+     48,
+     448,
+     672,
+     534
+    ],
+    "icon": [
+     64,
+     459,
+     128,
+     523
+    ],
+    "label": [
+     148,
+     467,
+     440,
+     515
+    ],
+    "dots": [
+     [
+      492,
+      491
+     ],
+     [
+      548,
+      491
+     ],
+     [
+      604,
+      491
+     ]
+    ],
+    "dotSize": 28,
+    "status": [
+     640,
+     477,
+     668,
+     505
+    ]
+   }
+  ],
+  "rowOrder": "sun, water, fertilizer, stake (omit the stake row for plants that are not staked; rows stay top-aligned)",
+  "note": "All boxes in PNG px (x0,y0,x1,y1); halve for display. dots = centre points; draw dot PNGs at dotSize PNG px. status = optional soft check per row. stamp = where the bloom stamp sits when the card is complete (overlaps top-right corner)."
+ },
+ "icons": {
+  "sun": {
+   "file": "ui/care/icon-sun.png",
+   "night": "ui/care/icon-sun-night.png",
+   "px": [
+    64,
+    64
+   ],
+   "display": [
+    32,
+    32
+   ],
+   "anchor": "centre"
+  },
+  "water": {
+   "file": "ui/care/icon-water.png",
+   "night": "ui/care/icon-water-night.png",
+   "px": [
+    64,
+    64
+   ],
+   "display": [
+    32,
+    32
+   ],
+   "anchor": "centre"
+  },
+  "fertilizer": {
+   "file": "ui/care/icon-fertilizer.png",
+   "night": "ui/care/icon-fertilizer-night.png",
+   "px": [
+    64,
+    64
+   ],
+   "display": [
+    32,
+    32
+   ],
+   "anchor": "centre"
+  },
+  "resting": {
+   "file": "ui/care/resting-leaf.png",
+   "night": "ui/care/resting-leaf-night.png",
+   "px": [
+    64,
+    64
+   ],
+   "display": [
+    32,
+    32
+   ],
+   "anchor": "centre"
+  },
+  "bloom": {
+   "file": "ui/care/bloom-stamp.png",
+   "night": "ui/care/bloom-stamp-night.png",
+   "px": [
+    128,
+    128
+   ],
+   "display": [
+    64,
+    64
+   ],
+   "anchor": "centre"
+  },
+  "dot-empty": {
+   "file": "ui/care/need-dot-empty.png",
+   "night": "ui/care/need-dot-empty-night.png",
+   "px": [
+    28,
+    28
+   ],
+   "display": [
+    14,
+    14
+   ],
+   "anchor": "centre"
+  },
+  "dot-filled": {
+   "file": "ui/care/need-dot-filled.png",
+   "night": "ui/care/need-dot-filled-night.png",
+   "px": [
+    28,
+    28
+   ],
+   "display": [
+    14,
+    14
+   ],
+   "anchor": "centre"
+  },
+  "check": {
+   "file": "ui/care/need-done.png",
+   "night": "ui/care/need-done-night.png",
+   "px": [
+    28,
+    28
+   ],
+   "display": [
+    14,
+    14
+   ],
+   "anchor": "centre"
+  },
+  "stake": {
+   "file": "ui/care/icon-stake.png",
+   "night": "ui/care/icon-stake-night.png",
+   "px": [
+    64,
+    64
+   ],
+   "display": [
+    32,
+    32
+   ],
+   "anchor": "centre",
+   "source": "downsized from ui/care/stake-icon.png (staking set)"
+  }
+ },
+ "soil": {
+  "files": "scene/soil/soil-{day|night}-bed{1..8}.png",
+  "fullFrame": "scene/soil/soil-{day|night}-all.png (1280x720, all 8 beds; alternative to the per-bed files)",
+  "beds": {
+   "bed1": {
+    "pos": [
+     257,
+     331
+    ],
+    "px": [
+     184,
+     72
+    ],
+    "quad": [
+     [
+      438,
+      336
+     ],
+     [
+      408,
+      400
+     ],
+     [
+      259,
+      397
+     ],
+     [
+      307,
+      333
+     ]
+    ]
+   },
+   "bed2": {
+    "pos": [
+     471,
+     333
+    ],
+    "px": [
+     164,
+     71
+    ],
+    "quad": [
+     [
+      632,
+      337
+     ],
+     [
+      623,
+      401
+     ],
+     [
+      473,
+      400
+     ],
+     [
+      498,
+      335
+     ]
+    ]
+   },
+   "bed3": {
+    "pos": [
+     678,
+     334
+    ],
+    "px": [
+     166,
+     71
+    ],
+    "quad": [
+     [
+      680,
+      338
+     ],
+     [
+      822,
+      336
+     ],
+     [
+      841,
+      400
+     ],
+     [
+      686,
+      402
+     ]
+    ]
+   },
+   "bed4": {
+    "pos": [
+     875,
+     335
+    ],
+    "px": [
+     186,
+     69
+    ],
+    "quad": [
+     [
+      1058,
+      399
+     ],
+     [
+      904,
+      401
+     ],
+     [
+      877,
+      339
+     ],
+     [
+      1016,
+      337
+     ]
+    ]
+   },
+   "bed5": {
+    "pos": [
+     163,
+     440
+    ],
+    "px": [
+     231,
+     106
+    ],
+    "quad": [
+     [
+      165,
+      535
+     ],
+     [
+      232,
+      442
+     ],
+     [
+      391,
+      446
+     ],
+     [
+      346,
+      543
+     ]
+    ]
+   },
+   "bed6": {
+    "pos": [
+     424,
+     446
+    ],
+    "px": [
+     198,
+     111
+    ],
+    "quad": [
+     [
+      619,
+      451
+     ],
+     [
+      604,
+      554
+     ],
+     [
+      426,
+      550
+     ],
+     [
+      462,
+      448
+     ]
+    ]
+   },
+   "bed7": {
+    "pos": [
+     685,
+     448
+    ],
+    "px": [
+     194,
+     109
+    ],
+    "quad": [
+     [
+      849,
+      450
+     ],
+     [
+      876,
+      554
+     ],
+     [
+      690,
+      552
+     ],
+     [
+      687,
+      450
+     ]
+    ]
+   },
+   "bed8": {
+    "pos": [
+     914,
+     445
+    ],
+    "px": [
+     243,
+     112
+    ],
+    "quad": [
+     [
+      1154,
+      548
+     ],
+     [
+      959,
+      554
+     ],
+     [
+      916,
+      451
+     ],
+     [
+      1083,
+      447
+     ]
+    ]
+   }
+  },
+  "units": "1x backdrop px; drawImage(img, pos[0], pos[1]) in art space, no scaling",
+  "order": "draw after drawBackdrop() and before plants/selection ring; pre-shaped to each bed's soil quad (stone rims and lawn left clear), no masking needed",
+  "lighting": "day file for dawn/midday/golden-hour, night file for night; crossfade with the same lightWeights as the backdrop (day alpha = 1 - weights.night)",
+  "fade": "fade in over ~1.2 s when a tag completes; remove at the morning reset"
+ }
+}

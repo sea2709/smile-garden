@@ -17,7 +17,7 @@
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-plant-name', 'needs-icons', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'needs-tag-img', 'needs-tag-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-card-bg', 'needs-card-fallback', 'needs-plant-name', 'needs-rows', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -122,6 +122,12 @@
                 p.staked,
             );
             const tendedAllMet = state.version >= 6 && D.plotTendedToday(state, i);
+            const needs = L.plantNeeds(p.plantId);
+            let tagProgress = { sun: 0, water: 0, fertilizer: 0, stake: false };
+            if (session) tagProgress = session.careProgressFor(i);
+            else if (state.dailyTends && state.dailyTends[i]) {
+                tagProgress = C.readProgressFromDailyTend(state.dailyTends[i], needs, p.staked);
+            }
             return {
                 plantId: p.plantId,
                 stage: p.stage,
@@ -132,6 +138,7 @@
                 careAllMet,
                 soilTended: !!(careAllMet || tendedAllMet),
                 tagResting: !!p.tagResting && !careAllMet && !tendedAllMet,
+                tagProgress,
             };
         });
         scene.setPlots(view, instant ? { instant: true } : undefined);
@@ -571,55 +578,91 @@
         const prog = session.careProgressFor(plot);
         const kind = L.plantById(pl.plantId);
         els.needsPlantName.textContent = `${kind.name} · bed ${plot + 1}`;
-        bindNeedsArt(els.needsTagImg, ART.needs.plantTag, els.needsTagFallback);
+        bindNeedsArt(els.needsCardBg, ART.needs.needsCard, els.needsCardFallback);
+        if (els.needsCard) {
+            els.needsCard.classList.toggle('needs-card--night', lighting === 'night');
+        }
         const allMet = C.allNeedsMet(prog, needs, pl.staked);
         const showResting = !!pl.tagResting && !allMet;
         if (els.needsBloomStamp) {
-            if (ART.needs.bloomStamp) bindNeedsArt(els.needsBloomStamp, ART.needs.bloomStamp, null);
+            bindNeedsArt(els.needsBloomStamp, ART.needsBloomSrc(lighting), null);
             els.needsBloomStamp.hidden = !allMet;
         }
         if (els.needsRestingStamp) {
-            bindNeedsArt(els.needsRestingStamp, ART.needs.restingLeaf, els.needsRestingFallback);
+            bindNeedsArt(els.needsRestingStamp, ART.needsRestingSrc(lighting), els.needsRestingFallback);
             els.needsRestingStamp.hidden = !showResting;
             if (els.needsRestingFallback) els.needsRestingFallback.hidden = !showResting || !els.needsRestingStamp.hidden;
         }
-        const box = els.needsIcons;
-        box.textContent = '';
-        const keys = ['sun', 'water', 'fertilizer', 'stake'];
-        for (const key of keys) {
-            const req = C.dotsForNeed(needs, key);
-            if (req <= 0) continue;
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'need-btn' + (C.fillFraction(prog, needs, key, pl.staked) >= 1 ? ' need-done' : '');
-            const iconPath = key === 'sun' ? ART.needs.iconSun
-                : key === 'water' ? ART.needs.iconWater
-                    : key === 'fertilizer' ? ART.needs.iconFertilizer
-                        : (lighting === 'night' ? ART.needs.iconStakeNight : ART.needs.iconStake);
-            const icon = document.createElement('img');
-            icon.className = 'need-icon';
-            icon.alt = '';
-            icon.src = artUrl(iconPath);
-            icon.onerror = () => { icon.replaceWith(document.createTextNode(NEED_EMOJI[key] || '•')); };
-            const lab = document.createElement('span');
-            lab.style.fontSize = '0.72rem';
-            lab.textContent = NEED_LABELS[key];
-            const dots = document.createElement('span');
-            dots.className = 'need-dots';
-            const got = key === 'stake'
-                ? (C.stakeNeedMet(prog, pl.staked) ? 1 : 0)
-                : Math.min(req, Math.floor((Number(prog[key]) || 0) + 1e-6));
-            for (let d = 0; d < req; d++) {
-                const dot = document.createElement('span');
-                dot.className = `need-dot ${key}${d < got ? ' on' : ''}`;
-                dots.appendChild(dot);
+        const rowsEl = els.needsRows;
+        if (rowsEl) {
+            rowsEl.textContent = '';
+            const night = lighting === 'night';
+            const half = (n) => n / 2;
+            for (const rowSpec of ART.needs.cardRows) {
+                const key = rowSpec.key;
+                const req = C.dotsForNeed(needs, key);
+                if (req <= 0) continue;
+                const done = C.fillFraction(prog, needs, key, pl.staked) >= 1;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'need-row' + (done ? ' need-row--done' : '');
+                const [rx0, ry0, rx1, ry1] = rowSpec.row;
+                const rowTop = half(ry0);
+                btn.style.top = `${rowTop}px`;
+                btn.style.height = `${half(ry1 - ry0)}px`;
+                const [ix0, iy0, ix1, iy1] = rowSpec.icon;
+                const icon = document.createElement('img');
+                icon.className = 'need-row-icon';
+                icon.alt = '';
+                icon.src = artUrl(ART.needsIconSrc(key, lighting));
+                icon.style.left = `${half(ix0)}px`;
+                icon.style.top = `${half(iy0) - rowTop}px`;
+                icon.style.width = `${half(ix1 - ix0)}px`;
+                icon.style.height = `${half(iy1 - iy0)}px`;
+                icon.onerror = () => { icon.replaceWith(document.createTextNode(NEED_EMOJI[key] || '•')); };
+                const dotsWrap = document.createElement('span');
+                dotsWrap.className = 'need-row-dots';
+                const got = key === 'stake'
+                    ? (C.stakeNeedMet(prog, pl.staked) ? 1 : 0)
+                    : Math.min(req, Math.floor((Number(prog[key]) || 0) + 1e-6));
+                const dotSz = half(rowSpec.dotSize);
+                rowSpec.dots.slice(0, req).forEach((cent, d) => {
+                    const dot = document.createElement('img');
+                    dot.className = 'need-row-dot';
+                    dot.alt = '';
+                    dot.src = artUrl(ART.needsDotSrc(d < got, lighting));
+                    dot.style.width = `${dotSz}px`;
+                    dot.style.height = `${dotSz}px`;
+                    dot.style.left = `${half(cent[0]) - dotSz / 2}px`;
+                    dot.style.top = `${half(cent[1]) - rowTop - dotSz / 2}px`;
+                    dot.style.position = 'absolute';
+                    dot.onerror = () => {
+                        const span = document.createElement('span');
+                        span.className = `need-dot-fallback ${key}${d < got ? ' on' : ''}`;
+                        dotsWrap.appendChild(span);
+                        return;
+                    };
+                    dotsWrap.appendChild(dot);
+                });
+                if (done) {
+                    const [sx0, sy0, sx1, sy1] = rowSpec.status;
+                    const check = document.createElement('img');
+                    check.className = 'need-row-check';
+                    check.alt = '';
+                    check.src = artUrl(ART.needsDoneSrc(lighting));
+                    check.style.left = `${half(sx0)}px`;
+                    check.style.top = `${half(sy0) - rowTop}px`;
+                    check.style.width = `${half(sx1 - sx0)}px`;
+                    check.style.height = `${half(sy1 - sy0)}px`;
+                    btn.append(check);
+                }
+                btn.append(icon, dotsWrap);
+                btn.addEventListener('click', () => {
+                    if (key === 'stake' && needs.stake) onStep(session.launchStretchCare('care-hub'));
+                    else onStep(session.startCare(key));
+                });
+                rowsEl.appendChild(btn);
             }
-            btn.append(icon, lab, dots);
-            btn.addEventListener('click', () => {
-                if (key === 'stake' && needs.stake) onStep(session.launchStretchCare('care-hub'));
-                else onStep(session.startCare(key));
-            });
-            box.appendChild(btn);
         }
         plotsForScene();
     }
@@ -2044,6 +2087,43 @@
             renderNeedsCard();
         },
         /** Mock capture: fill one care meter then return to the hub without waiting on face input. */
+        setNeedsCardDemo(plot, progress) {
+            if (!session) return null;
+            session.setSelectedPlot(plot);
+            if (progress) session.setCareProgress(plot, progress);
+            show('visit');
+            document.body.dataset.step = 'care-hub';
+            renderNeedsCard();
+            plotsForScene({ instant: true });
+            return plot;
+        },
+        /** Mock capture: garden tag/soil states without a live visit session. */
+        prepTagGardenDemo(mode) {
+            const plot = 2;
+            if (!state.plots[plot] || !state.plots[plot].plantId) plant('tomato', plot);
+            const day = state.dayNumber;
+            if (!state.dailyTends) state.dailyTends = {};
+            const needs = L.plantNeeds(state.plots[plot].plantId);
+            if (mode === 'complete') {
+                state.plots[plot].staked = true;
+                state.plots[plot].tagResting = false;
+                state.dailyTends[plot] = {
+                    day,
+                    allMet: true,
+                    progress: { sun: needs.sun, water: needs.water, fertilizer: needs.fertilizer, stake: true },
+                };
+            } else if (mode === 'resting') {
+                state.plots[plot].tagResting = true;
+                state.dailyTends[plot] = { day, allMet: false, progress: { sun: 0, water: 0, fertilizer: 0, stake: false } };
+            } else if (mode === 'partial') {
+                state.plots[plot].staked = false;
+                state.plots[plot].tagResting = false;
+                state.dailyTends[plot] = { day, allMet: false, progress: { sun: 1, water: 0, fertilizer: 0, stake: false } };
+            }
+            save();
+            plotsForScene({ instant: true });
+            return mode;
+        },
         completeCareNeedForCapture(needKey) {
             if (!session || session.selectedPlot == null) return null;
             const plot = session.selectedPlot;

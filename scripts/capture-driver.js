@@ -149,6 +149,62 @@ async function runTimeArt(win, outDir) {
     if (fs.existsSync(legacyDawn)) fs.copyFileSync(legacyDawn, legacyAlias);
 }
 
+async function runTagsArt(win, outDir) {
+    fs.mkdirSync(outDir, { recursive: true });
+    const wc = win.webContents;
+    const js = (code) => wc.executeJavaScript(code, true);
+    const ds = () => js('Object.assign({}, document.body.dataset)');
+    const G = (expr) => js(`(() => { const g = window.__smileGarden; return ${expr}; })()`);
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function waitFor(desc, pred, timeoutMs) {
+        const t0 = Date.now();
+        while (Date.now() - t0 < (timeoutMs || 60000)) {
+            if (await pred(await ds())) return;
+            await sleep(120);
+        }
+        throw new Error(`timeout waiting for ${desc}`);
+    }
+    const shot = async (name) => {
+        await sleep(450);
+        const img = await wc.capturePage();
+        fs.writeFileSync(path.join(outDir, name), img.toPNG());
+        console.log('[capture] wrote', name, img.getSize());
+    };
+    const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(1400); };
+    await waitFor('ready', (d) => d.ready === '1');
+    await G('g.reset()');
+    await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
+    await sleep(700);
+    await lightingTo('midday');
+    const safe = async (label, fn) => {
+        try { await fn(); } catch (e) { console.warn('[capture] tags:', label, e.message); }
+    };
+    await safe('plant', () => G(`g.plant('tomato', 2)`));
+    try {
+        await G(`g.plant('lettuce', 6)`);
+        await G('g.begin()');
+        await waitFor('visit', (d) => d.screen === 'visit', 8000);
+        await G('g.confirmPick()');
+        await waitFor('care hub', (d) => d.step === 'care-hub', 12000);
+        await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
+        await sleep(500);
+        await shot('needs-card-tomato-partial-day.png');
+    } catch (e) {
+        console.warn('[capture] partial needs card skipped:', e.message);
+    }
+    await safe('idle', () => js(`window.__smileGarden.show('idle')`));
+    await safe('complete', () => js(`window.__smileGarden.prepTagGardenDemo('complete')`));
+    await sleep(1200);
+    await shot('needs-tag-complete-soil-day.png');
+    await safe('resting', () => js(`window.__smileGarden.prepTagGardenDemo('resting')`));
+    await sleep(900);
+    await shot('needs-tag-resting-morning-day.png');
+    await lightingTo('night');
+    await safe('night', () => js(`window.__smileGarden.prepTagGardenDemo('complete')`));
+    await sleep(900);
+    await shot('needs-tag-night.png');
+}
+
 async function runStakeArt(win, outDir) {
     fs.mkdirSync(outDir, { recursive: true });
     const wc = win.webContents;
@@ -191,6 +247,11 @@ async function runStakeArt(win, outDir) {
 }
 
 async function run(win, outDir) {
+    if (process.env.SMILE_GARDEN_TAGS_SHOTS === '1') {
+        await runTagsArt(win, outDir);
+        app.quit();
+        return;
+    }
     if (process.env.SMILE_GARDEN_STAKE_SHOTS === '1') {
         await runStakeArt(win, outDir);
         app.quit();
