@@ -30,7 +30,15 @@ test('goToBed rolls day, season, and runs overnight growth', () => {
     const d = new Date(2026, 10, 16, 20);
     const s = V.createState(d);
     V.plantSeed(s, 0, 'lettuce', d);
-    V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, d);
+    const needs = require('../game/logic.js').plantNeeds('lettuce');
+    V.applyVisit(s, {
+        careMode: true,
+        careBeds: [{
+            plot: 0,
+            progress: { sun: needs.sun, water: needs.water, fertilizer: needs.fertilizer, stake: false },
+            allMet: true,
+        }],
+    }, d);
     assert.equal(s.plots[0].stage, 1);
     const out = V.goToBed(s, d);
     assert.equal(out.grew.length, 1);
@@ -47,7 +55,7 @@ test('v4 save migrates to day 1 spring 6:00', () => {
     delete old.dayNumber;
     const raw = JSON.stringify(old);
     const s = V.loadState(raw, d);
-    assert.equal(s.version, 5);
+    assert.equal(s.version, 6);
     assert.equal(s.dayNumber, 1);
     assert.equal(s.season, 'spring');
     assert.equal(s.gardenMinutes, 360);
@@ -58,7 +66,16 @@ test('season gating pauses out-of-season plants overnight', () => {
     const s = V.createState(d);
     s.season = 'winter';
     V.plantSeed(s, 0, 'cucumber', d);
-    V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, d);
+    s.plots[0].staked = true;
+    const needs = require('../game/logic.js').plantNeeds('cucumber');
+    V.applyVisit(s, {
+        careMode: true,
+        careBeds: [{
+            plot: 0,
+            progress: { sun: needs.sun, water: needs.water, fertilizer: needs.fertilizer, stake: true },
+            allMet: true,
+        }],
+    }, d);
     const out = V.goToBed(s, d);
     assert.equal(out.grew.length, 0);
     assert.equal(s.plots[0].stage, 1);

@@ -17,6 +17,14 @@ function run(session, seconds, input) {
 }
 const face = (h, talking) => ({ happiness: h, talking: talking === undefined ? false : talking, faceVisible: true });
 
+test('plant needs dots and stake flags', () => {
+    assert.deepEqual(L.plantNeeds('lettuce'), { sun: 1, water: 3, fertilizer: 1, stake: false });
+    assert.equal(L.plantNeedsStake('tomato'), true);
+    for (const p of L.PLANTS) {
+        assert.ok(p.needs && Number.isFinite(p.needs.sun), `${p.id} has needs.sun`);
+    }
+});
+
 test('normalizeConfidence converts SDK percentages to 0..1 and clamps', () => {
     assert.equal(L.normalizeConfidence(0), 0);
     assert.equal(L.normalizeConfidence(50), 0.5);

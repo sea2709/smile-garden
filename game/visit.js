@@ -32,7 +32,11 @@
 })(typeof self !== 'undefined' ? self : this, function (L, H, D) {
     'use strict';
 
-    const STATE_VERSION = 5;
+    const C = (typeof require === 'function')
+        ? require('./care-needs.js')
+        : (typeof self !== 'undefined' ? self.SmileCareNeeds : null);
+
+    const STATE_VERSION = 6;
     const PLOTS = 8;
     const MAX_STAGE = 5;
     const DAY_MS = 86400000;
@@ -207,6 +211,8 @@
             version: STATE_VERSION,
             createdDay: dayKey(d),
             wellnessAck: false,
+            setupDone: false,
+            cameraCheckNote: null,
             plots: new Array(PLOTS).fill(null),
             visitDays: [],
             journal: [],
@@ -240,6 +246,26 @@
             matureWater: p.matureWater,
             matureFert: p.matureFert,
             tendedDay: p.tendedDay,
+            staked: p.staked === true,
+            tagResting: p.tagResting === true,
+        });
+    }
+
+    /** Morning tag: gentle “resting” when a plant did not grow overnight (v6). */
+    function applyTagRestingAfterBedtime(state, growthOut) {
+        if (state.version < 6) return;
+        const grew = new Set((growthOut.grew || []).map((g) => g.plot));
+        const season = state.season || D.seasonForDayNumber(state.dayNumber);
+        const dayKeyStr = D.gardenDayKey(state.dayNumber);
+        state.plots.forEach((p, i) => {
+            if (!p || p.stage >= MAX_STAGE || p.picked) return;
+            if (H.isPlotRegrowing(p, dayKeyStr)) return;
+            if (!D.isPlantInSeason(p.plantId, season)) return;
+            if (grew.has(i)) {
+                p.tagResting = false;
+                return;
+            }
+            p.tagResting = true;
         });
     }
 
@@ -266,10 +292,14 @@
         }
         const fresh = createState(now);
         if (!obj || typeof obj !== 'object') return fresh;
-        if (obj.version !== STATE_VERSION && obj.version !== 3 && obj.version !== 4) return fresh;
+        if (obj.version !== STATE_VERSION && obj.version !== 3 && obj.version !== 4 && obj.version !== 5) return fresh;
         const s = fresh;
         s.createdDay = typeof obj.createdDay === 'string' ? obj.createdDay : s.createdDay;
         s.wellnessAck = obj.wellnessAck === true;
+        s.setupDone = obj.setupDone === true;
+        s.cameraCheckNote = typeof obj.cameraCheckNote === 'string' && obj.cameraCheckNote.length
+            ? obj.cameraCheckNote
+            : null;
         const plots = Array.isArray(obj.plots) ? obj.plots : [];
         for (let i = 0; i < PLOTS; i++) s.plots[i] = sanitizePlot(plots[i]);
         s.visitDays = Array.isArray(obj.visitDays)
@@ -312,6 +342,26 @@
         const st2 = obj.settings || {};
         if (Number.isFinite(Number(st2.realMsPerGardenMinute))) {
             s.settings.realMsPerGardenMinute = Math.max(100, Number(st2.realMsPerGardenMinute));
+        }
+        if (obj.version < 6) {
+            for (let i = 0; i < PLOTS; i++) {
+                const p = s.plots[i];
+                if (p) p.staked = false;
+            }
+            if (s.dailyTends && typeof s.dailyTends === 'object') {
+                const day = s.dayNumber;
+                for (const [k, raw] of Object.entries(s.dailyTends)) {
+                    const i = Number(k);
+                    const pl = s.plots[i];
+                    if (!pl) continue;
+                    const needs = L.plantNeeds(pl.plantId);
+                    const prog = C ? C.migrateLegacyTend(raw, needs, false) : null;
+                    if (prog) {
+                        s.dailyTends[k] = C.toDailyTendRecord(prog, needs, false, day);
+                        s.dailyTends[k].day = day;
+                    }
+                }
+            }
         }
         s.version = STATE_VERSION;
         const todayKey = s.version >= 5 ? D.gardenDayKey(s.dayNumber) : dayKey(now instanceof Date ? now : new Date(now === undefined ? Date.now() : now));
@@ -373,7 +423,7 @@
         const day = calendarKey(state, d);
         state.plots[i] = {
             plantId, plantedDay: day, stage: 1, sunBank: 0, lastGrowDay: null, matureDay: null,
-            picked: false, pickDay: null, matureWater: null, matureFert: null,
+            picked: false, pickDay: null, matureWater: null, matureFert: null, tagResting: false,
         };
         if (state.spareSeeds && state.spareSeeds[plantId] > 0) state.spareSeeds[plantId] -= 1;
         addJournal(state, { day, ts: d.getTime(), kind: 'planted', plantId, plot: i, stage: 1,
@@ -452,6 +502,7 @@
                 water: clamp01(b.water),
                 fertilizer: clamp01(b.fertilizer),
                 breaths: Number(b.breaths) || 0,
+                stretchStaked: !!b.stretchDone,
             })).filter((b) => b.plot >= 0 && b.plot < PLOTS);
         }
         const sun = Math.max(0, Math.min(TUNING.maxSunHours, Number(r.sunHours) || 0));
@@ -465,7 +516,54 @@
         return out;
     }
 
+    function growPlotsFromTendsV6(state, dayKeyStr, d, bedResults) {
+        const byPlot = Object.create(null);
+        for (const b of bedResults) byPlot[b.plot] = b;
+        const grew = [];
+        const waiting = [];
+        const tended = [];
+        const season = state.season || D.seasonForDayNumber(state.dayNumber);
+        advanceRegrowPlots(state, dayKeyStr);
+        state.plots.forEach((p, i) => {
+            if (!p || p.stage >= MAX_STAGE || p.picked) return;
+            const br = byPlot[i];
+            const kind = L.plantById(p.plantId);
+            if (!br) return;
+            tended.push({ plot: i, plantId: p.plantId, name: kind.name });
+            if (!br.allMet) {
+                waiting.push({ plot: i, plantId: p.plantId, name: kind.name, reason: 'needs-incomplete' });
+                return;
+            }
+            if (!D.isPlantInSeason(p.plantId, season)) {
+                waiting.push({ plot: i, plantId: p.plantId, name: kind.name, reason: 'out-of-season' });
+                return;
+            }
+            if (p.lastGrowDay === dayKeyStr) {
+                waiting.push({ plot: i, plantId: p.plantId, name: kind.name, reason: 'grew-today' });
+                return;
+            }
+            const from = p.stage;
+            p.stage += 1;
+            p.lastGrowDay = dayKeyStr;
+            p.sunBank = 0;
+            if (p.stage >= MAX_STAGE) {
+                p.matureDay = dayKeyStr;
+                p.matureWater = 1;
+                p.matureFert = 1;
+                p.picked = false;
+                p.pickDay = null;
+            }
+            grew.push({ plot: i, plantId: p.plantId, name: kind.name, from, to: p.stage, mature: p.stage >= MAX_STAGE });
+            addJournal(state, {
+                day: dayKeyStr, ts: d.getTime(), kind: p.stage >= MAX_STAGE ? 'mature' : 'stage', plantId: p.plantId, plot: i, stage: p.stage,
+                text: `${kind.name} in bed ${i + 1} ${STAGE_PHRASE[p.stage]}.`,
+            });
+        });
+        return { grew, waiting, tended };
+    }
+
   function growPlotsFromTends(state, dayKeyStr, d, bedResults) {
+        if (state.version >= 6 && C) return growPlotsFromTendsV6(state, dayKeyStr, d, bedResults);
         const byPlot = Object.create(null);
         for (const b of bedResults) byPlot[b.plot] = b;
         const grew = [];
@@ -523,13 +621,28 @@
         const beds = [];
         for (let i = 0; i < PLOTS; i++) {
             const t = state.dailyTends && state.dailyTends[i];
-            if (t && t.day === state.dayNumber) beds.push(Object.assign({ plot: i }, t));
+            if (!t || t.day !== state.dayNumber) continue;
+            if (state.version >= 6) {
+                beds.push({
+                    plot: i,
+                    sun: t.sun,
+                    water: t.water,
+                    fertilizer: t.fertilizer,
+                    stake: t.stake,
+                    allMet: t.allMet === true,
+                });
+            } else {
+                beds.push(Object.assign({ plot: i }, t));
+            }
         }
         return growPlotsFromTends(state, gkey, d, beds);
     }
 
     function goToBed(state, now) {
         const d = now instanceof Date ? now : new Date(now);
+        if (state.version >= 6) {
+            state.plots.forEach((p) => { if (p) p.tagResting = false; });
+        }
         const out = applyOvernightGrowth(state, d);
         const completedDay = state.dayNumber;
         const completedKey = D.gardenDayKey(completedDay);
@@ -540,6 +653,7 @@
         state.seasonDay = D.seasonDayNumber(state.dayNumber);
         state.gardenMinutes = D.DEFAULT_DAY_CONFIG.startMinutes;
         state.dailyTends = {};
+        if (state.version >= 6) applyTagRestingAfterBedtime(state, out);
         const day = completedKey;
         if (!state.visitDays.includes(day)) {
             state.visitDays.push(day);
@@ -568,11 +682,29 @@
         let tended = [];
         const before = unlockedPlants(state);
 
-        if (state.version >= 5) {
+        if (result && result.careMode && C && state.version >= 6) {
+            const careBeds = result.careBeds || [];
+            D.recordDayTending(state, careBeds.map((b) => {
+                const p = state.plots[b.plot];
+                const needs = L.plantNeeds(p.plantId);
+                const rec = C.toDailyTendRecord(b.progress, needs, p.staked, state.dayNumber);
+                return Object.assign({ plot: b.plot }, rec, { progress: b.progress, allMet: rec.allMet, stake: rec.stake });
+            }), state.dayNumber, (id) => L.plantById(id));
+            for (const b of careBeds) {
+                const p = state.plots[b.plot];
+                if (!p) continue;
+                const needs = L.plantNeeds(p.plantId);
+                if (needs.stake && b.progress && b.progress.stake) p.staked = true;
+                if (C.allNeedsMet(b.progress, needs, p.staked)) p.tagResting = false;
+                const kind = L.plantById(p.plantId);
+                tended.push({ plot: b.plot, plantId: p.plantId, name: kind.name });
+            }
+        } else if (state.version >= 5) {
             D.recordDayTending(state, bedResults, state.dayNumber, (id) => L.plantById(id));
             for (const b of bedResults) {
                 const p = state.plots[b.plot];
                 if (!p) continue;
+                if (b.stretchStaked && L.plantNeedsStake(p.plantId)) p.staked = true;
                 const kind = L.plantById(p.plantId);
                 if (b.sunHours > 0 || b.water > 0 || b.fertilizer > 0) {
                     tended.push({ plot: b.plot, plantId: p.plantId, name: kind.name, sunHours: b.sunHours, water: b.water, fertilizer: b.fertilizer });
@@ -694,10 +826,21 @@
     // ------------------------------------------------------------------
     // One daily visit, step by step.
     // ------------------------------------------------------------------
-    const STEPS = Object.freeze(['greeting', 'pick-harvest', 'harvest-hold', 'pick', 'smile', 'talk', 'breathe-offer', 'breathe', 'summary']);
+    const STEPS = Object.freeze([
+        'greeting', 'pick-harvest', 'harvest-hold', 'pick',
+        'care-hub', 'care-sun', 'care-water', 'care-breathe',
+        'smile', 'talk', 'breathe-offer', 'breathe', 'stretch-offer', 'stretch', 'summary',
+    ]);
+
+    /** When true, maybeChainStretchAfterBreathing() opens stretch after breath (rewire hook). */
+    let chainStretchAfterBreath = false;
 
     function emptyBedTally() {
-        return { smileWeighted: 0, smileSecondsRaw: 0, talkSecondsRaw: 0, breathsDone: 0, breathSkipped: false, breathTaken: false };
+        return {
+            smileWeighted: 0, smileSecondsRaw: 0, talkSecondsRaw: 0,
+            breathsDone: 0, breathSkipped: false, breathTaken: false,
+            stretchDone: false, stretchSkipped: false,
+        };
     }
 
     class VisitSession {
@@ -751,6 +894,81 @@
             this.pendingHarvests = [];
             this.selectedPlot = null;
             this.live = emptyBedTally();
+            let Stretch = null;
+            if (typeof require === 'function') {
+                try { Stretch = require('./stretch.js'); } catch (_) { /* browser bundle */ }
+            }
+            if (!Stretch && typeof globalThis !== 'undefined') Stretch = globalThis.SmileStretch;
+            this.stretchFlow = Stretch ? Stretch.createStretchFlow() : null;
+            this.stretchSnap = { leftProgress: 0, rightProgress: 0, rollDeg: 0, needsFaceHint: false };
+            /** @type {'pick'|'summary'|'advance'|string} */
+            this._stretchReturnStep = 'care-hub';
+            this._stretchAfterBreathChained = false;
+            this.careProgress = Object.create(null);
+            this.gardenDay = o.gardenDay || 1;
+            this.dailyTendsSeed = o.dailyTends || null;
+            this._careSmileRaw = 0;
+            this._careTalkRaw = 0;
+            this._careBreathRaw = 0;
+            for (const plot of this.plantedBeds) this._loadCareProgress(plot);
+        }
+
+        _loadCareProgress(plot) {
+            const p = this.plots[plot];
+            if (!p || !C) return;
+            const needs = L.plantNeeds(p.plantId);
+            const ext = this.dailyTendsSeed && this.dailyTendsSeed[plot];
+            const rec = ext && ext.day === this.gardenDay ? ext : null;
+            this.careProgress[plot] = C.readProgressFromDailyTend(rec, needs, p.staked);
+        }
+
+        careProgressFor(plot) {
+            if (!this.careProgress[plot]) this._loadCareProgress(plot);
+            return Object.assign(C.emptyProgress(), this.careProgress[plot]);
+        }
+
+        setCareProgress(plot, progress) {
+            this.careProgress[plot] = Object.assign(C.emptyProgress(), progress);
+            const p = this.plots[plot];
+            if (!p) return;
+            const needs = L.plantNeeds(p.plantId);
+            if (C.stakeNeedMet(this.careProgress[plot], p.staked) && needs.stake && !p.staked) {
+                /* staking applied at applyVisit */
+            }
+            this.events.push({ type: 'care-progress', plot, progress: this.careProgress[plot] });
+        }
+
+        allNeedsMetForPlot(plot) {
+            const p = this.plots[plot];
+            if (!p) return false;
+            return C.allNeedsMet(this.careProgressFor(plot), L.plantNeeds(p.plantId), p.staked);
+        }
+
+        startCare(needKey) {
+            if (this.selectedPlot == null) return this.step;
+            const p = this.plots[this.selectedPlot];
+            const needs = L.plantNeeds(p.plantId);
+            if (needKey === 'stake' && needs.stake) return this.launchStretchCare('care-hub');
+            if (needKey === 'sun' && needs.sun > 0) {
+                this._careSmileRaw = 0;
+                return this.go('care-sun');
+            }
+            if (needKey === 'water' && needs.water > 0) {
+                this._careTalkRaw = 0;
+                return this.go('care-water');
+            }
+            if (needKey === 'fertilizer' && needs.fertilizer > 0) {
+                this.pacer = new BreathPacer({ pace: this.pace, breaths: needs.fertilizer, easeIn: false });
+                this.breathT = 0;
+                this.breathsDone = 0;
+                this._careBreathRaw = 0;
+                return this.go('care-breathe');
+            }
+            return this.step;
+        }
+
+        finishCareHub() {
+            return this.go('summary');
         }
 
         bedInfo(plot) {
@@ -758,6 +976,67 @@
             if (!p) return { cost: TUNING.maxSunHours };
             const kind = L.plantById(p.plantId);
             return { cost: kind ? kind.cost : TUNING.maxSunHours, plantId: p.plantId };
+        }
+
+        selectedPlantNeedsStake() {
+            const plot = this.selectedPlot;
+            if (plot == null) return false;
+            const p = this.plots[plot];
+            return L.plantNeedsStake(p && p.plantId);
+        }
+
+        isStretchCareStep() {
+            return this.step === 'stretch-offer' || this.step === 'stretch';
+        }
+
+        /**
+         * Standalone neck-stretch / stake care for the selected stake-eligible plant.
+         * @param {string} [returnStep='pick'] step to resume after skip/complete
+         */
+        launchStretchCare(returnStep) {
+            if (!this.selectedPlantNeedsStake()) return this.step;
+            this._stretchAfterBreathChained = false;
+            this._stretchReturnStep = returnStep || 'pick';
+            return this.go('stretch-offer');
+        }
+
+        startStretchCare() {
+            return this.startStretch();
+        }
+
+        skipStretchCare() {
+            if (!this.isStretchCareStep()) return this.step;
+            this.live.stretchSkipped = true;
+            this._saveLiveToTally();
+            return this._endStretchCare();
+        }
+
+        completeStretchCare() {
+            if (this.step !== 'stretch') return this.step;
+            this.live.stretchDone = true;
+            if (this.selectedPlot != null && C) {
+                const prog = this.careProgressFor(this.selectedPlot);
+                prog.stake = true;
+                this.setCareProgress(this.selectedPlot, prog);
+            }
+            return this._endStretchCare();
+        }
+
+        _endStretchCare() {
+            if (this._stretchAfterBreathChained) return this.advanceToNextPlant();
+            const back = this._stretchReturnStep || 'pick';
+            if (back === 'advance') return this.advanceToNextPlant();
+            if (back === 'summary') return this.go('summary');
+            return this.go(back);
+        }
+
+        /** Single rewire point: optional stretch offer immediately after breathing. */
+        maybeChainStretchAfterBreathing() {
+            if (!chainStretchAfterBreath) return this.advanceToNextPlant();
+            if (!this.selectedPlantNeedsStake()) return this.advanceToNextPlant();
+            this._stretchAfterBreathChained = true;
+            this._stretchReturnStep = null;
+            return this.go('stretch-offer');
         }
 
         _syncLiveFromTally() {
@@ -804,8 +1083,24 @@
             if (this.step === 'pick-harvest') {
                 return this.harvestQueue.filter((i) => !this.harvestedPlots.includes(i));
             }
-            if (this.step === 'pick') return this.plantedBeds;
+            if (this.step === 'pick' || this.step === 'care-hub'
+                || this.step === 'care-sun' || this.step === 'care-water' || this.step === 'care-breathe'
+                || this.step === 'stretch-offer' || this.step === 'stretch') {
+                return this.plantedBeds;
+            }
             return [];
+        }
+
+        _careDotSecondsLeft(key) {
+            if (!C || this.selectedPlot == null) return 0;
+            const p = this.plots[this.selectedPlot];
+            const needs = L.plantNeeds(p.plantId);
+            const req = C.dotsForNeed(needs, key);
+            if (req <= 0) return 0;
+            const prog = this.careProgressFor(this.selectedPlot);
+            const got = Math.max(0, Number(prog[key]) || 0);
+            const unit = C.CARE_DOT_SECONDS[key] || 0;
+            return Math.max(0, (req - got) * unit);
         }
 
         stepDuration() {
@@ -813,16 +1108,25 @@
             if (this.step === 'talk') return this.talkSeconds;
             if (this.step === 'harvest-hold') return this.harvestSeconds;
             if (this.step === 'breathe') return this.pacer ? this.pacer.total : 0;
+            if (this.step === 'care-sun') return this._careDotSecondsLeft('sun');
+            if (this.step === 'care-water') return this._careDotSecondsLeft('water');
+            if (this.step === 'care-breathe') {
+                if (this.pacer) return this.pacer.total;
+                return this._careDotSecondsLeft('fertilizer');
+            }
             return 0;
         }
         stepRemaining() {
             if (this.step === 'harvest-hold') return Math.max(0, this.harvestSeconds - this.harvestSmile);
-            return Math.max(0, this.stepDuration() - (this.step === 'breathe' ? this.breathT : this.stepTime));
+            if (this.step === 'breathe') return Math.max(0, this.stepDuration() - this.breathT);
+            if (this.step === 'care-sun' || this.step === 'care-water') return this._careDotSecondsLeft(this.step === 'care-sun' ? 'sun' : 'water');
+            if (this.step === 'care-breathe' && this.pacer) return Math.max(0, this.pacer.total - this.breathT);
+            return Math.max(0, this.stepDuration() - this.stepTime);
         }
 
         go(step) {
             if (!STEPS.includes(step)) throw new Error('unknown step ' + step);
-            if (this.step === 'smile' || this.step === 'talk' || this.step === 'breathe') this._saveLiveToTally();
+            if (this.step === 'smile' || this.step === 'talk' || this.step === 'breathe' || this.step === 'stretch') this._saveLiveToTally();
             this.step = step;
             this.stepTime = 0;
             this.noFace = 0;
@@ -840,7 +1144,11 @@
             if (step === 'harvest-hold') {
                 this.harvestSmile = 0;
             }
-            if (step === 'smile' || step === 'talk' || step === 'breathe' || step === 'breathe-offer' || step === 'pick') {
+            if (step === 'stretch') {
+                if (this.stretchFlow) this.stretchFlow.reset();
+                this.stretchSnap = { leftProgress: 0, rightProgress: 0, rollDeg: 0, needsFaceHint: false };
+            }
+            if (step === 'smile' || step === 'talk' || step === 'breathe' || step === 'breathe-offer' || step === 'stretch-offer' || step === 'stretch' || step === 'pick') {
                 this._syncLiveFromTally();
             }
             this.events.push({ type: 'step', step, plot: this.selectedPlot, round: this.plantRound });
@@ -864,13 +1172,13 @@
             this.phase = 'tend';
             this.plantRound = 0;
             this.selectedPlot = this.plantedBeds[0];
-            return this.go('pick');
+            return this.go('care-hub');
         }
 
         confirmPick() {
             if (this.step === 'pick-harvest' && this.selectedPlot != null) return this.go('harvest-hold');
             if (this.step !== 'pick' || this.selectedPlot == null) return this.step;
-            return this.go('smile');
+            return this.go('care-hub');
         }
 
         confirmHarvestInstant() {
@@ -883,15 +1191,17 @@
             const i = Number(plot);
             const list = this.selectablePlots();
             if (!(i >= 0 && i < PLOTS) || !list.includes(i)) return false;
-            if (this.step !== 'pick' && this.step !== 'pick-harvest') return false;
+            const careSteps = ['pick', 'pick-harvest', 'care-hub', 'care-sun', 'care-water', 'care-breathe', 'stretch-offer', 'stretch'];
+            if (!careSteps.includes(this.step)) return false;
             this.selectedPlot = i;
+            this._loadCareProgress(i);
             this._syncLiveFromTally();
             this.events.push({ type: 'select', plot: i });
             return true;
         }
 
         moveSelection(dir) {
-            if (this.step !== 'pick' && this.step !== 'pick-harvest') return this.selectedPlot;
+            if (this.step !== 'pick' && this.step !== 'pick-harvest' && this.step !== 'care-hub') return this.selectedPlot;
             const list = this.selectablePlots();
             const next = movePlotSelection(this.selectedPlot, dir, list);
             if (next !== null && next !== this.selectedPlot) {
@@ -917,7 +1227,7 @@
                 this.phase = 'tend';
                 this.plantRound = 0;
                 this.selectedPlot = this.plantedBeds[0];
-                return this.go('pick');
+                return this.go('care-hub');
             }
             return this.go('summary');
         }
@@ -935,7 +1245,7 @@
                     this.phase = 'tend';
                     this.plantRound = 0;
                     this.selectedPlot = this.plantedBeds[0];
-                    return this.go('pick');
+                    return this.go('care-hub');
                 }
                 return this.go('summary');
             }
@@ -954,7 +1264,7 @@
             this.breathsDone = 0;
             this.breathSkipped = false;
             this.breathTaken = false;
-            return this.go('pick');
+            return this.go('care-hub');
         }
 
         skip() {
@@ -964,13 +1274,16 @@
             if (this.step === 'pick') return this.confirmPick();
             if (this.step === 'smile') return this.go('talk');
             if (this.step === 'talk') return this.go('breathe-offer');
-            if (this.step === 'breathe-offer') return this.advanceToNextPlant();
+            if (this.step === 'breathe-offer') return this.maybeChainStretchAfterBreathing();
             if (this.step === 'breathe') {
                 this.breathSkipped = true;
                 this.live.breathSkipped = true;
                 this._saveLiveToTally();
-                return this.advanceToNextPlant();
+                return this.maybeChainStretchAfterBreathing();
             }
+            if (this.step === 'stretch-offer' || this.step === 'stretch') return this.skipStretchCare();
+            if (this.step === 'care-sun' || this.step === 'care-water' || this.step === 'care-breathe') return this.go('care-hub');
+            if (this.step === 'care-hub') return this.finishCareHub();
             return this.step;
         }
 
@@ -978,6 +1291,15 @@
             if (opts && opts.pace) this.pace = opts.pace === 'gentle' ? 'gentle' : 'standard';
             if (opts && opts.breaths) this.breathCount = clampBreaths(opts.breaths);
             return this.go('breathe');
+        }
+
+        startStretch() {
+            if (!this.selectedPlantNeedsStake()) return this._endStretchCare();
+            return this.go('stretch');
+        }
+
+        confirmStretchManual() {
+            return this.completeStretchCare();
         }
 
         update(dt, input) {
@@ -1018,8 +1340,37 @@
                 this.live.breathsDone = this.breathsDone;
                 if (this.breathT >= this.pacer.total) {
                     this._saveLiveToTally();
-                    this.advanceToNextPlant();
+                    this.maybeChainStretchAfterBreathing();
                 }
+            } else if (this.step === 'care-sun' && this.selectedPlot != null && C) {
+                const plot = this.selectedPlot;
+                const needs = L.plantNeeds(this.plots[plot].plantId);
+                if (this.smiling && faceVisible) {
+                    const prog = C.addDotTime(this.careProgressFor(plot), 'sun', step, needs);
+                    this.setCareProgress(plot, prog);
+                }
+                if (C.fillFraction(this.careProgressFor(plot), needs, 'sun', this.plots[plot].staked) >= 1) this.go('care-hub');
+            } else if (this.step === 'care-water' && this.selectedPlot != null && C) {
+                const plot = this.selectedPlot;
+                const needs = L.plantNeeds(this.plots[plot].plantId);
+                if (this.talking && faceVisible) {
+                    const prog = C.addDotTime(this.careProgressFor(plot), 'water', step, needs);
+                    this.setCareProgress(plot, prog);
+                }
+                if (C.fillFraction(this.careProgressFor(plot), needs, 'water', this.plots[plot].staked) >= 1) this.go('care-hub');
+            } else if (this.step === 'care-breathe' && this.selectedPlot != null && C) {
+                const plot = this.selectedPlot;
+                const needs = L.plantNeeds(this.plots[plot].plantId);
+                this.breathT += step;
+                this.breathsDone = this.pacer ? this.pacer.completedAt(this.breathT) : 0;
+                const prog = C.addDotTime(this.careProgressFor(plot), 'fertilizer', step, needs);
+                this.setCareProgress(plot, prog);
+                if (this.pacer && this.breathT >= this.pacer.total) this.go('care-hub');
+                else if (C.fillFraction(this.careProgressFor(plot), needs, 'fertilizer', this.plots[plot].staked) >= 1) this.go('care-hub');
+            } else if (this.step === 'stretch' && this.stretchFlow) {
+                const snap = this.stretchFlow.update(step, input && input.stretch ? input.stretch : {});
+                this.stretchSnap = snap;
+                if (snap.complete) this.completeStretchCare();
             }
             const ev = this.events;
             this.events = [];
@@ -1028,6 +1379,28 @@
 
         result() {
             this._saveLiveToTally();
+            if (C) {
+                const careBeds = [];
+                for (const plot of this.plantedBeds) {
+                    const p = this.plots[plot];
+                    if (!p) continue;
+                    const needs = L.plantNeeds(p.plantId);
+                    const progress = this.careProgressFor(plot);
+                    const stakeDone = C.stakeNeedMet(progress, p.staked);
+                    careBeds.push({
+                        plot,
+                        progress,
+                        allMet: C.allNeedsMet(progress, needs, p.staked || progress.stake),
+                        stake: stakeDone,
+                    });
+                }
+                return {
+                    careMode: true,
+                    careBeds,
+                    harvestPlots: this.pendingHarvests.slice(),
+                    peakHappiness: this.peak,
+                };
+            }
             const beds = [];
             for (const plot of this.plantedBeds) {
                 const t = Object.assign(emptyBedTally(), this.bedTally[plot]);
@@ -1039,6 +1412,8 @@
                     breaths: t.breathsDone,
                     breathSkipped: t.breathSkipped,
                     breathTaken: t.breathTaken,
+                    stretchDone: t.stretchDone,
+                    stretchSkipped: t.stretchSkipped,
                 });
             }
             const totals = beds.reduce((a, b) => ({
@@ -1085,7 +1460,9 @@
     /** Short human sentence for a waiting plant (no guilt, nothing wilts). */
     function waitingText(w) {
         if (w.reason === 'grew-today') return `${w.name} already grew today. It will be ready for more tomorrow.`;
+        if (w.reason === 'needs-incomplete') return `${w.name} is resting until all of today's needs are met. Nothing is lost.`;
         if (w.reason === 'needs-water') return `${w.name} has its sun but would like more water. Chat a little longer next visit.`;
+        if (w.reason === 'out-of-season') return `${w.name} is resting for the season. It keeps its growth.`;
         const have = round1(w.sunBank), need = w.cost;
         return `${w.name} has ${have} of ${need} sun-hours saved up. It keeps them and grows on a sunnier visit.`;
     }
@@ -1097,19 +1474,39 @@
         for (let i = 0; i < days; i++) {
             clock.nextDay();
             advanceRegrowPlots(state, calendarKey(state, clock.now()));
-            const beds = [];
-            state.plots.forEach((p, plot) => {
-                if (!p || H.isPlotRegrowing(p, clock.today()) || p.picked) return;
-                if (p.stage >= MAX_STAGE) return;
-                beds.push({
-                    plot,
-                    sunHours: 12 * q,
-                    water: q,
-                    fertilizer: q > 0.8 ? 1 : 0,
-                    breaths: q > 0.8 ? 4 : 0,
+            let visitOut;
+            if (state.version >= 6 && C) {
+                const careBeds = [];
+                state.plots.forEach((p, plot) => {
+                    if (!p || H.isPlotRegrowing(p, clock.today()) || p.picked) return;
+                    if (p.stage >= MAX_STAGE) return;
+                    const needs = L.plantNeeds(p.plantId);
+                    const fill = (n) => (q >= 0.99 ? n : Math.min(n, Math.floor(n * q)));
+                    const progress = {
+                        sun: fill(needs.sun),
+                        water: fill(needs.water),
+                        fertilizer: fill(needs.fertilizer),
+                        stake: needs.stake ? (p.staked || q >= 0.99) : false,
+                    };
+                    const allMet = C.allNeedsMet(progress, needs, p.staked);
+                    careBeds.push({ plot, progress, allMet, stake: progress.stake });
                 });
-            });
-            const visitOut = applyVisit(state, { beds }, clock.now());
+                visitOut = applyVisit(state, { careMode: true, careBeds }, clock.now());
+            } else {
+                const beds = [];
+                state.plots.forEach((p, plot) => {
+                    if (!p || H.isPlotRegrowing(p, clock.today()) || p.picked) return;
+                    if (p.stage >= MAX_STAGE) return;
+                    beds.push({
+                        plot,
+                        sunHours: 12 * q,
+                        water: q,
+                        fertilizer: q > 0.8 ? 1 : 0,
+                        breaths: q > 0.8 ? 4 : 0,
+                    });
+                });
+                visitOut = applyVisit(state, { beds }, clock.now());
+            }
             if (state.version >= 5) {
                 const night = goToBed(state, clock.now());
                 visitOut.grew = night.grew;
@@ -1134,6 +1531,8 @@
         emptyPlots, plantedCount, matureCount, score, plantSeed, weeklyVisits, visitedToday, applyVisit,
         applyOvernightGrowth, goToBed,
         clampBreaths, BreathPacer, VisitSession, waitingText, simulateDays,
+        get chainStretchAfterBreath() { return chainStretchAfterBreath; },
+        set chainStretchAfterBreath(v) { chainStretchAfterBreath = !!v; },
         neighborPlot, movePlotSelection, plantedPlotIndices, firstPlantedPlot, perBedStepSeconds, visitBedResults,
         advanceRegrowPlots, applySessionHarvests, newUnlocksAfterHarvest,
     }, {

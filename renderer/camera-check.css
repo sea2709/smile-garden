@@ -1,0 +1,37 @@
+/* ---------- camera check / warm-up screen (Heily) ----------
+   Assets: assets/ui/camera-check/*.png. UI PNGs are 2x; backdrop is 1x like assets/backgrounds.
+   Stage is 1280x720; all positions are stage px. Layer order: backdrop -> video -> guides -> frame -> sill -> packets -> labels -> buttons. */
+.cc-stage { position: absolute; inset: 0; background: url('../assets/ui/camera-check/backdrop.jpg') 0 0 / 1280px 720px no-repeat; }
+.cc-video { position: absolute; left: 360px; top: 56px; width: 560px; height: 420px; object-fit: cover; transform: scaleX(-1); background: #d8cbb6; }
+.cc-face  { position: absolute; left: 530px; top: 116px; width: 220px; height: 280px; background: url('../assets/ui/camera-check/face-outline.png') center / contain no-repeat; pointer-events: none; transition: opacity .6s; }
+.cc-face.found { opacity: .4; }
+.cc-tilt  { position: absolute; top: 120px; width: 120px; height: 36px; background: center / contain no-repeat; opacity: 0; transition: opacity .4s; pointer-events: none; }
+.cc-tilt.left  { left: 420px; background-image: url('../assets/ui/camera-check/tilt-left.png'); }
+.cc-tilt.right { left: 740px; background-image: url('../assets/ui/camera-check/tilt-right.png'); }
+.cc-tilt.on { opacity: 1; animation: cc-pulse 1.6s ease-in-out infinite; }
+@keyframes cc-pulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+.cc-frame { position: absolute; left: 300px; top: 0; width: 680px; height: 520px; background: url('../assets/ui/camera-check/window-frame.png') 0 0 / 680px 520px no-repeat; pointer-events: none; }
+.cc-sill  { position: absolute; left: 280px; top: 520px; width: 720px; height: 80px; background: url('../assets/ui/camera-check/sill.png') 0 0 / 720px 80px no-repeat; }
+.cc-packet { position: absolute; top: 450px; width: 110px; height: 150px; margin-left: -55px; background: center bottom / 110px 150px no-repeat; transition: transform .3s ease; }
+.cc-packet[data-kind="smile"]   { left: 400px; } .cc-packet[data-kind="talk"]    { left: 560px; }
+.cc-packet[data-kind="breathe"] { left: 720px; } .cc-packet[data-kind="stretch"] { left: 880px; }
+/* state image: packet-{kind}-{closed|listening|sprouted}.png, e.g. */
+.cc-packet[data-kind="smile"][data-state="closed"]    { background-image: url('../assets/ui/camera-check/packet-smile-closed.png'); }
+.cc-packet[data-kind="smile"][data-state="listening"] { background-image: url('../assets/ui/camera-check/packet-smile-listening.png'); }
+.cc-packet[data-kind="smile"][data-state="sprouted"]  { background-image: url('../assets/ui/camera-check/packet-smile-sprouted.png'); animation: cc-pop .5s ease-out; }
+/* ...same three lines for talk / breathe / stretch */
+@keyframes cc-pop { 0% { transform: translateY(3px) scale(.97); } 60% { transform: translateY(-3px) scale(1.02); } 100% { transform: none; } }
+.cc-label { position: absolute; top: 610px; width: 140px; margin-left: -70px; text-align: center; font: 800 15px/20px var(--sans); color: var(--ink); text-shadow: 0 1px 6px rgba(255,248,228,.9); }
+.cc-label small { display: block; font-size: 12px; font-weight: 700; color: var(--ink-soft); }
+.cc-label.ready small { color: var(--sage-dark); }
+/* buttons: 9-slice painted pills, element must be exactly 44px tall */
+.cc-btn { position: absolute; top: 658px; height: 44px; padding: 0 24px; display: inline-flex; align-items: center; justify-content: center;
+    font: 800 16px/20px var(--sans); cursor: pointer; background: none; border-radius: 0; box-shadow: none;
+    border: 0 solid transparent; border-image-slice: 40 44 fill; border-image-width: 20px 22px; border-image-repeat: stretch;
+    filter: drop-shadow(0 3px 5px rgba(70,48,20,.18)); transition: transform .15s ease; }
+.cc-btn:hover { transform: translateY(-1px); } .cc-btn:active { transform: translateY(1px); }
+.cc-btn.start { right: 40px; min-width: 200px; color: #3f5a2a; border-image-source: url('../assets/ui/camera-check/btn-primary.png'); }
+.cc-btn.start:hover, .cc-btn.start:focus-visible { border-image-source: url('../assets/ui/camera-check/btn-primary-hover.png'); }
+.cc-btn.skip  { left: 40px;  min-width: 170px; color: var(--ink-soft); border-image-source: url('../assets/ui/camera-check/btn-secondary.png'); }
+.cc-btn.skip:hover, .cc-btn.skip:focus-visible { border-image-source: url('../assets/ui/camera-check/btn-secondary-hover.png'); }
+@media (prefers-reduced-motion: reduce) { .cc-tilt.on, .cc-packet { animation: none !important; } }
