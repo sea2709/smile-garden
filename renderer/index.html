@@ -21,6 +21,7 @@
                 <span class="week-dots" id="week-dots"></span><span id="week-text">0 visits this week</span>
             </span>
             <span id="score-chip" class="chip chip-score" title="Plots filled / plots grown to maturity">🌱 0/8</span>
+            <span id="basket-chip" class="chip chip-basket" title="Harvest basket (fills during a visit)" hidden>🧺 <span id="basket-count">0</span></span>
         </div>
         <div class="top-actions">
             <button id="btn-journal" class="btn btn-soft btn-small" type="button" title="Garden journal (J)">📖 Journal</button>
@@ -60,7 +61,7 @@
     <!-- Step panel (during a visit) -------------------------------------- -->
     <section id="step-panel" class="step-panel parchment" hidden>
         <div class="step-track" id="step-track">
-            <span data-step="smile">☀ Smile</span><span data-step="talk">💧 Talk</span><span data-step="breathe">🍃 Breathe</span><span data-step="summary">❀ Done</span>
+            <span data-step="harvest">🧺 Pick</span><span data-step="smile">☀ Smile</span><span data-step="talk">💧 Talk</span><span data-step="breathe">🍃 Breathe</span><span data-step="summary">❀ Done</span>
         </div>
         <div class="step-body">
             <div class="ring-wrap">
@@ -179,6 +180,8 @@
                 <div class="tabs">
                     <button class="tab" data-tab="diary" type="button">Diary</button>
                     <button class="tab" data-tab="plants" type="button">My plants</button>
+                    <button class="tab" data-tab="pantry" type="button">Pantry</button>
+                    <button class="tab" data-tab="decorate" type="button">Decorate</button>
                     <button class="tab" data-tab="library" type="button">Seed library</button>
                 </div>
                 <button id="btn-journal-close" class="btn btn-ghost btn-small" type="button">Close</button>
@@ -201,10 +204,21 @@
                 <option value="night">Night</option>
             </select></label></div>
         <div class="dev-row"><button id="dev-sim" class="btn btn-soft btn-small" type="button">Simulate 5 good days</button></div>
+        <div class="dev-row"><button id="dev-ready" class="btn btn-soft btn-small" type="button">Make all planted beds ready</button></div>
         <div class="dev-row"><button id="dev-fill" class="btn btn-soft btn-small" type="button">Fill empty beds</button></div>
         <div class="dev-row"><button id="dev-reset" class="btn btn-ghost btn-small" type="button">Reset garden</button></div>
         <p class="note">Plants grow at most one stage per real day. These tools are for demos.</p>
     </aside>
+
+    <section id="screen-unlock" class="overlay" hidden>
+        <div class="card parchment unlock-card" id="unlock-card">
+            <div class="eyebrow">New in your garden</div>
+            <h1 id="unlock-title">Seeds unlocked</h1>
+            <p id="unlock-body" class="lead"></p>
+            <div id="unlock-art" class="unlock-art"></div>
+            <div class="actions"><button id="btn-unlock-ok" class="btn btn-primary" type="button">Lovely</button></div>
+        </div>
+    </section>
 
     <div id="error-banner" class="error-banner" hidden>
         <div><strong id="error-title">Something went wrong</strong><div id="error-message"></div></div>
@@ -216,6 +230,7 @@
 </div>
 
 <script src="../game/logic.js"></script>
+<script src="../game/harvest.js"></script>
 <script src="../game/visit.js"></script>
 <script src="./art.js"></script>
 <script src="./mock-source.js"></script>

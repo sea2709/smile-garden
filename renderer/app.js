@@ -22,7 +22,8 @@
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
         'btn-sum-done', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
-        'dev-fill', 'dev-reset', 'error-banner', 'error-title', 'error-message', 'btn-error-keyboard', 'btn-error-dismiss']) {
+        'dev-ready', 'dev-fill', 'dev-reset', 'basket-chip', 'basket-count', 'screen-unlock', 'unlock-title', 'unlock-body', 'unlock-art', 'btn-unlock-ok',
+        'error-banner', 'error-title', 'error-message', 'btn-error-keyboard', 'btn-error-dismiss']) {
         els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = $(id);
     }
 
@@ -55,7 +56,7 @@
     // ------------------------------------------------------------------
     // Screens
     // ------------------------------------------------------------------
-    const overlays = ['screenWellness', 'screenGreeting', 'screenPicker', 'screenSummary', 'screenJournal'];
+    const overlays = ['screenWellness', 'screenGreeting', 'screenPicker', 'screenSummary', 'screenJournal', 'screenUnlock'];
     function show(name) {
         screen = name;
         document.body.dataset.screen = name;
@@ -73,6 +74,23 @@
         if (name !== 'picker') scene.setHover(null);
         if (name !== 'visit') scene.setTendSelection(null);
         els.plotTip.hidden = true;
+        if (name !== 'visit') els.basketChip.hidden = true;
+    }
+
+  function plotsForScene(instant) {
+        const today = clock.today();
+        const view = state.plots.map((p) => {
+            if (!p) return null;
+            const regrow = V.isPlotRegrowing(p, today);
+            return {
+                plantId: p.plantId,
+                stage: p.stage,
+                pickedSprite: regrow,
+                ready: V.isPlotReady(p, today),
+            };
+        });
+        scene.setPlots(view, instant ? { instant: true } : undefined);
+        scene.setDecor(state.decor);
     }
 
     function syncTendRing() {
@@ -83,8 +101,15 @@
         }
         const step = session.step;
         const plot = session.selectedPlot;
-        scene.setTendSelection(plot, { pulse: step === 'pick' });
-        if (step === 'pick') scene.setEffects({ plot: plot, sun: 0, water: 0, fert: 0 });
+        const harvestPick = step === 'pick-harvest' || step === 'harvest-hold';
+        scene.setTendSelection(plot, { pulse: step === 'pick' || step === 'pick-harvest' });
+        if (step === 'pick' || harvestPick) scene.setEffects({ plot: plot, sun: 0, water: 0, fert: 0 });
+    }
+
+    function refreshBasketChip(visitCount) {
+        const n = visitCount || 0;
+        els.basketCount.textContent = String(n);
+        els.basketChip.hidden = !(screen === 'visit' && n > 0);
     }
 
     function selectedPlantLabel() {
@@ -137,6 +162,9 @@
         els.weekText.textContent = `${weekly} ${weekly === 1 ? 'visit' : 'visits'} this week`;
         const sc = V.score(state);
         els.scoreChip.textContent = `🌱 ${sc.planted}/${sc.plots} planted · ❀ ${sc.mature} grown`;
+        const pantryN = (state.pantry && state.pantry.totalHarvests) || 0;
+        if (screen !== 'visit') els.basketChip.hidden = pantryN <= 0;
+        else if (session) refreshBasketChip(session.pendingHarvests.length);
         document.body.dataset.planted = String(sc.planted);
         document.body.dataset.mature = String(sc.mature);
         els.devDay.textContent = clock.offsetDays ? `+${clock.offsetDays} day${clock.offsetDays > 1 ? 's' : ''}` : 'today';
@@ -271,7 +299,13 @@
             card.type = 'button';
             card.className = 'seed-card' + (unlocked ? '' : ' locked');
             card.dataset.plant = p.id;
-            if (!unlocked) card.dataset.lock = `Unlocks after ${info.unlockAtVisit} visits`;
+            if (!unlocked) {
+                const h = info.unlockHarvests || 0;
+                const v = info.unlockAtVisit || 0;
+                card.dataset.lock = h > 0
+                    ? `Unlocks after ${h} harvest${h === 1 ? '' : 's'} or ${v} visits`
+                    : (v > 0 ? `Unlocks after ${v} visits` : 'Locked');
+            }
             const img = document.createElement('img');
             img.src = ART.plantSrc(p.id, 5);
             img.alt = '';
@@ -302,9 +336,9 @@
     function plant(plantId, plot) {
         const target = plot !== undefined ? plot : pickerTarget;
         const res = V.plantSeed(state, target, plantId, clock.now());
-        if (!res.ok) { toast(res.reason === 'locked' ? 'Those seeds unlock with more visits.' : 'That bed is taken.'); return res; }
+        if (!res.ok) { toast(res.reason === 'locked' ? 'Those seeds unlock with more harvests or visits.' : 'That bed is taken.'); return res; }
         save();
-        scene.setPlots(state.plots);
+        plotsForScene();
         floatLabel(res.plot, `${L.plantById(plantId).name} planted`);
         renderHud();
         const empty = V.emptyPlots(state);
@@ -319,6 +353,8 @@
     // Visit
     // ------------------------------------------------------------------
     const STEP_COPY = {
+        'pick-harvest': { title: 'Choose a crop to pick', text: 'Ready beds twinkle softly. Select one, then smile for about two seconds while you harvest (or press Enter).' },
+        'harvest-hold': { title: 'Smile to harvest', text: 'Hold a gentle smile on the crop you chose. Your harvest goes into the basket — nothing is ever lost.' },
         pick: { title: 'Choose a plant to tend', text: 'Click a bed or use arrow keys, then press Enter or Space. Only planted beds can be selected.' },
         smile: { title: 'Smile: sunlight', text: 'Smile for this plant. Warm light pours onto the bed you chose. Big or small, it all counts.' },
         talk: { title: 'Talk: water', text: 'Tell this plant about your day, out loud or in a whisper. Talking fills its watering can.' },
@@ -352,13 +388,17 @@
 
     async function beginVisit() {
         if (!(await ensureSource())) return;
+        const today = clock.today();
         session = new V.VisitSession({
             fast: config.fast,
             pace: state.settings.pace,
             breaths: state.settings.breaths,
             plots: state.plots,
-            plantedBeds: V.plantedPlotIndices(state.plots),
+            today,
+            tendBeds: V.tendablePlotIndices(state.plots, today),
         });
+        refreshBasketChip(0);
+        els.basketChip.hidden = session.harvestQueue.length === 0;
         trace.clear();
         talkPromptIdx = Math.floor(Math.random() * TALK_PROMPTS.length);
         show('visit');
@@ -378,8 +418,12 @@
         lastStep = step;
         document.body.dataset.step = step;
         if (source && source.setPhase) source.setPhase(step);
-        const order = ['smile', 'talk', 'breathe', 'summary'];
-        let idx = order.indexOf(step === 'breathe-offer' ? 'breathe' : step === 'pick' ? 'smile' : step);
+        const order = ['harvest', 'smile', 'talk', 'breathe', 'summary'];
+        let idx = order.indexOf(
+            step === 'pick-harvest' || step === 'harvest-hold' ? 'harvest'
+                : step === 'breathe-offer' ? 'breathe'
+                    : step === 'pick' ? 'smile'
+                        : step);
         if (idx < 0) idx = 0;
         els.stepTrack.querySelectorAll('span').forEach((s, i) => {
             s.classList.toggle('on', i === idx);
@@ -401,10 +445,22 @@
         box.textContent = '';
         const opt = document.getElementById('breath-options');
         if (opt) opt.remove();
-        if (step === 'pick') {
-            const go = mkBtn('Tend this plant', 'btn btn-primary', () => { session.confirmPick(); });
+        if (step === 'pick-harvest') {
+            const go = mkBtn('Harvest this bed', 'btn btn-primary', () => { onStep(session.confirmPick()); });
             go.id = 'btn-pick-go';
-            const skip = mkBtn('Finish visit', 'btn btn-ghost', () => { session.go('summary'); onStep('summary'); });
+            const skip = mkBtn('Skip harvest', 'btn btn-ghost', () => { onStep(session.skip()); });
+            skip.id = 'btn-skip';
+            box.append(skip, go);
+        } else if (step === 'harvest-hold') {
+            const inst = mkBtn('Harvest now (Enter)', 'btn btn-primary', () => { onStep(session.confirmHarvestInstant()); });
+            inst.id = 'btn-harvest-now';
+            const skip = mkBtn('Skip harvest', 'btn btn-ghost', () => { onStep(session.skip()); });
+            skip.id = 'btn-skip';
+            box.append(skip, inst);
+        } else if (step === 'pick') {
+            const go = mkBtn('Tend this plant', 'btn btn-primary', () => { onStep(session.confirmPick()); });
+            go.id = 'btn-pick-go';
+            const skip = mkBtn('Finish visit', 'btn btn-ghost', () => { onStep(session.go('summary')); });
             skip.id = 'btn-skip';
             box.append(skip, go);
         } else if (step === 'breathe-offer') {
@@ -479,7 +535,14 @@
         const input = currentInput();
         const events = session.update(dt, input);
         trace.push({ t, happiness: input.happiness, faceVisible: input.faceVisible, talking: input.talking, smiling: session.smiling });
-        for (const ev of events) if (ev.type === 'step' && ev.step !== lastStep) onStep(ev.step);
+        for (const ev of events) {
+            if (ev.type === 'step' && ev.step !== lastStep) onStep(ev.step);
+            if (ev.type === 'harvest-ready' && ev.plot != null) {
+                const pl = state.plots[ev.plot];
+                if (pl) scene.playHarvestAnim(ev.plot, pl.plantId);
+                refreshBasketChip(session.pendingHarvests.length);
+            }
+        }
         if (!session) return;
         const step = session.step;
         document.body.dataset.smiling = session.smiling ? '1' : '0';
@@ -490,8 +553,14 @@
         const rem = session.stepRemaining();
         const frac = dur > 0 ? 1 - rem / dur : 0;
         els.ringFg.style.strokeDashoffset = String(276.46 * frac);
-        els.ringText.textContent = step === 'breathe-offer' ? '🍃' : step === 'pick' ? '❀' : String(Math.ceil(rem));
-        if (step === 'pick') {
+        els.ringText.textContent = step === 'breathe-offer' ? '🍃' : (step === 'pick' || step === 'pick-harvest') ? '❀' : step === 'harvest-hold' ? '🧺' : String(Math.ceil(rem));
+        if (step === 'pick-harvest') {
+            const remH = session.remainingHarvestCount();
+            els.stepLive.textContent = `${selectedPlantLabel()} · ready to pick · ${remH} bed${remH === 1 ? '' : 's'} left. Enter or Space to harvest.`;
+        } else if (step === 'harvest-hold') {
+            els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
+                : session.smiling ? '🧺 Picking… hold that smile' : `Smile gently · ${Math.ceil(rem)} s (or press Enter)`;
+        } else if (step === 'pick') {
             const round = session.plantRound + 1;
             const total = session.plantedBeds.length;
             els.stepLive.textContent = `${selectedPlantLabel()} · plant ${round} of ${total}. Enter or Space to tend.`;
@@ -521,7 +590,8 @@
 
         // scene effects
         const on = L.DEFAULTS.smileOn;
-        const smileAmt = step === 'smile' && session.smiling ? 0.45 + 0.55 * L.clamp01((session.h - on) / (1 - on)) : 0;
+        const smileAmt = (step === 'smile' || step === 'harvest-hold') && session.smiling
+            ? 0.45 + 0.55 * L.clamp01((session.h - on) / (1 - on)) : 0;
         scene.setEffects({
             plot: session.selectedPlot,
             sun: smileAmt,
@@ -557,7 +627,14 @@
     async function finishVisit() {
         const result = session.result();
         const before = state.plots.map((p) => (p ? { plantId: p.plantId, stage: p.stage } : null));
+        const beforeSeeds = V.unlockedPlants(state);
+        const beforeDecor = V.decorUnlocked(state);
         const out = V.applyVisit(state, result, clock.now());
+        const harvested = V.applySessionHarvests(state, result.harvestPlots, clock.now());
+        const unlocks = V.newUnlocksAfterHarvest(state, beforeSeeds, beforeDecor);
+        out.harvested = harvested;
+        out.seedUnlocks = unlocks.seeds;
+        out.decorUnlocks = unlocks.decor;
         lastResult = Object.assign({}, out);
         save();
         if (source) { try { await source.stop(); } catch { /* ignore */ } }
@@ -578,9 +655,37 @@
                 floatLabel(g.plot, g.mature ? `${g.name}: fully grown!` : `${g.name} → ${V.STAGES[g.to].label}`);
             }, 700 + k * 650);
         });
-        setTimeout(() => { scene.setPlots(state.plots, { instant: true }); document.body.dataset.revealed = '1'; }, 900 + out.grew.length * 650 + 2300);
+        setTimeout(() => { plotsForScene({ instant: true }); document.body.dataset.revealed = '1'; }, 900 + out.grew.length * 650 + 2300);
         document.body.dataset.revealed = '0';
         document.body.dataset.grew = String(out.grew.length);
+        if (out.seedUnlocks.length || out.decorUnlocks.length) showUnlockReveal(out.seedUnlocks, out.decorUnlocks);
+    }
+
+    function showUnlockReveal(seeds, decor) {
+        const parts = [];
+        if (seeds.length) parts.push('New seeds: ' + seeds.map((id) => L.plantById(id).name).join(', '));
+        if (decor.length) {
+            const labels = decor.map((id) => (V.DECOR_UNLOCKS.find((d) => d.id === id) || { label: id }).label);
+            parts.push('New decorations: ' + labels.join(', '));
+        }
+        els.unlockTitle.textContent = seeds.length ? 'Fresh seeds for your journal' : 'Garden decorations';
+        els.unlockBody.textContent = parts.join(' · ');
+        els.unlockArt.textContent = '';
+        const cardSrc = ART.ui && ART.ui.unlockSeedCard;
+        const img = new Image();
+        img.alt = '';
+        img.className = 'unlock-seed-img';
+        img.src = cardSrc || ART.card;
+        img.onerror = () => { img.remove(); };
+        els.unlockArt.appendChild(img);
+        if (seeds[0]) {
+            const thumb = document.createElement('img');
+            thumb.src = ART.plantSrc(seeds[0], 5);
+            thumb.alt = '';
+            thumb.className = 'unlock-plant';
+            els.unlockArt.appendChild(thumb);
+        }
+        els.screenUnlock.hidden = false;
     }
 
     function renderSummary(out) {
@@ -617,9 +722,20 @@
             li.textContent = V.waitingText(w);
             els.sumWait.appendChild(li);
         }
-        for (const id of out.unlocked) {
+        for (const h of out.harvested || []) {
+            const li = document.createElement('li');
+            li.textContent = `Harvested ${h.yield}× ${h.name} from bed ${h.plot + 1}` + (h.mode === 'pull' ? ' (bed cleared; 1 seed returned).' : ' (will regrow soon).');
+            els.sumGrew.appendChild(li);
+        }
+        for (const id of out.seedUnlocks || out.unlocked || []) {
             const li = document.createElement('li');
             li.textContent = `New seeds unlocked: ${L.plantById(id).name}!`;
+            els.sumGrew.appendChild(li);
+        }
+        for (const id of out.decorUnlocks || []) {
+            const d = V.DECOR_UNLOCKS.find((x) => x.id === id);
+            const li = document.createElement('li');
+            li.textContent = `Decoration unlocked: ${d ? d.label : id} — place it from the Decorate journal tab.`;
             els.sumGrew.appendChild(li);
         }
         els.sumWeek.textContent = `${out.weekly} ${out.weekly === 1 ? 'visit' : 'visits'} this week. ` +
@@ -686,7 +802,10 @@
                 for (let s = 1; s <= 5; s++) { const d = document.createElement('i'); if (s <= p.stage) d.className = 'on'; pips.appendChild(d); }
                 const line = document.createElement('div');
                 line.className = 'note';
-                line.textContent = `${V.STAGES[p.stage].label} · planted ${days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago'} · needs ${kind.sunHoursLabel} of sun a day`;
+                let status = `${V.STAGES[p.stage].label}`;
+                if (V.isPlotReady(p, today)) status += ' · ready to pick';
+                else if (V.isPlotRegrowing(p, today)) status += ' · regrowing';
+                line.textContent = `${status} · planted ${days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago'} · needs ${kind.sunHoursLabel} of sun a day`;
                 txt.append(b, pips, line);
                 if (p.stage < 5) {
                     const bank = document.createElement('div');
@@ -700,6 +819,106 @@
                 row.append(img, txt);
                 body.appendChild(row);
             });
+        } else if (tab === 'pantry') {
+            const shelf = document.createElement('div');
+            shelf.className = 'pantry-shelf';
+            const bg = document.createElement('div');
+            bg.className = 'pantry-bg';
+            const items = (state.pantry && state.pantry.items) || {};
+            const keys = Object.keys(items).filter((k) => items[k].count > 0);
+            if (!keys.length) {
+                const p = document.createElement('p');
+                p.className = 'j-empty';
+                p.textContent = 'Your pantry is empty. Harvest mature crops during a visit to fill the shelf.';
+                shelf.appendChild(p);
+            } else {
+                const row = document.createElement('div');
+                row.className = 'pantry-row';
+                for (const id of keys) {
+                    const it = items[id];
+                    const slot = document.createElement('div');
+                    slot.className = 'pantry-slot';
+                    const icon = document.createElement('div');
+                    icon.className = 'produce-icon';
+                    icon.style.background = (ART.produce.placeholder && ART.produce.placeholder[id]) || '#c4a574';
+                    icon.textContent = (id[0] || '?').toUpperCase();
+                    const img = document.createElement('img');
+                    img.src = ART.produce.src(id);
+                    img.alt = '';
+                    img.className = 'produce-img';
+                    img.onerror = () => { img.hidden = true; };
+                    icon.appendChild(img);
+                    const cap = document.createElement('h3');
+                    cap.textContent = `${L.plantById(id).name} × ${it.count}`;
+                    const sub = document.createElement('div');
+                    sub.className = 'note';
+                    sub.textContent = it.firstDay ? `First picked ${V.dayStart(it.firstDay).toLocaleDateString()}` : '';
+                    slot.append(icon, cap, sub);
+                    row.appendChild(slot);
+                }
+                shelf.appendChild(row);
+            }
+            const total = (state.pantry && state.pantry.totalHarvests) || 0;
+            const foot = document.createElement('p');
+            foot.className = 'note';
+            foot.textContent = `${total} harvest${total === 1 ? '' : 's'} so far · collection only (no cooking yet).`;
+            body.append(shelf, foot);
+        } else if (tab === 'decorate') {
+            V.syncDecorUnlocks(state);
+            const unlocked = state.decor.unlocked || [];
+            if (!unlocked.length) {
+                const p = document.createElement('p');
+                p.className = 'j-empty';
+                p.textContent = 'Decorations unlock as you harvest. Lantern unlocks after 2 total harvests.';
+                body.appendChild(p);
+                return;
+            }
+            const intro = document.createElement('p');
+            intro.className = 'note';
+            intro.textContent = 'Pick a decoration, then tap a spot in the list to place or swap. Remove with Clear.';
+            body.appendChild(intro);
+            const picks = document.createElement('div');
+            picks.className = 'decor-picks';
+            let activeDecor = unlocked[0];
+            for (const id of unlocked) {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'btn btn-soft btn-small decor-pick';
+                const def = V.DECOR_UNLOCKS.find((d) => d.id === id);
+                b.textContent = def ? def.label : id;
+                b.addEventListener('click', () => {
+                    activeDecor = id;
+                    picks.querySelectorAll('.decor-pick').forEach((x) => x.classList.toggle('on', x === b));
+                });
+                if (id === activeDecor) b.classList.add('on');
+                picks.appendChild(b);
+            }
+            body.appendChild(picks);
+            const spots = document.createElement('div');
+            spots.className = 'decor-spots';
+            for (const spot of ART.decorSpots) {
+                const row = document.createElement('div');
+                row.className = 'decor-spot';
+                const cur = state.decor.placements[spot.id];
+                const label = document.createElement('b');
+                label.textContent = spot.label;
+                const now = document.createElement('span');
+                now.className = 'note';
+                now.textContent = cur ? (V.DECOR_UNLOCKS.find((d) => d.id === cur) || { label: cur }).label : 'Empty';
+                const place = mkBtn('Place here', 'btn btn-soft btn-small', () => {
+                    const r = V.placeDecor(state, spot.id, activeDecor);
+                    if (r.ok) { save(); plotsForScene({ instant: true }); renderJournal('decorate'); toast('Decoration placed.'); }
+                });
+                const clear = mkBtn('Clear', 'btn btn-ghost btn-small', () => {
+                    V.placeDecor(state, spot.id, null);
+                    save();
+                    plotsForScene({ instant: true });
+                    renderJournal('decorate');
+                });
+                row.append(label, now, place, clear);
+                spots.appendChild(row);
+            }
+            body.appendChild(spots);
         } else {
             const grid = document.createElement('div');
             grid.className = 'lib-grid';
@@ -766,12 +985,15 @@
         const i = scene.plotAt(e.clientX, e.clientY);
         scene.setHover(i);
         if (screen === 'visit') {
-            els.garden.style.cursor = (session && session.step === 'pick' && i !== null && state.plots[i]) ? 'pointer' : '';
-            if (i !== null && state.plots[i] && session && session.step === 'pick') {
+            const pickStep = session && (session.step === 'pick' || session.step === 'pick-harvest');
+            const canSelect = pickStep && i !== null && session.selectablePlots().includes(i);
+            els.garden.style.cursor = canSelect ? 'pointer' : '';
+            if (canSelect && state.plots[i]) {
                 const kind = L.plantById(state.plots[i].plantId);
                 els.plotTip.textContent = '';
                 const b = document.createElement('b'); b.textContent = kind.name;
-                els.plotTip.append(b, document.createTextNode(` · bed ${i + 1} — click to select`));
+                const action = session.step === 'pick-harvest' ? 'pick' : 'tend';
+                els.plotTip.append(b, document.createTextNode(` · bed ${i + 1} — click to ${action}`));
                 const c = scene.plotClient(i);
                 els.plotTip.style.left = `${c.x}px`;
                 els.plotTip.style.top = `${c.y - 70 * c.s}px`;
@@ -788,7 +1010,10 @@
             const kind = L.plantById(p.plantId);
             els.plotTip.textContent = '';
             const b = document.createElement('b'); b.textContent = kind.name;
-            els.plotTip.append(b, document.createTextNode(` · ${V.STAGES[p.stage].label}` + (p.stage < 5 ? ` · ${p.sunBank.toFixed(1)}/${kind.cost} sun-hours saved` : ' · fully grown')));
+            let extra = V.isPlotReady(p, clock.today()) ? ' · ready to pick'
+                : V.isPlotRegrowing(p, clock.today()) ? ' · regrowing'
+                    : (p.stage < 5 ? ` · ${p.sunBank.toFixed(1)}/${kind.cost} sun-hours saved` : ' · fully grown');
+            els.plotTip.append(b, document.createTextNode(` · ${V.STAGES[p.stage].label}${extra}`));
         }
         const c = scene.plotClient(i);
         els.plotTip.style.left = `${c.x}px`;
@@ -799,11 +1024,14 @@
     els.garden.addEventListener('click', (e) => {
         const i = scene.plotAt(e.clientX, e.clientY);
         if (i === null) return;
-        if (screen === 'visit' && session && session.step === 'pick' && state.plots[i]) {
-            session.setSelectedPlot(i);
-            syncTendRing();
-            if (session.step === 'pick') {
-                els.stepLive.textContent = `${selectedPlantLabel()} · plant ${session.plantRound + 1} of ${session.plantedBeds.length}. Enter or Space to tend.`;
+        if (screen === 'visit' && session && (session.step === 'pick' || session.step === 'pick-harvest')) {
+            if (session.setSelectedPlot(i)) {
+                syncTendRing();
+                if (session.step === 'pick') {
+                    els.stepLive.textContent = `${selectedPlantLabel()} · plant ${session.plantRound + 1} of ${session.plantedBeds.length}. Enter or Space to tend.`;
+                } else if (session.step === 'pick-harvest') {
+                    els.stepLive.textContent = `${selectedPlantLabel()} · ready to pick. Enter or Space to harvest.`;
+                }
             }
             return;
         }
@@ -854,6 +1082,15 @@
     els.devNextDay.addEventListener('click', nextDay);
     els.devLighting.addEventListener('change', () => setLightingOverride(els.devLighting.value));
     els.devSim.addEventListener('click', () => simulateDays(5));
+    els.devReady.addEventListener('click', () => {
+        if (screen === 'visit') return;
+        V.makeAllReady(state);
+        save();
+        plotsForScene({ instant: true });
+        renderHud();
+        toast('All planted beds are ready to pick.');
+    });
+    els.btnUnlockOk.addEventListener('click', () => { els.screenUnlock.hidden = true; });
     els.devFill.addEventListener('click', fillEmpty);
     els.devReset.addEventListener('click', () => {
         state = V.createState(clock.now());
@@ -861,7 +1098,7 @@
         clock.offsetDays = 0;
         lastResult = null;
         save();
-        scene.setPlots(state.plots, { instant: true });
+        plotsForScene({ instant: true });
         refreshLighting(); renderHud();
         show('greeting');
     });
@@ -891,7 +1128,7 @@
         currentDay = clock.today();
         save();
         lastResult = res[res.length - 1] || lastResult;
-        scene.setPlots(state.plots);
+        plotsForScene();
         refreshLighting(); renderHud();
         toast(`Simulated ${n} sunny visits.`);
         if (screen === 'greeting') renderGreeting();
@@ -900,7 +1137,7 @@
         const ids = V.unlockedPlants(state);
         V.emptyPlots(state).forEach((plot, k) => V.plantSeed(state, plot, ids[k % ids.length], clock.now()));
         save();
-        scene.setPlots(state.plots);
+        plotsForScene();
         renderHud();
     }
 
@@ -915,10 +1152,13 @@
         if (k === 'escape') { if (screen === 'journal') closeJournal(); else if (screen === 'picker') closePicker(); toggleDev(false); return; }
         if (screen === 'visit' && session) {
             if (k === 'enter' || k === ' ') {
-                if (session.step === 'pick') { e.preventDefault(); session.confirmPick(); return; }
+                e.preventDefault();
+                if (session.step === 'pick-harvest') { onStep(session.confirmPick()); return; }
+                if (session.step === 'harvest-hold') { onStep(session.confirmHarvestInstant()); return; }
+                if (session.step === 'pick') { onStep(session.confirmPick()); return; }
             }
             const nav = { arrowleft: 'left', arrowright: 'right', arrowup: 'up', arrowdown: 'down' };
-            if (nav[k] && session.step === 'pick') {
+            if (nav[k] && (session.step === 'pick' || session.step === 'pick-harvest')) {
                 e.preventDefault();
                 session.moveSelection(nav[k]);
                 syncTendRing();
@@ -980,7 +1220,7 @@
 
     async function init() {
         refreshLighting();
-        scene.setPlots(state.plots, { instant: true });
+        plotsForScene({ instant: true });
         els.devLighting.value = state.settings.lighting;
         renderHud();
         requestAnimationFrame(loop);
@@ -1030,7 +1270,8 @@
         startBreathing: (o) => session && session.startBreathing(o || {}),
         show,
         toggleDev,
-        reset() { localStorage.removeItem(STORE_KEY); state = V.createState(new Date()); clock.offsetDays = 0; scene.setPlots(state.plots, { instant: true }); renderHud(); },
+        makeAllReady: () => { V.makeAllReady(state); save(); plotsForScene({ instant: true }); renderHud(); },
+        reset() { localStorage.removeItem(STORE_KEY); state = V.createState(new Date()); clock.offsetDays = 0; plotsForScene({ instant: true }); renderHud(); },
     };
 
     window.addEventListener('beforeunload', () => { if (source) { try { source.destroy(); } catch { /* ignore */ } } });

@@ -34,5 +34,37 @@
                 return '../assets/selection/ring-' + kind + '-bed' + i + '.png';
             },
         },
+        // Fixed decoration anchors (backdrop px, bottom-centre). Chosen clear of the 8 bed boxes in plots[].
+        decorSpots: [
+            Object.freeze({ id: 'nw-path', label: 'Northwest path', x: 168, y: 298 }),
+            Object.freeze({ id: 'ne-hedge', label: 'Northeast hedge', x: 1110, y: 310 }),
+            Object.freeze({ id: 'sw-corner', label: 'Southwest corner', x: 145, y: 580 }),
+            Object.freeze({ id: 'se-path', label: 'Southeast path', x: 1155, y: 575 }),
+            Object.freeze({ id: 'mid-left', label: 'Mid-left lawn', x: 218, y: 460 }),
+        ],
+        produce: {
+            size: 128,
+            placeholder: Object.freeze({
+                lettuce: '#8ecf7a', mint: '#6bb88a', cucumber: '#5a9e62', tomato: '#e07055',
+                sunflower: '#f0c040', apple: '#c86b4a',
+            }),
+            src(id) { return '../assets/produce/' + id + '.png'; },
+        },
+        plantPickedSrc(id) {
+            const dir = this.plants[id] && this.plants[id].dir;
+            return dir ? '../assets/plants/' + dir + '/picked.png' : null;
+        },
+        decor: {
+            ids: ['lantern', 'birdbath', 'bench', 'scarecrow', 'fairy-lights'],
+            src(id, kind) { return '../assets/decor/' + id + '-' + kind + '.png'; },
+            placeholderH: 96,
+        },
+        ui: {
+            pantryShelf: '../assets/ui/pantry-shelf.png',
+            unlockSeedCard: '../assets/ui/unlock-seed-card.png',
+        },
+        harvestFx: Object.freeze({ frameW: 200, frameH: 320, soilY: 282, count: 12, fps: 12 }),
+        harvestFxSrc(kind) { return '../assets/effects/harvest-' + kind + '-strip.png'; },
+        basketHud: Object.freeze({ x: 1195, y: 68 }),
     });
 })();
