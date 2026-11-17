@@ -1,60 +1,54 @@
 # Camera check — potting-shed window (Heily)
 
-Pre-game **Camera check** (`#screen-camera-check`). Full-screen stage **1280×720 display px** (all painted assets @2×). Code positions from `renderer/art.js` → `cameraCheck.layout` with CSS fallbacks.
+Pre-game **Camera check** (`#screen-camera-check`). Full-screen stage **1280×720 display px**. **Authoritative layout:** `assets/ui/camera-check/camera-check-manifest.json`. Registered in `renderer/art.js` → `cameraCheck`. CSS: `renderer/camera-check-ui.css` (`.cc-*`).
 
-## Theme
+## Layer order
 
-Potting-shed interior: wooden **window** looking out at the live camera, **sill** with four **seed packets** (mini-tests), shed **backdrop** on the wall.
+1. `backdrop.png` (1× 1280×720, opaque planks)
+2. Live **video** — **360, 56**, **560×420**, `object-fit: cover`, **`scaleX(-1)`** mirror
+3. **Overlays** — `face-outline.png`, `tilt-left/right.png` (behind frame; outline → **40%** opacity once face found; pulse active tilt arrow during stretch test)
+4. `window-frame.png` — **300, 0**, display **680×520** (2× source 1360×1040); visible picture **370, 66, 540×400**
+5. `sill.png` — **280, 520**, **720×80**
+6. Seed **packets** — **110×150** display (220×300 @2×), centres **x = 400 / 560 / 720 / 880**, **top y = 450** (feet ~**y = 600**)
+7. **Labels** — code text **y = 610–650**: `ready`, `listening…`, `next`
+8. **Buttons** — 9-slice pills, **exactly 44 px** tall (`border-image-slice: 40 44 fill`; `border-image-width: 20px 22px`)
 
-## Asset list
+## Packets (smile / talk / breathe / stretch)
 
-| Asset | Path | Design px (1×) | @2× export |
-|-------|------|----------------|------------|
-| Shed backdrop | `assets/ui/camera-check/backdrop.png` | 1280 × 720 | 2560 × 1440 |
-| Window frame | `assets/ui/camera-check/window-frame.png` | 640 × 500 | 1280 × 1000 |
-| Sill | `assets/ui/camera-check/sill.png` | 1280 × 80 | 2560 × 160 |
-| Packet smile closed | `assets/ui/camera-check/packet-smile-closed.png` | 110 × 150 | 220 × 300 |
-| Packet smile sprouted | `assets/ui/camera-check/packet-smile-sprouted.png` | 110 × 150 | 220 × 300 |
-| Packet talk closed | `assets/ui/camera-check/packet-talk-closed.png` | 110 × 150 | 220 × 300 |
-| Packet talk sprouted | `assets/ui/camera-check/packet-talk-sprouted.png` | 110 × 150 | 220 × 300 |
-| Packet breathe closed | `assets/ui/camera-check/packet-breathe-closed.png` | 110 × 150 | 220 × 300 |
-| Packet breathe sprouted | `assets/ui/camera-check/packet-breathe-sprouted.png` | 110 × 150 | 220 × 300 |
-| Packet stretch closed | `assets/ui/camera-check/packet-stretch-closed.png` | 110 × 150 | 220 × 300 |
-| Packet stretch sprouted | `assets/ui/camera-check/packet-stretch-sprouted.png` | 110 × 150 | 220 × 300 |
+| State | Art | When |
+|-------|-----|------|
+| closed | `packet-{kind}-closed.png` | Default |
+| listening | `packet-{kind}-listening.png` | Active check |
+| sprouted | `packet-{kind}-sprouted.png` | Passed |
 
-**Sprouted** = that check **passed** (not merely skipped). **Closed** = default. Code swaps on `passed[key]`; skipped packets stay closed (label shows “Skipped”).
+Game key `breath` → filename stem **`breathe`**.
 
-Face outline: faint oval in the frame art and/or CSS `.cc-face-oval`.
+## Buttons
 
-## Layout (display px on 1280×720 stage)
+| Button | Position (display px) | Asset |
+|--------|----------------------|--------|
+| Skip for now | **40, 658**, min width ~200 | `btn-secondary.png` + hover |
+| Start my garden | **right 40, top 658**, min width ~200 | `btn-primary.png` + hover |
 
-Coordinates are **backdrop / stage space**, origin top-left.
+Text colours: primary **#3f5a2a**, secondary **#7a6652**.
 
-| Element | Position |
-|---------|----------|
-| **Camera preview** | 4:3, **560 × 420**; horizontal center **x = 640**; **top y = 56** (left edge **x = 360**) |
-| **Window frame** | **640 × 500**, centered on preview center (**cx = 640**, **cy = 266** → left **320**, top **16**); transparent opening for video |
-| **Sill** | Vertical span **y = 520 … 600** (80px band, full stage width in art) |
-| **Seed packets** (smile, talk, breathe, neck stretch) | Each **110 × 150**; horizontal centers **x = 400, 560, 720, 880**; **bottom y = 600** (top **y = 450**) |
-| **Packet labels** (live meter / hint) | Under each packet, **y = 610 … 650** (40px tall strip, centered on packet **cx**) |
-| **“Start my garden”** | Primary button, **bottom-right**, baseline near **y ≈ 680** |
-| **“Skip for now”** | Text link, **bottom-left**, baseline near **y ≈ 680** |
+## Care UI during check
 
-Status lines (**Face found**, **Lighting OK**, camera errors): code places a compact row just below the preview opening (~**y = 480**, centered).
-
-## Live UI / stretch & breath
-
-- Active **smile** or **talk**: label shows hold **meter** (0–100%).
-- Active **breathe**: label mirrors breath pill text (warming → settling → stable); center **breath guide** still used when active.
-- Active **neck stretch**: label + existing **sunflower stretch guide** when active.
+- **Smile / talk:** meter under `listening…` on the active packet label.
+- **Breathe:** centre breath guide + pill text when active.
+- **Stretch:** stretch HUD + tilt hints; packet label `next` until selected.
 
 ## Code fallbacks
 
-Missing PNGs: painted shed colors in CSS, emoji packet tiles (☀ 💬 🍃 🌻), CSS face oval.
+Missing PNGs: gradient backdrop, emoji packet tiles, CSS face oval, plain rounded buttons.
 
-## Screenshots (capture)
+## Screenshots
+
+Reference: **`docs/camera-check-mockup.png`**.
+
+Capture (`npm run screenshots` after wellness):
 
 - `camera-check-initial.png`
-- `camera-check-midway.png`
+- `camera-check-mockup-states.png` (smile+talk sprouted, breathe listening, stretch next)
 - `camera-check-all-passed.png`
 - `camera-check-denied.png`

@@ -227,30 +227,41 @@
             backdrop: '../assets/ui/camera-check/backdrop.png',
             windowFrame: '../assets/ui/camera-check/window-frame.png',
             sill: '../assets/ui/camera-check/sill.png',
+            faceOutline: '../assets/ui/camera-check/face-outline.png',
+            tiltLeft: '../assets/ui/camera-check/tilt-left.png',
+            tiltRight: '../assets/ui/camera-check/tilt-right.png',
             /** Game check key → packet filename stem (breath → breathe). */
             packetStem: Object.freeze({ smile: 'smile', talk: 'talk', breath: 'breathe', stretch: 'stretch' }),
-            /** Display layout on the 1280×720 stage (art assets @2×). */
+            /** Display layout — assets/ui/camera-check/camera-check-manifest.json */
             layout: Object.freeze({
                 stageW: 1280,
                 stageH: 720,
-                preview: Object.freeze({ w: 560, h: 420, cx: 640, top: 56 }),
-                windowFrame: Object.freeze({ w: 640, h: 500, cx: 640, cy: 266 }),
-                sill: Object.freeze({ top: 520, bottom: 600 }),
-                packet: Object.freeze({ w: 110, h: 150, bottom: 600 }),
+                camera: Object.freeze({ x: 360, y: 56, w: 560, h: 420 }),
+                opening: Object.freeze({ x: 370, y: 66, w: 540, h: 400 }),
+                windowFrame: Object.freeze({ x: 300, y: 0, w: 680, h: 520 }),
+                sill: Object.freeze({ x: 280, y: 520, w: 720, h: 80 }),
+                faceOutline: Object.freeze({ x: 530, y: 116, w: 220, h: 280 }),
+                tiltLeft: Object.freeze({ x: 420, y: 120, w: 120, h: 36 }),
+                tiltRight: Object.freeze({ x: 740, y: 120, w: 120, h: 35 }),
+                packet: Object.freeze({ w: 110, h: 150, top: 450, bottom: 600 }),
                 packetCenters: Object.freeze({ smile: 400, talk: 560, breath: 720, stretch: 880 }),
                 label: Object.freeze({ top: 610, bottom: 650 }),
-                footerY: 680,
-                skipLeft: 96,
-                startRight: 96,
+                btnStart: Object.freeze({ x: 1000, y: 658, w: 240, h: 44 }),
+                btnSkip: Object.freeze({ x: 40, y: 658, w: 200, h: 44 }),
             }),
+            btnSlice: Object.freeze({ slice: '40 44 fill', width: '20px 22px', height: 44 }),
+            faceFoundOpacity: 0.4,
             backdropPixels: Object.freeze([1280, 720]),
-            windowFramePixels: Object.freeze([640, 500]),
-            sillPixels: Object.freeze([1280, 80]),
-            packetPixels: Object.freeze([110, 150]),
-            packetSrc(checkKey, sprouted) {
+            windowFramePixels: Object.freeze([1360, 1040]),
+            sillPixels: Object.freeze([1440, 160]),
+            packetPixels: Object.freeze([220, 300]),
+            packetDisplay: Object.freeze([110, 150]),
+            packetSrc(checkKey, state) {
                 const stem = this.packetStem[checkKey] || checkKey;
-                const state = sprouted ? 'sprouted' : 'closed';
-                return `../assets/ui/camera-check/packet-${stem}-${state}.png`;
+                const st = state === 'sprouted' || state === true
+                    ? 'sprouted'
+                    : state === 'listening' ? 'listening' : 'closed';
+                return `../assets/ui/camera-check/packet-${stem}-${st}.png`;
             },
         }),
         stretch: Object.freeze({

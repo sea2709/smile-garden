@@ -220,6 +220,9 @@ async function run(win, outDir) {
     await sleep(1200);
     await waitFor('camera check', (d) => d.screen === 'camera-check', 20000);
     await shot('camera-check-initial.png');
+    await js(`window.__smileGarden.setCameraCheckDemo({ passed: ['smile', 'talk'], active: 'breath' })`);
+    await sleep(500);
+    await shot('camera-check-mockup-states.png');
     await G(`g.selectCameraCheck('smile')`);
     await sleep(4200);
     await G(`g.selectCameraCheck('talk')`);

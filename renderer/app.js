@@ -20,7 +20,7 @@
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
         'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-sunflower', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-plant-name', 'needs-icons', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'needs-tag-img', 'needs-tag-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
-        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-note', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now',
+        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -216,6 +216,19 @@
             els.ccSill.src = artUrl(cc.sill);
             els.ccSill.onerror = () => { els.ccSill.dataset.fallback = '1'; };
         }
+        if (els.ccFaceOutline && cc.faceOutline) {
+            els.ccFaceOutline.src = artUrl(cc.faceOutline);
+            els.ccFaceOutline.hidden = false;
+            els.ccFaceOutline.onerror = () => { els.ccFaceOutline.dataset.fallback = '1'; };
+        }
+        if (els.ccTiltLeft && cc.tiltLeft) {
+            els.ccTiltLeft.src = artUrl(cc.tiltLeft);
+            els.ccTiltLeft.hidden = false;
+        }
+        if (els.ccTiltRight && cc.tiltRight) {
+            els.ccTiltRight.src = artUrl(cc.tiltRight);
+            els.ccTiltRight.hidden = false;
+        }
         cameraCheckGridMounted = true;
     }
 
@@ -254,11 +267,19 @@
             els.stretchGuide.hidden = active !== 'stretch';
             if (active === 'breath') renderBreathRate();
             if (active === 'stretch') renderStretchHud();
-            const breathLabel = active === 'breath' && els.breathRate && !els.breathRate.hidden
-                ? els.breathRate.textContent
-                : '';
             CCUI.renderStatus(els.ccStatusFace, els.ccStatusLight, els.ccStatusCamera, snap);
-            CCUI.renderPackets(els.ccPackets, snap, active, ART, artUrl, { breathLabel });
+            CCUI.renderPackets(els.ccPackets, snap, active, ART, artUrl);
+        }
+        if (els.ccFaceOutline) {
+            els.ccFaceOutline.classList.toggle('found', !!snap.faceFound);
+        }
+        const stretch = snap.stretchSnap || {};
+        const tiltOn = active === 'stretch' && !stretch.complete;
+        if (els.ccTiltLeft) {
+            els.ccTiltLeft.classList.toggle('on', tiltOn && stretch.activeSide === 'left');
+        }
+        if (els.ccTiltRight) {
+            els.ccTiltRight.classList.toggle('on', tiltOn && stretch.activeSide === 'right');
         }
     }
 
@@ -2142,6 +2163,16 @@
         markAllCameraChecksPassed() {
             if (!cameraCheckSession) return;
             for (const k of CC.CHECKS) cameraCheckSession.markPassed(k);
+            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
+        },
+        /** Capture/helper: fix packet visuals to match docs/camera-check-mockup.png */
+        setCameraCheckDemo(opts) {
+            if (!cameraCheckSession) return;
+            const o = opts || {};
+            for (const k of (o.passed || [])) cameraCheckSession.markPassed(k);
+            if (o.active) cameraCheckSession.select(o.active);
+            signal.h = 0.82;
+            signal.validation = 'Ok';
             renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
         },
         setCameraDeniedDemo(on) {

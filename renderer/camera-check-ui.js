@@ -4,14 +4,20 @@
 
     const CHECKS = Object.freeze(['smile', 'talk', 'breath', 'stretch']);
 
-    const LABELS = Object.freeze({
-        smile: { title: 'Smile', sub: 'Hold a happy smile ~2 s' },
-        talk: { title: 'Talk', sub: 'Talk to the garden ~2 s' },
-        breath: { title: 'Breathe', sub: 'Stable breath (~20–30 s)' },
-        stretch: { title: 'Neck stretch', sub: 'Tilt each side ~2 s' },
-    });
-
     const FALLBACK_ICON = Object.freeze({ smile: '☀', talk: '💬', breath: '🍃', stretch: '🌻' });
+
+    function firstOpenCheck(snap) {
+        for (const k of CHECKS) {
+            if (!snap.passed[k] && !snap.skipped[k]) return k;
+        }
+        return null;
+    }
+
+    function packetState(key, snap, active) {
+        if (snap.passed && snap.passed[key]) return 'sprouted';
+        if (active === key) return 'listening';
+        return 'closed';
+    }
 
     function mountPackets(container, ART, artUrl, handlers) {
         container.textContent = '';
@@ -23,11 +29,10 @@
             btn.className = 'cc-packet';
             btn.dataset.check = key;
             btn.style.left = `${cx}px`;
-            btn.title = LABELS[key].title;
             const img = document.createElement('img');
             img.dataset.role = 'packet';
             img.alt = '';
-            img.src = artUrl(ART.cameraCheck.packetSrc(key, false));
+            img.src = artUrl(ART.cameraCheck.packetSrc(key, 'closed'));
             img.onerror = () => {
                 const fb = document.createElement('span');
                 fb.className = 'cc-packet-fallback';
@@ -44,63 +49,54 @@
             lab.className = 'cc-packet-label';
             lab.dataset.check = key;
             lab.style.left = `${cx}px`;
-            lab.textContent = LABELS[key].title;
+            lab.textContent = 'ready';
             container.appendChild(btn);
             container.appendChild(lab);
         }
     }
 
-    function labelText(key, snap, active, extras) {
-        if (snap.passed[key]) return '✓ Sprouted';
-        if (snap.skipped[key]) return 'Skipped';
-        if (active !== key) return LABELS[key].title;
-        if (key === 'smile') {
-            const pct = Math.round((snap.smileMeter || 0) * 100);
-            return pct > 0 ? `Smile ${pct}%` : LABELS.smile.sub;
-        }
-        if (key === 'talk') {
-            const pct = Math.round((snap.talkMeter || 0) * 100);
-            return pct > 0 ? `Talking ${pct}%` : LABELS.talk.sub;
-        }
-        if (key === 'breath') {
-            return (extras && extras.breathLabel) || 'Listening…';
-        }
-        if (key === 'stretch' && snap.stretchSnap) {
-            if (snap.stretchSnap.complete) return '✓ Both sides';
-            const side = snap.stretchSnap.activeSide;
-            if (side === 'left') return 'Hold left tilt…';
-            if (side === 'right') return 'Hold right tilt…';
-            return LABELS.stretch.sub;
-        }
-        return LABELS[key].sub;
+    function labelText(key, snap, active) {
+        if (snap.passed && snap.passed[key]) return '';
+        if (snap.skipped && snap.skipped[key]) return 'Skipped';
+        if (active === key) return 'listening…';
+        const next = firstOpenCheck(snap);
+        if (next === key) return 'next';
+        return 'ready';
     }
 
-    function renderPackets(container, snap, active, ART, artUrl, extras) {
+    function renderPackets(container, snap, active, ART, artUrl) {
         if (!container) return;
         const cc = ART.cameraCheck || {};
         container.querySelectorAll('.cc-packet').forEach((btn) => {
             const k = btn.dataset.check;
             const passed = !!(snap.passed && snap.passed[k]);
             const done = passed || !!(snap.skipped && snap.skipped[k]);
+            const state = packetState(k, snap, active);
             btn.classList.toggle('on', k === active);
             btn.classList.toggle('done', done);
             btn.classList.toggle('passed', passed);
+            btn.dataset.state = state;
             const img = btn.querySelector('img[data-role="packet"]');
             if (img && cc.packetSrc) {
-                img.src = artUrl(cc.packetSrc(k, passed));
+                img.src = artUrl(cc.packetSrc(k, state));
             }
         });
         container.querySelectorAll('.cc-packet-label').forEach((lab) => {
             const k = lab.dataset.check;
-            const text = labelText(k, snap, active, extras);
+            const text = labelText(k, snap, active);
             lab.textContent = '';
+            lab.classList.toggle('ready', text === 'ready');
+            if (!text) {
+                lab.textContent = '';
+                return;
+            }
             if (active === k && (k === 'smile' || k === 'talk')) {
+                const frac = k === 'smile' ? snap.smileMeter : snap.talkMeter;
                 const cap = document.createElement('span');
-                cap.textContent = text.replace(/ \d+%$/, '') + ' ';
+                cap.textContent = 'listening…';
                 const meter = document.createElement('div');
                 meter.className = 'cc-meter';
                 const fill = document.createElement('i');
-                const frac = k === 'smile' ? snap.smileMeter : snap.talkMeter;
                 fill.style.width = `${Math.round((frac || 0) * 100)}%`;
                 meter.appendChild(fill);
                 lab.append(cap, meter);
@@ -128,7 +124,6 @@
 
     window.SmileCameraCheckUI = Object.freeze({
         CHECKS,
-        LABELS,
         mountPackets,
         renderPackets,
         renderStatus,

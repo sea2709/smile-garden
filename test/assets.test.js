@@ -159,21 +159,31 @@ test('breath UI art: manifest pills, icons, dots and breath-ui.css', () => {
     assert.ok(fs.existsSync(path.join(root, 'docs', 'breath-mockup.png')));
 });
 
-test('camera check art: potting-shed manifest, layout, and art spec doc', () => {
+test('camera check art matches assets/ui/camera-check/camera-check-manifest.json', () => {
+    const manifestPath = path.join(root, 'assets', 'ui', 'camera-check', 'camera-check-manifest.json');
+    const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
     assert.ok(ART.cameraCheck);
-    assert.ok(ART.cameraCheck.backdrop.includes('backdrop'));
-    assert.ok(ART.cameraCheck.windowFrame.includes('window-frame'));
-    assert.ok(ART.cameraCheck.sill.includes('sill'));
-    assert.equal(ART.cameraCheck.packetStem.breath, 'breathe');
-    const layout = ART.cameraCheck.layout;
-    assert.equal(layout.preview.w, 560);
-    assert.equal(layout.preview.h, 420);
-    assert.equal(layout.packetCenters.smile, 400);
-    assert.equal(layout.packetCenters.stretch, 880);
-    assert.ok(ART.cameraCheck.packetSrc('smile', true).includes('packet-smile-sprouted'));
-    assert.ok(ART.cameraCheck.packetSrc('breath', false).includes('packet-breathe-closed'));
+    assert.equal(ART.cameraCheck.layout.camera.w, manifest.camera_rect[2]);
+    assert.equal(ART.cameraCheck.layout.windowFrame.w, manifest.assets['window-frame.png'].display_size[0]);
+    assert.equal(ART.cameraCheck.packetDisplay[0], manifest.packets.display_size[0]);
+    assert.equal(ART.cameraCheck.layout.packetCenters.smile, manifest.packets.centers_x.smile);
+    assert.equal(ART.cameraCheck.layout.btnStart.h, manifest.buttons.start.rect[3]);
+    assert.ok(ART.cameraCheck.packetSrc('smile', 'sprouted').includes('packet-smile-sprouted'));
+    assert.ok(ART.cameraCheck.packetSrc('breath', 'listening').includes('packet-breathe-listening'));
+    assert.ok(ART.cameraCheck.packetSrc('breath', 'closed').includes('packet-breathe-closed'));
+    for (const rel of Object.keys(manifest.assets)) {
+        const ent = manifest.assets[rel];
+        const file = ent.file.replace(/^assets\//, '');
+        assert.ok(fs.existsSync(path.join(root, 'assets', file)), file);
+        if (ent.png_size) {
+            const buf = fs.readFileSync(path.join(root, 'assets', file));
+            assert.equal(buf.readUInt32BE(16), ent.png_size[0], `${rel} width`);
+            assert.equal(buf.readUInt32BE(20), ent.png_size[1], `${rel} height`);
+        }
+    }
     assert.ok(fs.existsSync(path.join(root, 'renderer', 'camera-check-ui.css')));
     assert.ok(fs.existsSync(path.join(root, 'docs', 'ART-CAMERA-CHECK.md')));
+    assert.ok(fs.existsSync(path.join(root, 'docs', 'camera-check-mockup.png')));
     assert.ok(fs.existsSync(path.join(root, 'game', 'camera-check.js')));
 });
 
