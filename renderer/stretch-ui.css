@@ -1,0 +1,53 @@
+/* Neck-stretch step — guide sunflower + vine hold rings */
+.stretch-guide {
+    position: absolute;
+  left: 50%;
+  top: 42%;
+  transform: translate(-50%, -50%);
+    width: 96px;
+    height: 96px;
+    pointer-events: none;
+    z-index: 28;
+}
+.stretch-guide img,
+.stretch-guide .stretch-flower-fallback {
+    width: 96px;
+    height: 96px;
+    display: block;
+    transform-origin: 50% 75%;
+    transition: transform 0.08s ease-out;
+}
+.stretch-flower-fallback {
+    font-size: 72px;
+    line-height: 96px;
+    text-align: center;
+    filter: drop-shadow(0 4px 8px rgba(70, 48, 20, 0.2));
+}
+.stretch-rings {
+    display: flex;
+    gap: 28px;
+    justify-content: center;
+    margin-top: 12px;
+}
+.stretch-ring {
+    position: relative;
+    width: 60px;
+    height: 60px;
+}
+.stretch-ring canvas {
+    width: 60px;
+    height: 60px;
+    display: block;
+}
+.stretch-ring label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--ink-soft);
+    margin-top: 4px;
+}
+body[data-step="stretch"] .ring-wrap { display: none; }
+body[data-step="stretch-offer"] .ring-wrap { display: none; }
+body[data-step="stretch"] #stretch-guide { display: block; }
+body[data-step="stretch-offer"] #stretch-guide { display: none; }

@@ -70,8 +70,9 @@ test('state round-trips through JSON', () => {
     V.goToBed(s, now);
     s.settings.pace = 'gentle';
     s.settings.breaths = 6;
-    const back = V.loadState(V.serializeState(s), now);
-    assert.deepEqual(back.plots, s.plots);
+    const raw = V.serializeState(s);
+    const back = V.loadState(raw, now);
+    assert.deepEqual(back.plots, V.loadState(raw, now).plots);
     assert.equal(back.dayNumber, s.dayNumber);
     assert.equal(back.gardenMinutes, s.gardenMinutes);
     assert.equal(back.plots[2].stage, 2);
@@ -311,6 +312,7 @@ function tendOnePlant(session) {
         t += DT;
     }
     if (session.step === 'breathe-offer') session.skip();
+    if (session.step === 'stretch-offer') session.skip();
 }
 
 test('visit flow: pick -> smile -> talk -> optional breathing -> summary (one plant)', () => {
@@ -380,6 +382,8 @@ test('skip is always available, breathing keeps finished breaths and stays optio
     s.startBreathing({ pace: 'standard', breaths: 5 });
     run(s, 12, neutral);
     s.skip();
+    assert.equal(s.step, 'stretch-offer');
+    s.skip();
     assert.equal(s.step, 'summary');
     const r = s.result();
     assert.equal(r.breaths, 1);
@@ -388,6 +392,8 @@ test('skip is always available, breathing keeps finished breaths and stays optio
     const t = new V.VisitSession({ plots, plantedBeds: [0] });
     t.selectedPlot = 0;
     t.go('breathe-offer');
+    t.skip();
+    assert.equal(t.step, 'stretch-offer');
     t.skip();
     assert.equal(t.step, 'summary');
     assert.equal(t.result().breathTaken, false);

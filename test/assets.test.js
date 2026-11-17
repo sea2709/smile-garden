@@ -159,6 +159,15 @@ test('breath UI art: manifest pills, icons, dots and breath-ui.css', () => {
     assert.ok(fs.existsSync(path.join(root, 'docs', 'breath-mockup.png')));
 });
 
+test('stretch UI art: manifest paths, css, and art spec doc', () => {
+    assert.ok(ART.stretch);
+    assert.ok(ART.stretch.guideSunflower.includes('stretch/'));
+    assert.ok(ART.stretch.stake.includes('stake'));
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'stretch-ui.css')));
+    assert.ok(fs.existsSync(path.join(root, 'docs', 'ART-STRETCH.md')));
+    assert.ok(fs.existsSync(path.join(root, 'game', 'stretch.js')));
+});
+
 test('selection ring art: 8 day/night sprites and backdrop offsets', () => {
     assert.ok(ART.selection);
     for (let b = 1; b <= 8; b++) {

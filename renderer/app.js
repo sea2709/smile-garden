@@ -16,7 +16,7 @@
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub', 'meter-sun', 'meter-water', 'meter-fert',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-rate', 'breath-count', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-sunflower', 'stretch-ring-left', 'stretch-ring-right', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -77,8 +77,10 @@
     /** When true, HUD season stays on `state.season` (demo capture); otherwise it tracks `dayNumber`. */
     let hudSeasonOverride = false;
 
-    const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', faceGoneAt: 0, breathing: null };
+    const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', faceGoneAt: 0, breathing: null, landmarks: null, landmarksAt: 0, landmarksStable: false };
     let breathHudDemoLock = false;
+    let stretchHudDemoLock = false;
+    let stretchDemoSnap = null;
 
     // ------------------------------------------------------------------
     // Screens
@@ -119,6 +121,7 @@
                 pickedSprite: regrow,
                 ready: V.isPlotReady(p, today),
                 tendedToday: D.plotTendedToday(state, i),
+                staked: !!p.staked,
             };
         });
         scene.setPlots(view, instant ? { instant: true } : undefined);
@@ -471,6 +474,8 @@
         talk: { title: 'Talk: water', text: 'Tell this plant about your day, out loud or in a whisper. Talking fills its watering can.' },
         'breathe-offer': { title: 'Calm breaths: fertilizer', text: 'Optional. A few soft breaths through your nose give the beds a little fertilizer, which only speeds growth.' },
         breathe: { title: 'Breathe with the light', text: 'Follow the glow: in as it grows, out as it fades. No holding, no straining.' },
+        'stretch-offer': { title: 'Neck stretch: stake the plant', text: 'Optional. Tip each ear toward a shoulder and hold briefly — like giving the plant a gentle stake. Skip anytime; your visit still counts.' },
+        stretch: { title: 'Easy neck stretch', text: 'Tilt toward one shoulder (~15°) and hold about 3 seconds, then the other. Order does not matter.' },
     };
     const TALK_PROMPTS = ['What made you smile today?', 'Tell the tomatoes about your morning.', 'What are you looking forward to?',
         'Describe the weather where you are.', 'Say hello to each bed.', 'What would you cook with this harvest?'];
@@ -502,6 +507,12 @@
         source.on('status', (s) => { document.body.dataset.status = s; });
         source.on('error', (e) => showError('SmartSpectra error', `${e.name}: ${e.message || ''}`, !config.mock));
         source.on('stream', (stream) => { els.preview.srcObject = stream || null; els.pip.hidden = !stream; });
+        source.on('landmarks', (lm) => {
+            if (!lm || !lm.points) return;
+            signal.landmarks = lm.points;
+            signal.landmarksAt = performance.now();
+            signal.landmarksStable = !!lm.stable;
+        });
         if (source.setNight) source.setNight(lighting === 'night');
         return true;
     }
@@ -539,12 +550,13 @@
         lastStep = step;
         document.body.dataset.step = step;
         if (source && source.setPhase) source.setPhase(step);
-        const order = ['harvest', 'smile', 'talk', 'breathe', 'summary'];
+        const order = ['harvest', 'smile', 'talk', 'breathe', 'stretch', 'summary'];
         let idx = order.indexOf(
             step === 'pick-harvest' || step === 'harvest-hold' ? 'harvest'
                 : step === 'breathe-offer' ? 'breathe'
-                    : step === 'pick' ? 'smile'
-                        : step);
+                    : step === 'stretch-offer' ? 'stretch'
+                        : step === 'pick' ? 'smile'
+                            : step);
         if (idx < 0) idx = 0;
         els.stepTrack.querySelectorAll('span').forEach((s, i) => {
             s.classList.toggle('on', i === idx);
@@ -556,6 +568,7 @@
         els.stepTitle.textContent = step === 'pick' ? copy.title : (who ? `${copy.title} · ${who}` : copy.title);
         els.stepText.textContent = copy.text;
         els.breathGuide.hidden = step !== 'breathe';
+        els.stretchGuide.hidden = step !== 'stretch';
         renderStepActions(step);
         if (step !== 'breathe') {
             els.breathRate.hidden = true;
@@ -590,6 +603,18 @@
             const skip = mkBtn('Finish visit', 'btn btn-ghost', () => { onStep(session.go('summary')); });
             skip.id = 'btn-skip';
             box.append(skip, go);
+        } else if (step === 'stretch-offer') {
+            const skip = mkBtn(session.hasMorePlants() ? 'Next plant' : 'Skip stretch', 'btn btn-ghost', () => { onStep(session.skip()); });
+            skip.id = 'btn-skip';
+            const go = mkBtn('Try a neck stretch', 'btn btn-primary', () => { onStep(session.startStretch()); });
+            go.id = 'btn-stretch-start';
+            box.append(skip, go);
+        } else if (step === 'stretch') {
+            const skip = mkBtn('Skip', 'btn btn-ghost', () => { onStep(session.skip()); });
+            skip.id = 'btn-skip';
+            const done = mkBtn('I stretched', 'btn btn-soft', () => { onStep(session.confirmStretchManual()); });
+            done.id = 'btn-stretch-done';
+            box.append(skip, done);
         } else if (step === 'breathe-offer') {
             const group = document.createElement('div');
             group.className = 'opt-group';
@@ -682,8 +707,88 @@
         };
     }
 
+    function stretchSample() {
+        const now = performance.now();
+        const valOk = signal.validation === 'Ok' || signal.validation === 'CameraTuning';
+        const lmFresh = signal.landmarksAt && now - signal.landmarksAt < 700;
+        const faceVisible = lmFresh && valOk && signal.landmarks && signal.landmarks.length > 0;
+        return {
+            points: faceVisible ? signal.landmarks : null,
+            stable: signal.landmarksStable,
+            faceVisible,
+            mirrored: true,
+        };
+    }
+
+    function drawStretchRing(canvas, progress, done) {
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+        ctx.clearRect(0, 0, w, h);
+        const cx = w / 2;
+        const cy = h / 2;
+        const r = w * 0.38;
+        ctx.lineWidth = 5;
+        ctx.strokeStyle = 'rgba(150, 120, 80, 0.35)';
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        const p = done ? 1 : Math.max(0, Math.min(1, progress));
+        if (p > 0.01) {
+            ctx.strokeStyle = done ? 'rgba(125, 154, 91, 0.95)' : 'rgba(125, 154, 91, 0.75)';
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p);
+            ctx.stroke();
+        }
+        if (done) {
+            ctx.fillStyle = 'rgba(125, 154, 91, 0.9)';
+            ctx.font = 'bold 22px Nunito, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('✓', cx, cy + 8);
+        }
+    }
+
+    function renderStretchHud() {
+        if (!stretchHudDemoLock && (!session || session.step !== 'stretch')) return;
+        const snap = stretchHudDemoLock && stretchDemoSnap
+            ? stretchDemoSnap
+            : (session && session.stretchSnap) || {};
+        const roll = snap.rollDeg || 0;
+        const img = els.stretchSunflower;
+        if (ART.stretch && img && !img.dataset.fallback) {
+            img.onerror = () => {
+                img.dataset.fallback = '1';
+                const fb = document.createElement('div');
+                fb.className = 'stretch-flower-fallback';
+                fb.textContent = '🌻';
+                img.replaceWith(fb);
+            };
+            if (!img.src) img.src = artUrl(ART.stretch.guideSunflower);
+        }
+        const flowerEl = document.querySelector('.stretch-flower-fallback') || img;
+        if (flowerEl) flowerEl.style.transform = `rotate(${Math.max(-32, Math.min(32, roll * 1.4))}deg)`;
+        drawStretchRing(els.stretchRingLeft, snap.leftProgress, snap.leftDone);
+        drawStretchRing(els.stretchRingRight, snap.rightProgress, snap.rightDone);
+        if (snap.needsFaceHint) {
+            els.hint.hidden = false;
+            els.hintTitle.textContent = 'Face the camera';
+            els.hintSub.textContent = 'Tip one ear toward your shoulder so we can see the stretch. Or tap Skip / I stretched.';
+            document.body.dataset.hint = 'stretch-face';
+        } else if (document.body.dataset.hint === 'stretch-face') {
+            els.hint.hidden = true;
+            document.body.dataset.hint = '';
+        }
+        const side = snap.activeSide;
+        els.stepLive.textContent = snap.complete ? 'Lovely — your plant is staked for harvest.'
+            : side === 'left' ? 'Hold toward your left shoulder…'
+                : side === 'right' ? 'Hold toward your right shoulder…'
+                    : 'Tip each ear toward a shoulder and hold gently.';
+    }
+
     function updateVisit(dt, t) {
         const input = currentInput();
+        if (session && session.step === 'stretch') input.stretch = stretchSample();
         const events = session.update(dt, input);
         trace.push({ t, happiness: input.happiness, faceVisible: input.faceVisible, talking: input.talking, smiling: session.smiling });
         for (const ev of events) {
@@ -726,6 +831,10 @@
             els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
                 : session.talking ? `💧 Watering: can ${Math.round(session.water * 100)}% full` : `Watering can ${Math.round(session.water * 100)}% full`;
         } else if (step === 'breathe-offer') {
+            els.stepLive.textContent = '';
+        } else if (step === 'stretch') {
+            renderStretchHud();
+        } else if (step === 'stretch-offer') {
             els.stepLive.textContent = '';
         } else if (step === 'breathe') {
             const b = session.pacer.at(session.breathT);
@@ -1459,6 +1568,7 @@
     }
 
     const manualKeys = { s: 'smile', ' ': 'smile', t: 'talk', f: 'hide' };
+    const tiltKeys = { '[': 'tiltLeft', ']': 'tiltRight' };
     window.addEventListener('keydown', (e) => {
         if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
         const k = e.key.toLowerCase();
@@ -1483,6 +1593,11 @@
             }
         }
         if (k === 'a' && source && source.setAuto && config.mock) { source.setAuto(true); els.mockMode.textContent = 'Demo player (auto)'; return; }
+        if (tiltKeys[e.key] && source && source.setKeys && (config.mock || config.keyboard)) {
+            source.setKeys({ [tiltKeys[e.key]]: true });
+            els.mockMode.textContent = 'Keyboard player';
+            return;
+        }
         if (manualKeys[k] && source && source.setKeys && (config.mock || config.keyboard)) {
             if (k === ' ') e.preventDefault();
             source.setKeys({ [manualKeys[k]]: true });
@@ -1491,6 +1606,10 @@
     });
     window.addEventListener('keyup', (e) => {
         const k = e.key.toLowerCase();
+        if (tiltKeys[e.key] && source && source.setKeys && (config.mock || config.keyboard)) {
+            source.setKeys({ [tiltKeys[e.key]]: false });
+            return;
+        }
         if (manualKeys[k] && source && source.setKeys && (config.mock || config.keyboard)) source.setKeys({ [manualKeys[k]]: false });
     });
 
@@ -1695,6 +1814,48 @@
         clearBreathHudDemo() {
             breathHudDemoLock = false;
             if (session && session.step === 'breathe') renderBreathRate();
+        },
+        setStretchHudDemo(mode) {
+            const modes = {
+                'left-hold': { leftProgress: 0.68, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -21, activeSide: 'left', complete: false, needsFaceHint: false },
+                'right-hold': { leftProgress: 1, rightProgress: 0.72, leftDone: true, rightDone: false, rollDeg: 19, activeSide: 'right', complete: false, needsFaceHint: false },
+                done: { leftProgress: 1, rightProgress: 1, leftDone: true, rightDone: true, rollDeg: 2, activeSide: null, complete: true, needsFaceHint: false },
+            };
+            stretchHudDemoLock = true;
+            stretchDemoSnap = modes[mode] || modes['left-hold'];
+            show('visit');
+            document.body.dataset.step = 'stretch';
+            const copy = STEP_COPY.stretch;
+            els.stepTitle.textContent = copy.title;
+            els.stepText.textContent = copy.text;
+            els.stretchGuide.hidden = false;
+            els.stepPanel.querySelector('.step-actions').innerHTML = '';
+            renderStretchHud();
+        },
+        clearStretchHudDemo() {
+            stretchHudDemoLock = false;
+            stretchDemoSnap = null;
+            if (session) onStep(session.step);
+        },
+        setStakedBed(plot, staked) {
+            const p = state.plots[plot];
+            if (!p || !p.plantId) return;
+            p.staked = staked !== false;
+            save();
+            plotsForScene({ instant: true });
+            renderHud();
+        },
+        finishVisitForCapture() {
+            if (!session) return;
+            stretchHudDemoLock = false;
+            stretchDemoSnap = null;
+            let guard = 0;
+            while (session.step !== 'summary' && guard++ < 90) {
+                if (session.step === 'pick' || session.step === 'pick-harvest') onStep(session.confirmPick());
+                else onStep(session.skip());
+            }
+            if (session.step !== 'summary') onStep(session.go('summary'));
+            else finishVisit();
         },
         async previewBedtimeGlow() {
             scene.setLighting('night');

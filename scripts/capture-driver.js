@@ -256,18 +256,34 @@ async function run(win, outDir) {
     await shot('07-breathing-step.png');
     await waitFor('2 breaths', (d) => Number(d.breath) >= 2, 30000);
     await js(`document.getElementById('btn-skip').click()`);
-    for (let i = 0; i < 30; i++) {
-        const d = await ds();
-        if (d.screen === 'summary' || d.step === 'summary') break;
-        if (d.step === 'pick') await G('g.confirmPick()');
-        else await G('g.skip()');
-        await sleep(280);
+    await waitFor('stretch offer', (d) => d.step === 'stretch-offer', 15000);
+    await sleep(500);
+    await shot('07d-stretch-offer.png');
+    await js(`document.getElementById('btn-stretch-start').click()`);
+    await waitFor('stretch step', (d) => d.step === 'stretch', 8000);
+    await G(`g.setStretchHudDemo('left-hold')`);
+    await sleep(450);
+    await shot('07e-stretch-left-hold.png');
+    await G(`g.setStretchHudDemo('right-hold')`);
+    await sleep(450);
+    await shot('07f-stretch-right-hold.png');
+    await G(`g.setStretchHudDemo('done')`);
+    await sleep(450);
+    await shot('07g-stretch-complete.png');
+    await G('g.clearStretchHudDemo()');
+    await G('g.finishVisitForCapture()');
+    await waitFor('visit end', (d) => d.screen === 'idle' || d.screen === 'summary', 25000);
+    await sleep(600);
+    if ((await ds()).screen === 'summary') {
+        await waitFor('revealed', (d) => d.revealed === '1', 15000);
+        await shot('08-summary-growth.png');
+        await js(`document.getElementById('btn-sum-done').click()`);
+    } else {
+        await G('g.previewMorningCard()');
+        await sleep(1200);
+        await shot('08-summary-growth.png');
+        await G(`g.show('idle')`);
     }
-    await waitFor('summary', (d) => d.screen === 'summary', 15000);
-    await sleep(1500);
-    await shot('08-summary-growth.png');
-    await waitFor('revealed', (d) => d.revealed === '1', 15000);
-    await js(`document.getElementById('btn-sum-done').click()`);
 
     // --- a few days later, golden hour ---
     await G('g.simulateDays(2)');
@@ -278,6 +294,10 @@ async function run(win, outDir) {
     await sleep(2500);
     await G(`g.show('idle')`);
     await shot('09-golden-hour-garden.png');
+    await G('g.setStakedBed(4, true)');
+    await sleep(800);
+    await shot('09b-staked-plant-bed.png');
+    await G('g.setStakedBed(4, false)');
 
     await lightingTo('midday');
     await G(`g.show('idle')`);

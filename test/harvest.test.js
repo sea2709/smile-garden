@@ -8,11 +8,12 @@ const V = require('../game/visit.js');
 
 const at = (y, m, d, h = 10) => new Date(y, m - 1, d, h, 0, 0, 0);
 
-test('computeYield: base 1, +1 full water, +1 fertilizer, never below 1', () => {
+test('computeYield: base 1, +1 full water, +1 fertilizer, +1 staked, never below 1', () => {
     const p = { plantId: 'tomato', matureWater: 1, matureFert: 1 };
     assert.equal(H.computeYield(p), 3);
     assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0, matureFert: 0 }), 1);
     assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0.5, matureFert: 0 }), 1);
+    assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0, matureFert: 0, staked: true }), 2);
 });
 
 test('harvestPlot pull clears bed and grants spare seed', () => {

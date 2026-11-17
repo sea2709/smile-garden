@@ -240,6 +240,7 @@
             matureWater: p.matureWater,
             matureFert: p.matureFert,
             tendedDay: p.tendedDay,
+            staked: p.staked === true,
         });
     }
 
@@ -452,6 +453,7 @@
                 water: clamp01(b.water),
                 fertilizer: clamp01(b.fertilizer),
                 breaths: Number(b.breaths) || 0,
+                stretchStaked: !!b.stretchDone,
             })).filter((b) => b.plot >= 0 && b.plot < PLOTS);
         }
         const sun = Math.max(0, Math.min(TUNING.maxSunHours, Number(r.sunHours) || 0));
@@ -573,6 +575,7 @@
             for (const b of bedResults) {
                 const p = state.plots[b.plot];
                 if (!p) continue;
+                if (b.stretchStaked) p.staked = true;
                 const kind = L.plantById(p.plantId);
                 if (b.sunHours > 0 || b.water > 0 || b.fertilizer > 0) {
                     tended.push({ plot: b.plot, plantId: p.plantId, name: kind.name, sunHours: b.sunHours, water: b.water, fertilizer: b.fertilizer });
@@ -694,10 +697,14 @@
     // ------------------------------------------------------------------
     // One daily visit, step by step.
     // ------------------------------------------------------------------
-    const STEPS = Object.freeze(['greeting', 'pick-harvest', 'harvest-hold', 'pick', 'smile', 'talk', 'breathe-offer', 'breathe', 'summary']);
+    const STEPS = Object.freeze(['greeting', 'pick-harvest', 'harvest-hold', 'pick', 'smile', 'talk', 'breathe-offer', 'breathe', 'stretch-offer', 'stretch', 'summary']);
 
     function emptyBedTally() {
-        return { smileWeighted: 0, smileSecondsRaw: 0, talkSecondsRaw: 0, breathsDone: 0, breathSkipped: false, breathTaken: false };
+        return {
+            smileWeighted: 0, smileSecondsRaw: 0, talkSecondsRaw: 0,
+            breathsDone: 0, breathSkipped: false, breathTaken: false,
+            stretchDone: false, stretchSkipped: false,
+        };
     }
 
     class VisitSession {
@@ -751,6 +758,13 @@
             this.pendingHarvests = [];
             this.selectedPlot = null;
             this.live = emptyBedTally();
+            let Stretch = null;
+            if (typeof require === 'function') {
+                try { Stretch = require('./stretch.js'); } catch (_) { /* browser bundle */ }
+            }
+            if (!Stretch && typeof globalThis !== 'undefined') Stretch = globalThis.SmileStretch;
+            this.stretchFlow = Stretch ? Stretch.createStretchFlow() : null;
+            this.stretchSnap = { leftProgress: 0, rightProgress: 0, rollDeg: 0, needsFaceHint: false };
         }
 
         bedInfo(plot) {
@@ -822,7 +836,7 @@
 
         go(step) {
             if (!STEPS.includes(step)) throw new Error('unknown step ' + step);
-            if (this.step === 'smile' || this.step === 'talk' || this.step === 'breathe') this._saveLiveToTally();
+            if (this.step === 'smile' || this.step === 'talk' || this.step === 'breathe' || this.step === 'stretch') this._saveLiveToTally();
             this.step = step;
             this.stepTime = 0;
             this.noFace = 0;
@@ -840,7 +854,11 @@
             if (step === 'harvest-hold') {
                 this.harvestSmile = 0;
             }
-            if (step === 'smile' || step === 'talk' || step === 'breathe' || step === 'breathe-offer' || step === 'pick') {
+            if (step === 'stretch') {
+                if (this.stretchFlow) this.stretchFlow.reset();
+                this.stretchSnap = { leftProgress: 0, rightProgress: 0, rollDeg: 0, needsFaceHint: false };
+            }
+            if (step === 'smile' || step === 'talk' || step === 'breathe' || step === 'breathe-offer' || step === 'stretch-offer' || step === 'stretch' || step === 'pick') {
                 this._syncLiveFromTally();
             }
             this.events.push({ type: 'step', step, plot: this.selectedPlot, round: this.plantRound });
@@ -964,10 +982,16 @@
             if (this.step === 'pick') return this.confirmPick();
             if (this.step === 'smile') return this.go('talk');
             if (this.step === 'talk') return this.go('breathe-offer');
-            if (this.step === 'breathe-offer') return this.advanceToNextPlant();
+            if (this.step === 'breathe-offer') return this.go('stretch-offer');
             if (this.step === 'breathe') {
                 this.breathSkipped = true;
                 this.live.breathSkipped = true;
+                this._saveLiveToTally();
+                return this.go('stretch-offer');
+            }
+            if (this.step === 'stretch-offer') return this.advanceToNextPlant();
+            if (this.step === 'stretch') {
+                this.live.stretchSkipped = true;
                 this._saveLiveToTally();
                 return this.advanceToNextPlant();
             }
@@ -978,6 +1002,17 @@
             if (opts && opts.pace) this.pace = opts.pace === 'gentle' ? 'gentle' : 'standard';
             if (opts && opts.breaths) this.breathCount = clampBreaths(opts.breaths);
             return this.go('breathe');
+        }
+
+        startStretch() {
+            return this.go('stretch');
+        }
+
+        confirmStretchManual() {
+            if (this.step !== 'stretch') return this.step;
+            this.live.stretchDone = true;
+            this._saveLiveToTally();
+            return this.advanceToNextPlant();
         }
 
         update(dt, input) {
@@ -1018,6 +1053,14 @@
                 this.live.breathsDone = this.breathsDone;
                 if (this.breathT >= this.pacer.total) {
                     this._saveLiveToTally();
+                    this.go('stretch-offer');
+                }
+            } else if (this.step === 'stretch' && this.stretchFlow) {
+                const snap = this.stretchFlow.update(step, input && input.stretch ? input.stretch : {});
+                this.stretchSnap = snap;
+                if (snap.complete) {
+                    this.live.stretchDone = true;
+                    this._saveLiveToTally();
                     this.advanceToNextPlant();
                 }
             }
@@ -1039,6 +1082,8 @@
                     breaths: t.breathsDone,
                     breathSkipped: t.breathSkipped,
                     breathTaken: t.breathTaken,
+                    stretchDone: t.stretchDone,
+                    stretchSkipped: t.stretchSkipped,
                 });
             }
             const totals = beds.reduce((a, b) => ({

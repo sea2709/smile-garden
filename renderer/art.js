@@ -185,5 +185,20 @@
             return '../assets/effects/harvest-' + kind + '-strip.png';
         },
         basketHud: Object.freeze({ x: 1195, y: 68, w: 36, h: 36 }),
+        stretch: Object.freeze({
+            scale2x: true,
+            guideSunflower: '../assets/ui/stretch/guide-sunflower.png',
+            guidePixels: Object.freeze([192, 192]),
+            guideDisplay: 96,
+            vineRingEmpty: '../assets/ui/stretch/vine-ring-empty.png',
+            vineRingFull: '../assets/ui/stretch/vine-ring-full.png',
+            vinePixels: Object.freeze([120, 120]),
+            vineDisplay: 60,
+            stake: '../assets/plants/stake.png',
+            stakePixels: Object.freeze([80, 200]),
+            stakeDisplay: Object.freeze({ w: 20, h: 50 }),
+            stakeOffset: Object.freeze([14, -8]),
+        }),
+        plantStakeSrc() { return this.stretch.stake; },
     });
 })();

@@ -97,7 +97,8 @@
         return Object.assign({}, p, {
             picked: p.picked === true,
             pickDay: typeof p.pickDay === 'string' ? p.pickDay : null,
-            matureWater: p.matureWater == null ? null : Math.max(0, Math.min(1, Number(p.matureWater) || 0)),
+            staked: p.staked === true,
+        matureWater: p.matureWater == null ? null : Math.max(0, Math.min(1, Number(p.matureWater) || 0)),
             matureFert: p.matureFert == null ? null : Math.max(0, Math.min(1, Number(p.matureFert) || 0)),
             tendedDay: Number.isFinite(Number(p.tendedDay)) ? Math.round(Number(p.tendedDay)) : p.tendedDay,
         });
@@ -146,6 +147,7 @@
         const f = p.matureFert == null ? 0 : p.matureFert;
         if (w >= WATER_FULL) y += 1;
         if (f > 0) y += 1;
+        if (p.staked) y += 1;
         return y;
     }
 
@@ -244,6 +246,7 @@
                 pickDay: dk,
                 matureWater: null,
                 matureFert: null,
+                staked: false,
             });
         }
         return {

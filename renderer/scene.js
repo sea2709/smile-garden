@@ -82,6 +82,7 @@
         const genericHarvest = { day: null, night: null };
         const produceImgs = {};
         const basketImg = (ART.produce && ART.produce.basket) ? loadImage(ART.produce.basket) : null;
+        const stakeImg = ART.stretch ? loadImage(resolveArt(ART.stretch.stake)) : null;
         const logoDayImg = (ART.ui && ART.ui.logoDay) ? loadImage(resolveArt(ART.ui.logoDay)) : null;
         const logoNightImg = (ART.ui && ART.ui.logoNight) ? loadImage(resolveArt(ART.ui.logoNight)) : null;
         let logoOnCanvas = false;
@@ -326,6 +327,7 @@
                     ready: !!raw.ready,
                     pickedSprite: !!raw.pickedSprite,
                     tendedToday: !!raw.tendedToday,
+                    staked: !!raw.staked,
                 } : null;
                 const o = plots[i];
                 if (animate && n && (!o || o.plantId !== n.plantId)) {
@@ -1130,6 +1132,33 @@
             ctx.restore();
         }
 
+        function drawStake(i) {
+            const pl = plots[i];
+            if (!pl || !pl.staked || !ART.stretch) return;
+            const bed = ART.plots[i];
+            const off = ART.stretch.stakeOffset || [14, -8];
+            const disp = ART.stretch.stakeDisplay || { w: 20, h: 50 };
+            const x = bed.x + off[0];
+            const y = bed.y + off[1];
+            if (ready(stakeImg)) {
+                const sp = ART.stretch.stakePixels || [80, 200];
+                ctx.drawImage(stakeImg, 0, 0, sp[0], sp[1], x - disp.w / 2, y - disp.h, disp.w, disp.h);
+            } else {
+                ctx.save();
+                ctx.fillStyle = '#c4a574';
+                ctx.strokeStyle = '#8a6b40';
+                ctx.lineWidth = 1.2;
+                ctx.fillRect(x - 3, y - disp.h, 6, disp.h);
+                ctx.strokeRect(x - 3, y - disp.h, 6, disp.h);
+                ctx.strokeStyle = '#d8c4a0';
+                ctx.beginPath();
+                ctx.moveTo(x - 5, y - disp.h + 18);
+                ctx.lineTo(x + 5, y - disp.h + 22);
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
+
         function drawPlants(t) {
             const now = performance.now() / 1000;
             ctx.filter = SPRITE_FILTER[lighting] || 'none';
@@ -1181,6 +1210,7 @@
                 }
                 const st = plantSpriteStage(pl, i);
                 if (st != null) drawSprite(pl.plantId, st, i, t, 1, 1);
+                if (pl.staked) drawStake(i);
             }
             ctx.filter = 'none';
         }

@@ -8,8 +8,9 @@
 // Breathing rate warms up across the visit (like the real SDK) and becomes
 // stable during the breathe step.
 //
-// Keyboard fallback: setKeys({ smile, talk, hide }) switches to manual input
-// (hold S / Space to smile, T to talk, F to leave the frame). setAuto(true)
+// Keyboard fallback: setKeys({ smile, talk, hide, tiltLeft, tiltRight })
+// (hold S / Space to smile, T to talk, F to hide, [ / ] to tilt for stretch).
+// setAuto(true)
 // hands control back to the simulated player.
 
 (function () {
@@ -40,7 +41,8 @@
         let night = false;
         let darkDone = false;
         let auto = opts.auto !== false;
-        const keys = { smile: false, talk: false, hide: false };
+        const keys = { smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false };
+        const Stretch = typeof window !== 'undefined' ? window.SmileStretch : null;
         let h = 0.1;
         let visitT = 0;
         const nowS = () => performance.now() / 1000;
@@ -96,6 +98,11 @@
                     target = 0.14;
                     setValidation('Ok');
                 }
+            } else if (phase === 'stretch') {
+                target = 0.22;
+                talking = false;
+                setValidation('Ok');
+                face = true;
             } else {
                 face = !keys.hide;
                 target = keys.smile ? 0.86 : 0.12;
@@ -109,6 +116,13 @@
                 // Percentages like the SDK (ExpressionScore.confidence is 0..100).
                 em.emit('expression', { happiness: L.normalizeConfidence(value * 100), stable: true });
                 em.emit('talking', { detected: talking, stable: true });
+                if (Stretch && (phase === 'stretch' || keys.tiltLeft || keys.tiltRight)) {
+                    let rollDeg = 0;
+                    if (auto && phase === 'stretch') rollDeg = 20 * Math.sin(phaseT * 0.55);
+                    else if (keys.tiltLeft) rollDeg = -20;
+                    else if (keys.tiltRight) rollDeg = 20;
+                    em.emit('landmarks', { points: Stretch.syntheticLandmarks(rollDeg), stable: true, space: 'normalized' });
+                }
             } else {
                 em.emit('noface', {});
             }

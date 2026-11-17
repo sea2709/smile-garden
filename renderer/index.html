@@ -8,6 +8,7 @@
     <title>Smile Garden</title>
     <link rel="stylesheet" href="./styles.css">
     <link rel="stylesheet" href="./breath-ui.css">
+    <link rel="stylesheet" href="./stretch-ui.css">
 </head>
 <body data-screen="loading" data-ready="0">
 <div id="app" class="app">
@@ -68,7 +69,7 @@
     <!-- Step panel (during a visit) -------------------------------------- -->
     <section id="step-panel" class="step-panel parchment" hidden>
         <div class="step-track" id="step-track">
-            <span data-step="harvest">🧺 Pick</span><span data-step="smile">☀ Smile</span><span data-step="talk">💧 Talk</span><span data-step="breathe">🍃 Breathe</span><span data-step="summary">❀ Done</span>
+            <span data-step="harvest">🧺 Pick</span><span data-step="smile">☀ Smile</span><span data-step="talk">💧 Talk</span><span data-step="breathe">🍃 Breathe</span><span data-step="stretch">🌻 Stretch</span><span data-step="summary">❀ Done</span>
         </div>
         <div class="step-body">
             <div class="ring-wrap">
@@ -90,6 +91,14 @@
     </section>
 
     <!-- Breathing guide (center) ----------------------------------------- -->
+    <div id="stretch-guide" class="stretch-guide" hidden>
+        <img id="stretch-sunflower" class="stretch-sunflower" width="96" height="96" alt="">
+        <div class="stretch-rings">
+            <div class="stretch-ring"><canvas id="stretch-ring-left" width="60" height="60"></canvas><label>Left</label></div>
+            <div class="stretch-ring"><canvas id="stretch-ring-right" width="60" height="60"></canvas><label>Right</label></div>
+        </div>
+    </div>
+
     <section id="breath-guide" class="breath-guide" hidden>
         <div class="breath-orb-wrap">
             <div class="breath-halo" id="breath-halo"></div>
@@ -141,6 +150,7 @@
                 <li><span class="dot dot-sun"></span><b>Smile</b> for about <span id="plan-smile">45</span> s: sunlight</li>
                 <li><span class="dot dot-water"></span><b>Talk</b> to your plants for about <span id="plan-talk">30</span> s: water</li>
                 <li><span class="dot dot-fert"></span><b>Breathe</b> calmly, if you like: fertilizer (optional)</li>
+                <li><span class="dot dot-stretch"></span><b>Stretch</b> your neck, if you like: stakes the plant for a richer harvest (optional)</li>
             </ol>
             <p id="greet-note" class="note"></p>
             <div class="actions">
@@ -250,6 +260,7 @@
 <script src="../game/visit.js"></script>
 <script src="../game/critters.js"></script>
 <script src="../game/season-particles.js"></script>
+<script src="../game/stretch.js"></script>
 <script src="./art.js"></script>
 <script src="./mock-source.js"></script>
 <script src="./scene.js"></script>
