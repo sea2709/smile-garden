@@ -71,7 +71,27 @@
         if (name === 'idle') renderIdle();
         scene.setHighlight(name === 'picker' ? pickerTarget : null);
         if (name !== 'picker') scene.setHover(null);
+        if (name !== 'visit') scene.setTendSelection(null);
         els.plotTip.hidden = true;
+    }
+
+    function syncTendRing() {
+        if (!session || screen !== 'visit') {
+            scene.setTendSelection(null);
+            scene.setEffects({ plot: null, sun: 0, water: 0, fert: 0 });
+            return;
+        }
+        const step = session.step;
+        const plot = session.selectedPlot;
+        scene.setTendSelection(plot, { pulse: step === 'pick' });
+        if (step === 'pick') scene.setEffects({ plot: plot, sun: 0, water: 0, fert: 0 });
+    }
+
+    function selectedPlantLabel() {
+        if (!session || session.selectedPlot == null) return '';
+        const p = state.plots[session.selectedPlot];
+        if (!p) return `Bed ${session.selectedPlot + 1}`;
+        return `${L.plantById(p.plantId).name} (bed ${session.selectedPlot + 1})`;
     }
 
     let journalReturn = 'idle';
@@ -173,7 +193,8 @@
         drawMeter(els.meterSun, 'sun', m.sun / V.TUNING.maxSunHours);
         drawMeter(els.meterWater, 'water', m.water);
         drawMeter(els.meterFert, 'fertilizer', m.fert);
-        els.meterSunVal.textContent = `${m.sun.toFixed(1)} / 12 h`;
+        const goal = session && session.selectedPlot != null ? session.sunGoal(session.selectedPlot) : 12;
+        els.meterSunVal.textContent = session ? `${m.sun.toFixed(1)} / ${goal} h` : `${m.sun.toFixed(1)} / 12 h`;
         els.meterWaterVal.textContent = `${Math.round(m.water * 100)}%`;
         els.meterFertVal.textContent = m.fertUsed ? `${Math.round(m.fert * 100)}%` : 'optional';
         const step = session ? session.step : '';
@@ -199,8 +220,12 @@
         els.greetDate.textContent = `${fmtDate(now)} · ${V.LIGHTING_LABELS[lighting]}`;
         els.greetTitle.textContent = V.greetingFor(lighting);
         els.greetStatus.textContent = gardenStatusLine();
-        els.planSmile.textContent = String(config.fast ? V.TUNING.fastSmileSeconds : V.TUNING.smileSeconds);
-        els.planTalk.textContent = String(config.fast ? V.TUNING.fastTalkSeconds : V.TUNING.talkSeconds);
+        const planted = V.plantedCount(state);
+        const baseSmile = config.fast ? V.TUNING.fastSmileSeconds : V.TUNING.smileSeconds;
+        const baseTalk = config.fast ? V.TUNING.fastTalkSeconds : V.TUNING.talkSeconds;
+        const n = Math.max(1, planted);
+        els.planSmile.textContent = String(Math.round(V.perBedStepSeconds(baseSmile, n, V.TUNING.minSmilePerBed)));
+        els.planTalk.textContent = String(Math.round(V.perBedStepSeconds(baseTalk, n, V.TUNING.minTalkPerBed)));
         const empty = V.emptyPlots(state).length;
         els.btnGreetPlant.hidden = !empty;
         els.btnGreetPlant.textContent = V.plantedCount(state) ? '🌱 Plant another seed' : '🌱 Plant a seed';
@@ -294,8 +319,9 @@
     // Visit
     // ------------------------------------------------------------------
     const STEP_COPY = {
-        smile: { title: 'Smile: sunlight', text: 'Smile at your garden. Every smile pours warm light onto the beds. Big or small, it all counts.' },
-        talk: { title: 'Talk: water', text: 'Tell your plants about your day, out loud or in a whisper. Talking fills the watering can.' },
+        pick: { title: 'Choose a plant to tend', text: 'Click a bed or use arrow keys, then press Enter or Space. Only planted beds can be selected.' },
+        smile: { title: 'Smile: sunlight', text: 'Smile for this plant. Warm light pours onto the bed you chose. Big or small, it all counts.' },
+        talk: { title: 'Talk: water', text: 'Tell this plant about your day, out loud or in a whisper. Talking fills its watering can.' },
         'breathe-offer': { title: 'Calm breaths: fertilizer', text: 'Optional. A few soft breaths through your nose give the beds a little fertilizer, which only speeds growth.' },
         breathe: { title: 'Breathe with the light', text: 'Follow the glow: in as it grows, out as it fades. No holding, no straining.' },
     };
@@ -326,12 +352,18 @@
 
     async function beginVisit() {
         if (!(await ensureSource())) return;
-        session = new V.VisitSession({ fast: config.fast, pace: state.settings.pace, breaths: state.settings.breaths });
+        session = new V.VisitSession({
+            fast: config.fast,
+            pace: state.settings.pace,
+            breaths: state.settings.breaths,
+            plots: state.plots,
+            plantedBeds: V.plantedPlotIndices(state.plots),
+        });
         trace.clear();
         talkPromptIdx = Math.floor(Math.random() * TALK_PROMPTS.length);
         show('visit');
         session.begin();
-        onStep('smile');
+        onStep(session.step);
         try {
             await source.start();
             sourceReady = true;
@@ -347,18 +379,21 @@
         document.body.dataset.step = step;
         if (source && source.setPhase) source.setPhase(step);
         const order = ['smile', 'talk', 'breathe', 'summary'];
-        const idx = order.indexOf(step === 'breathe-offer' ? 'breathe' : step);
+        let idx = order.indexOf(step === 'breathe-offer' ? 'breathe' : step === 'pick' ? 'smile' : step);
+        if (idx < 0) idx = 0;
         els.stepTrack.querySelectorAll('span').forEach((s, i) => {
             s.classList.toggle('on', i === idx);
             s.classList.toggle('done', i < idx);
         });
         if (step === 'summary') { finishVisit(); return; }
-        const copy = STEP_COPY[step];
-        els.stepTitle.textContent = copy.title;
+        const copy = STEP_COPY[step] || STEP_COPY.smile;
+        const who = selectedPlantLabel();
+        els.stepTitle.textContent = step === 'pick' ? copy.title : (who ? `${copy.title} · ${who}` : copy.title);
         els.stepText.textContent = copy.text;
         els.breathGuide.hidden = step !== 'breathe';
         renderStepActions(step);
         if (step === 'breathe') renderBreathCount(0);
+        syncTendRing();
     }
 
     function renderStepActions(step) {
@@ -366,7 +401,13 @@
         box.textContent = '';
         const opt = document.getElementById('breath-options');
         if (opt) opt.remove();
-        if (step === 'breathe-offer') {
+        if (step === 'pick') {
+            const go = mkBtn('Tend this plant', 'btn btn-primary', () => { session.confirmPick(); });
+            go.id = 'btn-pick-go';
+            const skip = mkBtn('Finish visit', 'btn btn-ghost', () => { session.go('summary'); onStep('summary'); });
+            skip.id = 'btn-skip';
+            box.append(skip, go);
+        } else if (step === 'breathe-offer') {
             const group = document.createElement('div');
             group.className = 'opt-group';
             group.id = 'breath-options';
@@ -393,7 +434,7 @@
             note.textContent = 'Skip it if you have a heart or lung condition, are pregnant, or just don\'t feel like it today.';
             group.appendChild(note);
             els.stepText.after(group);
-            const skip = mkBtn('Skip to summary', 'btn btn-ghost', () => { session.skip(); });
+            const skip = mkBtn(session.hasMorePlants() ? 'Next plant' : 'Skip breathing', 'btn btn-ghost', () => { session.skip(); });
             skip.id = 'btn-skip';
             const go = mkBtn('Start breathing', 'btn btn-primary', () => {
                 session.startBreathing({ pace: state.settings.pace, breaths: state.settings.breaths });
@@ -449,8 +490,12 @@
         const rem = session.stepRemaining();
         const frac = dur > 0 ? 1 - rem / dur : 0;
         els.ringFg.style.strokeDashoffset = String(276.46 * frac);
-        els.ringText.textContent = step === 'breathe-offer' ? '🍃' : String(Math.ceil(rem));
-        if (step === 'smile') {
+        els.ringText.textContent = step === 'breathe-offer' ? '🍃' : step === 'pick' ? '❀' : String(Math.ceil(rem));
+        if (step === 'pick') {
+            const round = session.plantRound + 1;
+            const total = session.plantedBeds.length;
+            els.stepLive.textContent = `${selectedPlantLabel()} · plant ${round} of ${total}. Enter or Space to tend.`;
+        } else if (step === 'smile') {
             els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
                 : session.smiling ? `☀ Sunlight pouring: ${session.sunHours.toFixed(1)} h` : `${session.sunHours.toFixed(1)} h of sun so far. Smile when you're ready`;
         } else if (step === 'talk') {
@@ -477,7 +522,13 @@
         // scene effects
         const on = L.DEFAULTS.smileOn;
         const smileAmt = step === 'smile' && session.smiling ? 0.45 + 0.55 * L.clamp01((session.h - on) / (1 - on)) : 0;
-        scene.setEffects({ sun: smileAmt, water: step === 'talk' && session.talking ? 1 : 0, fert: step === 'breathe' ? 0.9 : 0 });
+        scene.setEffects({
+            plot: session.selectedPlot,
+            sun: smileAmt,
+            water: step === 'talk' && session.talking ? 1 : 0,
+            fert: step === 'breathe' ? 0.9 : 0,
+        });
+        syncTendRing();
 
         // hints
         updateHint(step, input);
@@ -536,10 +587,20 @@
         const now = clock.now();
         els.sumDate.textContent = `${fmtDate(now)} · ${V.LIGHTING_LABELS[lighting]}`;
         els.sumTitle.textContent = out.grew.length ? (out.grew.some((g) => g.mature) ? 'Something grew all the way!' : 'Your garden grew today') : 'A lovely, quiet visit';
-        els.sumSun.textContent = `${out.sunHours.toFixed(1)} h`;
-        els.sumWater.textContent = `${Math.round(out.water * 100)}%`;
-        els.sumFert.textContent = out.fertilizer > 0 ? `${Math.round(out.fertilizer * 100)}%` : 'skipped';
+        els.sumSun.textContent = `${out.sunHours.toFixed(1)} h total`;
+        els.sumWater.textContent = out.tended && out.tended.length
+            ? out.tended.map((t) => `bed ${t.plot + 1}: ${Math.round(t.water * 100)}%`).join(' · ')
+            : `${Math.round(out.water * 100)}%`;
+        els.sumFert.textContent = out.tended && out.tended.some((t) => t.fertilizer > 0)
+            ? out.tended.filter((t) => t.fertilizer > 0).map((t) => `bed ${t.plot + 1}: ${Math.round(t.fertilizer * 100)}%`).join(' · ')
+            : (out.fertilizer > 0 ? `${Math.round(out.fertilizer * 100)}%` : 'skipped');
         els.sumGrew.textContent = '';
+        if (out.tended && out.tended.length) {
+            const li = document.createElement('li');
+            li.textContent = 'Today you tended: ' + out.tended.map((t) => `${t.name} (${t.sunHours.toFixed(1)} h sun, ${Math.round(t.water * 100)}% water` +
+                (t.fertilizer > 0 ? `, ${Math.round(t.fertilizer * 100)}% fertilizer` : '') + ')').join('; ') + '.';
+            els.sumGrew.appendChild(li);
+        }
         for (const g of out.grew) {
             const li = document.createElement('li');
             li.textContent = g.mature ? `${g.name} in bed ${g.plot + 1} is fully grown.` : `${g.name} in bed ${g.plot + 1} grew: ${V.STAGES[g.from].label} → ${V.STAGES[g.to].label}.`;
@@ -704,7 +765,21 @@
     els.garden.addEventListener('mousemove', (e) => {
         const i = scene.plotAt(e.clientX, e.clientY);
         scene.setHover(i);
-        if (screen === 'visit' || i === null) { els.plotTip.hidden = true; els.garden.style.cursor = ''; return; }
+        if (screen === 'visit') {
+            els.garden.style.cursor = (session && session.step === 'pick' && i !== null && state.plots[i]) ? 'pointer' : '';
+            if (i !== null && state.plots[i] && session && session.step === 'pick') {
+                const kind = L.plantById(state.plots[i].plantId);
+                els.plotTip.textContent = '';
+                const b = document.createElement('b'); b.textContent = kind.name;
+                els.plotTip.append(b, document.createTextNode(` · bed ${i + 1} — click to select`));
+                const c = scene.plotClient(i);
+                els.plotTip.style.left = `${c.x}px`;
+                els.plotTip.style.top = `${c.y - 70 * c.s}px`;
+                els.plotTip.hidden = false;
+            } else els.plotTip.hidden = true;
+            return;
+        }
+        if (i === null) { els.plotTip.hidden = true; els.garden.style.cursor = ''; return; }
         const p = state.plots[i];
         els.garden.style.cursor = (!p && V.emptyPlots(state).length) ? 'pointer' : '';
         if (!p) {
@@ -723,7 +798,16 @@
     els.garden.addEventListener('mouseleave', () => { els.plotTip.hidden = true; scene.setHover(null); });
     els.garden.addEventListener('click', (e) => {
         const i = scene.plotAt(e.clientX, e.clientY);
-        if (i === null || state.plots[i]) return;
+        if (i === null) return;
+        if (screen === 'visit' && session && session.step === 'pick' && state.plots[i]) {
+            session.setSelectedPlot(i);
+            syncTendRing();
+            if (session.step === 'pick') {
+                els.stepLive.textContent = `${selectedPlantLabel()} · plant ${session.plantRound + 1} of ${session.plantedBeds.length}. Enter or Space to tend.`;
+            }
+            return;
+        }
+        if (state.plots[i]) return;
         if (screen === 'picker') { pickerTarget = i; scene.setHighlight(i); els.pickerTarget.textContent = `for bed ${i + 1}`; }
         else if (screen === 'idle' || screen === 'greeting') openPicker(i);
     });
@@ -829,6 +913,18 @@
         if (k === 'd') { toggleDev(); return; }
         if (k === 'n' && devOpen) { nextDay(); return; }
         if (k === 'escape') { if (screen === 'journal') closeJournal(); else if (screen === 'picker') closePicker(); toggleDev(false); return; }
+        if (screen === 'visit' && session) {
+            if (k === 'enter' || k === ' ') {
+                if (session.step === 'pick') { e.preventDefault(); session.confirmPick(); return; }
+            }
+            const nav = { arrowleft: 'left', arrowright: 'right', arrowup: 'up', arrowdown: 'down' };
+            if (nav[k] && session.step === 'pick') {
+                e.preventDefault();
+                session.moveSelection(nav[k]);
+                syncTendRing();
+                return;
+            }
+        }
         if (k === 'a' && source && source.setAuto && config.mock) { source.setAuto(true); els.mockMode.textContent = 'Demo player (auto)'; return; }
         if (manualKeys[k] && source && source.setKeys && (config.mock || config.keyboard)) {
             if (k === ' ') e.preventDefault();
@@ -919,7 +1015,18 @@
         clock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness,
         plant: (id, plot) => plant(id, plot),
         begin: () => (screen === 'greeting' || screen === 'idle' ? beginVisit() : null),
-        skip: () => session && session.skip(),
+        skip: () => {
+            if (!session) return null;
+            const step = session.skip();
+            onStep(step);
+            return step;
+        },
+        confirmPick: () => {
+            if (!session) return null;
+            const step = session.confirmPick();
+            onStep(step);
+            return step;
+        },
         startBreathing: (o) => session && session.startBreathing(o || {}),
         show,
         toggleDev,

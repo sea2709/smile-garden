@@ -35,7 +35,14 @@
 
         const fxImgs = {};
         if (ART.effects) for (const n of ART.effects.names) fxImgs[n] = loadImage(ART.effectSrc(n));
-        // one-shot absorb plays per plot: { kind, t0 }
+        const ringImgs = { day: [], night: [] };
+        if (ART.selection) {
+            for (let b = 1; b <= 8; b++) {
+                ringImgs.day[b] = loadImage(ART.selection.src('day', b - 1));
+                ringImgs.night[b] = loadImage(ART.selection.src('night', b - 1));
+            }
+        }
+        // one-shot absorb plays per plot: { kind, t0, i }
         const absorbs = [];
         const SPRITE_KINDS = { sun: 'sun', water: 'water', fert: 'fertilizer' };
         const fxWasOn = { sun: false, water: false, fert: false };
@@ -51,6 +58,9 @@
         const swayPhase = ART.plots.map((_, i) => i * 1.7 + 0.4);
         let highlight = null;   // plot index (picker target)
         let hover = null;
+        let tendPlot = null;    // selected bed during a visit
+        let tendRingPulse = false;
+        let effectPlot = null;  // bed receiving sun/water/fert FX
         const fx = { sun: 0, sunTarget: 0, water: 0, waterTarget: 0, fert: 0, fertTarget: 0, breath: 0 };
 
         const motes = [];
@@ -157,15 +167,18 @@
             }
         }
 
-        function playAbsorb(kind) {
+        function playAbsorb(kind, plot) {
             const t0 = performance.now() / 1000;
-            for (let i = 0; i < 8; i++) if (plots[i]) absorbs.push({ kind, i, t0 });
+            const i = plot === null || plot === undefined ? effectPlot : plot;
+            if (i === null || i === undefined) return;
+            if (plots[i]) absorbs.push({ kind, i, t0 });
         }
         function setEffects(e) {
+            if ('plot' in e) effectPlot = e.plot === null || e.plot === undefined ? null : e.plot;
             for (const k of ['sun', 'water', 'fert']) {
                 if (!(k in e)) continue;
                 const on = clamp(e[k]) > 0.05;
-                if (fxWasOn[k] && !on) playAbsorb(k);
+                if (fxWasOn[k] && !on) playAbsorb(k, effectPlot);
                 fxWasOn[k] = on;
             }
             if ('sun' in e) fx.sunTarget = clamp(e.sun);
@@ -177,6 +190,11 @@
 
         function setHighlight(i) { highlight = i === null || i === undefined ? null : i; }
         function setHover(i) { hover = i; }
+        function setTendSelection(plot, opts) {
+            const o = opts || {};
+            tendPlot = plot === null || plot === undefined ? null : plot;
+            tendRingPulse = !!o.pulse;
+        }
 
         function toArt(clientX, clientY) {
             const r = canvas.getBoundingClientRect();
@@ -224,8 +242,8 @@
                 }
             }
             // water drops while talking
-            if (fx.water > 0.05 && rnd() < fx.water * dt * 30) {
-                const i = Math.floor(rnd() * 8);
+            if (fx.water > 0.05 && effectPlot !== null && rnd() < fx.water * dt * 30) {
+                const i = effectPlot;
                 const p = ART.plots[i];
                 drops.push({ x: p.x + (rnd() - 0.5) * p.w * 0.7, y: p.y - 260 - rnd() * 120, vy: 60 + rnd() * 40, ty: p.y - 4 + (rnd() - 0.5) * 10, r: 2.2 + rnd() * 1.8, sway: rnd() * TAU });
             }
@@ -244,8 +262,8 @@
                 if (ripples[i].life > ripples[i].max) ripples.splice(i, 1);
             }
             // fertilizer flecks while breathing (spawn mostly on the out-breath)
-            if (fx.fert > 0.05 && rnd() < fx.fert * dt * 16 * (0.4 + (1 - fx.breath))) {
-                const i = Math.floor(rnd() * 8);
+            if (fx.fert > 0.05 && effectPlot !== null && rnd() < fx.fert * dt * 16 * (0.4 + (1 - fx.breath))) {
+                const i = effectPlot;
                 const p = ART.plots[i];
                 flecks.push({ x: p.x + (rnd() - 0.5) * p.w * 0.9, y: p.y - 120 - rnd() * 60, ty: p.y - 2, vy: 16 + rnd() * 10, ph: rnd() * TAU, r: 1.8 + rnd() * 1.8, rot: rnd() * TAU, hue: rnd() });
             }
@@ -356,15 +374,33 @@
             'golden-hour': 'sepia(0.20) saturate(1.08) brightness(0.98)',
             night: 'brightness(0.58) saturate(0.62) hue-rotate(8deg) contrast(0.95)',
         };
+        function drawSelectionRing(i, t) {
+            if (!ART.selection || tendPlot !== i) return;
+            const bed = i + 1;
+            const kind = lighting === 'night' ? 'night' : 'day';
+            const img = ringImgs[kind][bed];
+            const off = ART.selection.offsets['bed' + bed];
+            if (!ready(img) || !off) return;
+            const pulse = tendRingPulse ? 0.75 + 0.25 * (0.5 + 0.5 * Math.sin(t * Math.PI)) : 1;
+            ctx.save();
+            ctx.globalAlpha = pulse;
+            ctx.drawImage(img, off[0], off[1]);
+            ctx.restore();
+        }
+
         function drawPlants(t) {
             const now = performance.now() / 1000;
             ctx.filter = SPRITE_FILTER[lighting] || 'none';
             const order = [0, 1, 2, 3, 4, 5, 6, 7];
             for (const i of order) {
                 const pl = plots[i];
-                if (i === highlight && !pl) drawPlotGlow(i, t, true);
+                if (i === highlight && !pl && tendPlot === null) drawPlotGlow(i, t, true);
                 else if (i === hover && !pl && highlight !== null) drawPlotGlow(i, t, false);
-                if (!pl) continue;
+                if (!pl) {
+                    if (tendPlot === i) drawSelectionRing(i, t);
+                    continue;
+                }
+                if (tendPlot === i) drawSelectionRing(i, t);
                 const an = anims[i];
                 if (an) {
                     const k = (now - an.t0) / an.dur;
@@ -531,10 +567,10 @@
             if (!E) return;
             const loopFrame = Math.floor(t * E.fps) % E.count;
             const levels = { sun: fx.sun, water: fx.water, fert: fx.fert };
-            for (let i = 0; i < 8; i++) {
-                if (!plots[i]) continue;
+            const fxI = effectPlot;
+            if (fxI !== null && plots[fxI]) {
                 for (const k of ['water', 'fert', 'sun']) {
-                    if (levels[k] > 0.03) drawFxFrame(k, 'loop', i, (loopFrame + i * 3) % E.count, levels[k] * FX_GAIN[k]);
+                    if (levels[k] > 0.03) drawFxFrame(k, 'loop', fxI, (loopFrame + fxI * 3) % E.count, levels[k] * FX_GAIN[k]);
                 }
             }
             const now = performance.now() / 1000;
@@ -567,7 +603,7 @@
             drawVignette();
         }
 
-        return { resize, update, draw, setLighting, setPlots, playGrowth, playAbsorb, setEffects, setHighlight, setHover, plotAt, plotClient,
+        return { resize, update, draw, setLighting, setPlots, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
             get lighting() { return lighting; }, images: { bgImgs, plantImgs } };
     }
 

@@ -37,3 +37,13 @@ test('every plant in the game has 5 painted stages and UI cards exist', () => {
     }
     assert.ok(fs.existsSync(fromRenderer(ART.card)));
 });
+
+test('selection ring art: 8 day/night sprites and backdrop offsets', () => {
+    assert.ok(ART.selection);
+    for (let b = 1; b <= 8; b++) {
+        const key = 'bed' + b;
+        assert.ok(Array.isArray(ART.selection.offsets[key]) && ART.selection.offsets[key].length === 2, key);
+        assert.ok(fs.existsSync(fromRenderer(ART.selection.src('day', b - 1))), `day bed ${b}`);
+        assert.ok(fs.existsSync(fromRenderer(ART.selection.src('night', b - 1))), `night bed ${b}`);
+    }
+});

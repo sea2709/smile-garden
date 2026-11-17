@@ -58,6 +58,10 @@ async function run(win, outDir) {
     // --- a full visit at midday ---
     await lightingTo('midday');
     await G('g.begin()');
+    await waitFor('pick', (d) => d.step === 'pick', 10000);
+    await sleep(1600);
+    await shot('03b-selection-ring-visit.png');
+    await G('g.confirmPick()');
     await waitFor('smiling', (d) => d.step === 'smile' && d.smiling === '1', 20000);
     await sleep(2600);
     await shot('04-smile-step-midday.png');
@@ -73,7 +77,14 @@ async function run(win, outDir) {
     await shot('07-breathing-step.png');
     await waitFor('2 breaths', (d) => Number(d.breath) >= 2, 30000);
     await js(`document.getElementById('btn-skip').click()`);
-    await waitFor('summary', (d) => d.screen === 'summary', 10000);
+    for (let i = 0; i < 30; i++) {
+        const d = await ds();
+        if (d.screen === 'summary' || d.step === 'summary') break;
+        if (d.step === 'pick') await G('g.confirmPick()');
+        else await G('g.skip()');
+        await sleep(280);
+    }
+    await waitFor('summary', (d) => d.screen === 'summary', 15000);
     await sleep(1500);
     await shot('08-summary-growth.png');
     await waitFor('revealed', (d) => d.revealed === '1', 15000);
@@ -96,13 +107,18 @@ async function run(win, outDir) {
     await sleep(800);
     await shot('10-greeting-night.png');
     await G('g.begin()');
+    await G('g.confirmPick()');
     await waitFor('night light hint', (d) => d.hint === 'night-light', 20000);
     await sleep(500);
     await shot('11-night-light-hint.png');
-    await G('g.skip()'); await sleep(300);
-    await G('g.skip()'); await sleep(300);
-    await G('g.skip()');
-    await waitFor('summary', (d) => d.screen === 'summary', 10000);
+    for (let i = 0; i < 30; i++) {
+        const d = await ds();
+        if (d.screen === 'summary' || d.step === 'summary') break;
+        if (d.step === 'pick') await G('g.confirmPick()');
+        else await G('g.skip()');
+        await sleep(280);
+    }
+    await waitFor('summary', (d) => d.screen === 'summary', 15000);
     await waitFor('revealed', (d) => d.revealed === '1', 15000);
     await G(`g.show('idle')`);
     await sleep(2500);

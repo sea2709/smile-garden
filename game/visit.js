@@ -55,6 +55,8 @@
         fastSmileSeconds: 14,
         fastTalkSeconds: 10,
         poorFaceSeconds: 1.5,     // face missing this long = "poor reading" (pause + hint)
+        minSmilePerBed: 6,        // per-bed smile step floor when many beds are planted
+        minTalkPerBed: 4,         // per-bed talk step floor
     });
 
     // Seeds unlock by visit count, so returning brings something new (never
@@ -301,28 +303,105 @@
         return state.visitDays.includes(dayKey(now instanceof Date ? now : new Date(now)));
     }
 
+    /** Plot grid: beds 0–3 back row, 4–7 front row (left to right). */
+    const PLOT_ROW = (i) => (i < 4 ? 0 : 1);
+    const PLOT_COL = (i) => i % 4;
+
+    function neighborPlot(i, dir) {
+        const r = PLOT_ROW(i);
+        const c = PLOT_COL(i);
+        if (dir === 'left' && c > 0) return i - 1;
+        if (dir === 'right' && c < 3) return i + 1;
+        if (dir === 'up' && r > 0) return i - 4;
+        if (dir === 'down' && r < 1) return i + 4;
+        return null;
+    }
+
+    /** Move selection among planted beds along an arrow direction (wraps within 8 steps). */
+    function movePlotSelection(current, dir, planted) {
+        const set = new Set(planted);
+        if (!set.size) return null;
+        const start = set.has(current) ? current : planted[0];
+        let i = start;
+        for (let n = 0; n < 8; n++) {
+            const next = neighborPlot(i, dir);
+            if (next === null) break;
+            i = next;
+            if (set.has(i)) return i;
+        }
+        return start;
+    }
+
+    function plantedPlotIndices(plots) {
+        const out = [];
+        (plots || []).forEach((p, i) => { if (p) out.push(i); });
+        return out;
+    }
+
+    function firstPlantedPlot(plots) {
+        const idx = plantedPlotIndices(plots);
+        return idx.length ? idx[0] : null;
+    }
+
+    function perBedStepSeconds(total, plantedCount, floor) {
+        const n = Math.max(1, plantedCount);
+        return Math.max(floor, total / n);
+    }
+
+    /** Normalize visit result: per-bed { beds: [{plot, sunHours, water, fertilizer, breaths}] } or legacy garden-wide. */
+    function visitBedResults(result) {
+        const r = result || {};
+        if (Array.isArray(r.beds) && r.beds.length) {
+            return r.beds.map((b) => ({
+                plot: Number(b.plot),
+                sunHours: Math.max(0, Math.min(TUNING.maxSunHours, Number(b.sunHours) || 0)),
+                water: clamp01(b.water),
+                fertilizer: clamp01(b.fertilizer),
+                breaths: Number(b.breaths) || 0,
+            })).filter((b) => b.plot >= 0 && b.plot < PLOTS);
+        }
+        const sun = Math.max(0, Math.min(TUNING.maxSunHours, Number(r.sunHours) || 0));
+        const water = clamp01(r.water);
+        const fert = clamp01(r.fertilizer);
+        const breaths = Number(r.breaths) || 0;
+        const out = [];
+        for (let i = 0; i < PLOTS; i++) {
+            out.push({ plot: i, sunHours: sun, water, fertilizer: fert, breaths });
+        }
+        return out;
+    }
+
     /**
-     * Apply a finished visit: bank sunlight, grow qualifying plants by at most
+     * Apply a finished visit: bank sunlight per bed, grow qualifying plants by at most
      * one stage per local day, record the visit and journal entries.
-     * result = { sunHours 0..12, water 0..1, fertilizer 0..1, breaths }.
-     * Returns { day, grew: [...], waiting: [...], weekly, firstVisitToday, unlocked: [...] }.
+     * result.beds = [{ plot, sunHours, water, fertilizer, breaths? }, ...].
+     * Returns { day, grew, waiting, tended, weekly, firstVisitToday, unlocked, ... }.
      */
     function applyVisit(state, result, now) {
         const d = now instanceof Date ? now : new Date(now);
         const day = dayKey(d);
-        const r = result || {};
-        const sun = Math.max(0, Math.min(TUNING.maxSunHours, Number(r.sunHours) || 0));
-        const water = clamp01(r.water);
-        const fert = clamp01(r.fertilizer);
-        const banked = sun * (1 + TUNING.fertilizerBoost * fert);
-        const watered = water >= TUNING.waterToGrow;
+        const bedResults = visitBedResults(result);
+        const byPlot = Object.create(null);
+        for (const b of bedResults) byPlot[b.plot] = b;
+
         const grew = [];
         const waiting = [];
+        const tended = [];
 
         state.plots.forEach((p, i) => {
             if (!p || p.stage >= MAX_STAGE) return;
             const kind = L.plantById(p.plantId);
             const cost = kind.cost;
+            const br = byPlot[i];
+            if (!br) return;
+            const sun = br.sunHours;
+            const water = br.water;
+            const fert = br.fertilizer;
+            if (sun > 0 || water > 0 || fert > 0) {
+                tended.push({ plot: i, plantId: p.plantId, name: kind.name, sunHours: sun, water, fertilizer: fert });
+            }
+            const banked = sun * (1 + TUNING.fertilizerBoost * fert);
+            const watered = water >= TUNING.waterToGrow;
             p.sunBank = Math.min(cost, p.sunBank + banked);
             const info = { plot: i, plantId: p.plantId, name: kind.name, stage: p.stage, sunBank: p.sunBank, cost };
             if (p.lastGrowDay === day) { waiting.push(Object.assign(info, { reason: 'grew-today' })); return; }
@@ -348,17 +427,29 @@
             if (state.visitDays.length > 400) state.visitDays.splice(0, state.visitDays.length - 400);
         }
         const unlocked = unlockedPlants(state).filter((id) => !before.includes(id));
+
+        const sumSun = tended.reduce((s, t) => s + t.sunHours, 0);
+        const sumWater = tended.length ? tended.reduce((s, t) => s + t.water, 0) / tended.length : 0;
+        const sumFert = tended.length ? tended.reduce((s, t) => s + t.fertilizer, 0) / tended.length : 0;
+        const parts = tended.map((t) => `bed ${t.plot + 1}: ${round1(t.sunHours)} h sun, ${Math.round(t.water * 100)}% water` +
+            (t.fertilizer > 0 ? `, ${Math.round(t.fertilizer * 100)}% fertilizer` : ''));
         addJournal(state, {
             day, ts: d.getTime(), kind: 'visit',
-            sunHours: round1(sun), water: round2(water), fertilizer: round2(fert), breaths: Number(r.breaths) || 0,
-            text: `Visit: ${round1(sun)} h of sun, watering can ${Math.round(water * 100)}% full` +
-                (fert > 0 ? `, fertilizer ${Math.round(fert * 100)}%` : '') + '.',
+            sunHours: round1(sumSun), water: round2(sumWater), fertilizer: round2(sumFert),
+            breaths: tended.reduce((s, t) => s + (byPlot[t.plot].breaths || 0), 0),
+            text: parts.length ? `Visit per plant: ${parts.join('; ')}.` : 'Visit: a quiet hello to the garden.',
         });
         for (const id of unlocked) {
             addJournal(state, { day, ts: d.getTime(), kind: 'unlock', plantId: id, text: `New seeds: ${L.plantById(id).name}.` });
         }
-        return { day, sunHours: sun, water, fertilizer: fert, banked, watered, grew, waiting, unlocked,
-            firstVisitToday, weekly: weeklyVisits(state, d), visits: visitCount(state) };
+        const legacy = bedResults[0] || { sunHours: 0, water: 0, fertilizer: 0 };
+        return {
+            day, sunHours: sumSun, water: sumWater, fertilizer: sumFert,
+            tended, grew, waiting, unlocked, firstVisitToday,
+            weekly: weeklyVisits(state, d), visits: visitCount(state),
+            banked: legacy.sunHours * (1 + TUNING.fertilizerBoost * legacy.fertilizer),
+            watered: legacy.water >= TUNING.waterToGrow,
+        };
     }
 
     const round1 = (x) => Math.round(x * 10) / 10;
@@ -441,30 +532,41 @@
     // ------------------------------------------------------------------
     // One daily visit, step by step.
     // ------------------------------------------------------------------
-    const STEPS = Object.freeze(['greeting', 'smile', 'talk', 'breathe-offer', 'breathe', 'summary']);
+    const STEPS = Object.freeze(['greeting', 'pick', 'smile', 'talk', 'breathe-offer', 'breathe', 'summary']);
+
+    function emptyBedTally() {
+        return { smileWeighted: 0, smileSecondsRaw: 0, talkSecondsRaw: 0, breathsDone: 0, breathSkipped: false, breathTaken: false };
+    }
 
     class VisitSession {
         /**
-         * opts: { fast, smileSeconds, talkSeconds, pace, breaths }
+         * opts: { fast, smileSeconds, talkSeconds, pace, breaths, plantedBeds, plots }
          * update(dt, input) with input = { happiness 0..1|null, talking bool|null, faceVisible bool }
          */
         constructor(opts) {
-            const o = Object.assign({ fast: false }, opts);
-            this.smileSeconds = o.smileSeconds || (o.fast ? TUNING.fastSmileSeconds : TUNING.smileSeconds);
-            this.talkSeconds = o.talkSeconds || (o.fast ? TUNING.fastTalkSeconds : TUNING.talkSeconds);
+            const o = Object.assign({ fast: false, plots: [] }, opts);
+            const baseSmile = o.smileSeconds || (o.fast ? TUNING.fastSmileSeconds : TUNING.smileSeconds);
+            const baseTalk = o.talkSeconds || (o.fast ? TUNING.fastTalkSeconds : TUNING.talkSeconds);
+            this.baseSmileSeconds = baseSmile;
+            this.baseTalkSeconds = baseTalk;
+            this.fast = !!o.fast;
+            this.plantedBeds = Array.isArray(o.plantedBeds)
+                ? o.plantedBeds.slice()
+                : plantedPlotIndices(o.plots);
+            const n = Math.max(1, this.plantedBeds.length);
+            this.smileSeconds = perBedStepSeconds(baseSmile, n, TUNING.minSmilePerBed);
+            this.talkSeconds = perBedStepSeconds(baseTalk, n, TUNING.minTalkPerBed);
             this.pace = o.pace === 'gentle' ? 'gentle' : 'standard';
             this.breathCount = clampBreaths(o.breaths);
+            this.plots = o.plots || [];
             this.step = 'greeting';
-            this.stepTime = 0;          // seconds of active (face-visible) time in this step
+            this.stepTime = 0;
             this.detector = new L.SmileDetector();
             this.h = null;
             this.smiling = false;
             this.talking = false;
             this.noFace = 0;
             this.poorReading = false;
-            this.smileWeighted = 0;     // seconds of smiling, weighted 0.6..1 by smile size
-            this.smileSecondsRaw = 0;
-            this.talkSecondsRaw = 0;
             this.peak = 0;
             this.pacer = null;
             this.breathT = 0;
@@ -472,15 +574,58 @@
             this.breathSkipped = false;
             this.breathTaken = false;
             this.events = [];
+            this.bedTally = Object.create(null);
+            this.plantRound = 0;
+            this.selectedPlot = this.plantedBeds.length ? this.plantedBeds[0] : null;
+            this.live = emptyBedTally();
         }
 
-        // Shorter (demo) steps scale the targets so a full day stays reachable.
-        get sunHours() {
-            const need = TUNING.smileSecondsForMax * (this.smileSeconds / TUNING.smileSeconds);
-            return Math.min(TUNING.maxSunHours, (this.smileWeighted / need) * TUNING.maxSunHours);
+        bedInfo(plot) {
+            const p = this.plots[plot];
+            if (!p) return { cost: TUNING.maxSunHours };
+            const kind = L.plantById(p.plantId);
+            return { cost: kind ? kind.cost : TUNING.maxSunHours, plantId: p.plantId };
         }
-        get water() { return clamp01(this.talkSecondsRaw / (TUNING.talkSecondsForFull * (this.talkSeconds / TUNING.talkSeconds))); }
-        get fertilizer() { return this.pacer ? clamp01(this.breathsDone / this.pacer.breaths) : 0; }
+
+        _syncLiveFromTally() {
+            const t = this.bedTally[this.selectedPlot];
+            this.live = t ? Object.assign(emptyBedTally(), t) : emptyBedTally();
+        }
+
+        _saveLiveToTally() {
+            if (this.selectedPlot == null) return;
+            this.bedTally[this.selectedPlot] = Object.assign(emptyBedTally(), this.live);
+        }
+
+        sunHoursFor(plot, tally) {
+            const t = tally || this.live;
+            const need = TUNING.smileSecondsForMax * (this.smileSeconds / this.baseSmileSeconds);
+            return Math.min(TUNING.maxSunHours, (t.smileWeighted / need) * TUNING.maxSunHours);
+        }
+        waterFor(tally) {
+            const t = tally || this.live;
+            return clamp01(t.talkSecondsRaw / (TUNING.talkSecondsForFull * (this.talkSeconds / this.baseTalkSeconds)));
+        }
+        fertilizerFor(tally) {
+            const t = tally || this.live;
+            if (this.step === 'breathe' && this.pacer) return clamp01(this.breathsDone / this.pacer.breaths);
+            if (t.breathTaken && this.pacer) return clamp01(t.breathsDone / this.pacer.breaths);
+            return t.breathsDone > 0 && this.breathCount ? clamp01(t.breathsDone / this.breathCount) : 0;
+        }
+
+        get sunHours() { return this.sunHoursFor(this.selectedPlot); }
+        get water() { return this.waterFor(); }
+        get fertilizer() { return this.fertilizerFor(); }
+
+        sunGoal(plot) {
+            const info = this.bedInfo(plot);
+            return Math.min(TUNING.maxSunHours, info.cost);
+        }
+        bedTopped(step) {
+            if (step === 'smile') return this.sunHours >= this.sunGoal(this.selectedPlot) - 1e-6;
+            if (step === 'talk') return this.water >= 1 - 1e-6;
+            return false;
+        }
 
         stepDuration() {
             if (this.step === 'smile') return this.smileSeconds;
@@ -492,6 +637,7 @@
 
         go(step) {
             if (!STEPS.includes(step)) throw new Error('unknown step ' + step);
+            if (this.step === 'smile' || this.step === 'talk' || this.step === 'breathe') this._saveLiveToTally();
             this.step = step;
             this.stepTime = 0;
             this.noFace = 0;
@@ -500,21 +646,76 @@
                 this.pacer = new BreathPacer({ pace: this.pace, breaths: this.breathCount });
                 this.breathT = 0;
                 this.breathsDone = 0;
+                this.breathSkipped = false;
                 this.breathTaken = true;
+                this.live.breathTaken = true;
             }
-            this.events.push({ type: 'step', step });
+            if (step === 'smile' || step === 'talk' || step === 'breathe' || step === 'breathe-offer' || step === 'pick') {
+                this._syncLiveFromTally();
+            }
+            this.events.push({ type: 'step', step, plot: this.selectedPlot, round: this.plantRound });
             return step;
         }
 
-        begin() { return this.go('smile'); }
+        begin() {
+            if (!this.plantedBeds.length) return this.go('summary');
+            this.plantRound = 0;
+            this.selectedPlot = this.plantedBeds[0];
+            return this.go('pick');
+        }
 
-        /** Skip the current step (always allowed). Breathing keeps completed breaths. */
+        confirmPick() {
+            if (this.step !== 'pick' || this.selectedPlot == null) return this.step;
+            return this.go('smile');
+        }
+
+        setSelectedPlot(plot) {
+            const i = Number(plot);
+            if (!(i >= 0 && i < PLOTS) || !this.plantedBeds.includes(i)) return false;
+            if (this.step !== 'pick') return false;
+            this.selectedPlot = i;
+            this._syncLiveFromTally();
+            this.events.push({ type: 'select', plot: i });
+            return true;
+        }
+
+        moveSelection(dir) {
+            if (this.step !== 'pick') return this.selectedPlot;
+            const next = movePlotSelection(this.selectedPlot, dir, this.plantedBeds);
+            if (next !== null && next !== this.selectedPlot) {
+                this.selectedPlot = next;
+                this._syncLiveFromTally();
+                this.events.push({ type: 'select', plot: next });
+            }
+            return this.selectedPlot;
+        }
+
+        hasMorePlants() { return this.plantRound + 1 < this.plantedBeds.length; }
+
+        advanceToNextPlant() {
+            this._saveLiveToTally();
+            this.plantRound += 1;
+            if (this.plantRound >= this.plantedBeds.length) return this.go('summary');
+            this.selectedPlot = this.plantedBeds[this.plantRound];
+            this.pacer = null;
+            this.breathsDone = 0;
+            this.breathSkipped = false;
+            this.breathTaken = false;
+            return this.go('pick');
+        }
+
         skip() {
-            if (this.step === 'greeting') return this.go('smile');
+            if (this.step === 'greeting') return this.begin();
+            if (this.step === 'pick') return this.confirmPick();
             if (this.step === 'smile') return this.go('talk');
             if (this.step === 'talk') return this.go('breathe-offer');
-            if (this.step === 'breathe-offer') return this.go('summary');
-            if (this.step === 'breathe') { this.breathSkipped = true; return this.go('summary'); }
+            if (this.step === 'breathe-offer') return this.advanceToNextPlant();
+            if (this.step === 'breathe') {
+                this.breathSkipped = true;
+                this.live.breathSkipped = true;
+                this._saveLiveToTally();
+                return this.advanceToNextPlant();
+            }
             return this.step;
         }
 
@@ -524,7 +725,6 @@
             return this.go('breathe');
         }
 
-        /** Advance time. Returns events since the last call. */
         update(dt, input) {
             const step = Math.max(0, Math.min(0.25, Number(dt) || 0));
             const inp = input || {};
@@ -540,41 +740,69 @@
             this.talking = faceVisible && inp.talking === true;
 
             if (this.step === 'smile' || this.step === 'talk') {
-                // The step clock waits while the face is missing (no lost time).
                 if (faceVisible) this.stepTime += step;
                 if (this.step === 'smile' && this.smiling && faceVisible) {
                     const on = L.DEFAULTS.smileOn;
                     const intensity = clamp01((this.h - on) / (1 - on));
-                    this.smileWeighted += step * (0.6 + 0.4 * intensity);
-                    this.smileSecondsRaw += step;
+                    this.live.smileWeighted += step * (0.6 + 0.4 * intensity);
+                    this.live.smileSecondsRaw += step;
                     this.peak = Math.max(this.peak, this.h);
                 }
-                if (this.step === 'talk' && this.talking) this.talkSecondsRaw += step;
-                if (this.stepTime >= this.stepDuration()) this.go(this.step === 'smile' ? 'talk' : 'breathe-offer');
+                if (this.step === 'talk' && this.talking) this.live.talkSecondsRaw += step;
+                const topped = this.bedTopped(this.step);
+                if (topped || this.stepTime >= this.stepDuration()) {
+                    this._saveLiveToTally();
+                    this.go(this.step === 'smile' ? 'talk' : 'breathe-offer');
+                }
             } else if (this.step === 'breathe') {
-                // Breathing is guided by time only; no reading needed.
                 this.breathT += step;
                 this.breathsDone = this.pacer.completedAt(this.breathT);
-                if (this.breathT >= this.pacer.total) this.go('summary');
+                this.live.breathsDone = this.breathsDone;
+                if (this.breathT >= this.pacer.total) {
+                    this._saveLiveToTally();
+                    this.advanceToNextPlant();
+                }
             }
             const ev = this.events;
             this.events = [];
             return ev;
         }
 
-        /** Data for applyVisit(). */
         result() {
-            return {
-                sunHours: this.sunHours,
-                water: this.water,
-                fertilizer: this.fertilizer,
-                breaths: this.breathsDone,
-                smileSeconds: this.smileSecondsRaw,
-                talkSeconds: this.talkSecondsRaw,
-                breathSkipped: this.breathSkipped,
-                breathTaken: this.breathTaken,
+            this._saveLiveToTally();
+            const beds = [];
+            for (const plot of this.plantedBeds) {
+                const t = Object.assign(emptyBedTally(), this.bedTally[plot]);
+                beds.push({
+                    plot,
+                    sunHours: this.sunHoursFor(plot, t),
+                    water: this.waterFor(t),
+                    fertilizer: t.breathsDone > 0 ? clamp01(t.breathsDone / this.breathCount) : 0,
+                    breaths: t.breathsDone,
+                    breathSkipped: t.breathSkipped,
+                    breathTaken: t.breathTaken,
+                });
+            }
+            const totals = beds.reduce((a, b) => ({
+                sunHours: a.sunHours + b.sunHours,
+                water: a.water + b.water,
+                fertilizer: a.fertilizer + b.fertilizer,
+                breaths: a.breaths + b.breaths,
+            }), { sunHours: 0, water: 0, fertilizer: 0, breaths: 0 });
+            const n = Math.max(1, beds.length);
+            return Object.assign({
+                beds,
+                breathSkipped: beds.some((b) => b.breathSkipped),
+                breathTaken: beds.some((b) => b.breathTaken),
                 peakHappiness: this.peak,
-            };
+                smileSeconds: beds.reduce((s, b, i) => s + (this.bedTally[this.plantedBeds[i]]?.smileSecondsRaw || 0), 0),
+                talkSeconds: beds.reduce((s, b, i) => s + (this.bedTally[this.plantedBeds[i]]?.talkSecondsRaw || 0), 0),
+            }, {
+                sunHours: totals.sunHours,
+                water: totals.water / n,
+                fertilizer: totals.fertilizer / n,
+                breaths: totals.breaths,
+            });
         }
     }
 
@@ -592,7 +820,18 @@
         const out = [];
         for (let i = 0; i < days; i++) {
             clock.nextDay();
-            out.push(applyVisit(state, { sunHours: 12 * q, water: q, fertilizer: q > 0.8 ? 1 : 0, breaths: q > 0.8 ? 4 : 0 }, clock.now()));
+            const beds = [];
+            state.plots.forEach((p, plot) => {
+                if (!p) return;
+                beds.push({
+                    plot,
+                    sunHours: 12 * q,
+                    water: q,
+                    fertilizer: q > 0.8 ? 1 : 0,
+                    breaths: q > 0.8 ? 4 : 0,
+                });
+            });
+            out.push(applyVisit(state, { beds }, clock.now()));
         }
         return out;
     }
@@ -605,5 +844,6 @@
         plantInfo, createState, loadState, serializeState, visitCount, isUnlocked, unlockedPlants,
         emptyPlots, plantedCount, matureCount, score, plantSeed, weeklyVisits, visitedToday, applyVisit,
         clampBreaths, BreathPacer, VisitSession, waitingText, simulateDays,
+        neighborPlot, movePlotSelection, plantedPlotIndices, firstPlantedPlot, perBedStepSeconds, visitBedResults,
     };
 });

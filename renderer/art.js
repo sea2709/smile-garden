@@ -18,5 +18,21 @@
             names: ['sun-day-loop', 'sun-day-absorb', 'sun-night-loop', 'sun-night-absorb', 'water-day-loop', 'water-day-absorb', 'water-night-loop', 'water-night-absorb', 'fertilizer-day-loop', 'fertilizer-day-absorb', 'fertilizer-night-loop', 'fertilizer-night-absorb'] },
         effectSrc(name) { return '../assets/effects/' + name + '-strip.png'; },
         plantSrc(id, stage) { return '../assets/plants/' + this.plants[id].dir + '/stage-' + stage + '.png'; },
+        selection: {
+            offsets: {
+                bed1: [232, 304],
+                bed2: [444, 306],
+                bed3: [650, 306],
+                bed4: [849, 308],
+                bed5: [139, 412],
+                bed6: [396, 418],
+                bed7: [653, 418],
+                bed8: [887, 416],
+            },
+            src(kind, bed) {
+                const i = Math.max(1, Math.min(8, Math.round(Number(bed)) + 1));
+                return '../assets/selection/ring-' + kind + '-bed' + i + '.png';
+            },
+        },
     });
 })();
