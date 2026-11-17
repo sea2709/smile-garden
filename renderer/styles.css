@@ -85,6 +85,24 @@ body[data-canvas-logo="1"] .brand:not(:has(.brand-logo)) {
     min-width: 0; width: 0; flex: 0 0 auto; overflow: visible; pointer-events: none;
 }
 body[data-painted-clock="1"] .chip-day { display: none; }
+body[data-painted-clock="1"] .topbar {
+    min-height: 56px;
+    flex-wrap: wrap;
+    align-content: flex-start;
+    row-gap: 6px;
+    padding-bottom: 54px;
+    pointer-events: none;
+}
+body[data-painted-clock="1"] .topbar .chip,
+body[data-painted-clock="1"] .topbar .btn { pointer-events: auto; }
+body[data-painted-clock="1"] .chips {
+    flex: 1 1 100%;
+    order: 4;
+    max-width: min(100%, calc(50vw - 84px));
+    margin-left: calc(18px + var(--hud-logo-width) + var(--hud-logo-gap));
+    box-sizing: border-box;
+}
+body[data-painted-clock="1"] .top-actions { order: 3; margin-left: auto; }
 .btn-bed .btn-bed-icon { width: 28px; height: 28px; margin-right: 6px; vertical-align: middle; }
 body[data-painted-clock="1"] .chip-day #day-chip-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
 .chips { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }

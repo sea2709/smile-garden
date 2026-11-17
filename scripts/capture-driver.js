@@ -38,7 +38,7 @@ async function runTimeArt(win, outDir) {
     const shotTopBar2x = async (name) => {
         await waitHud();
         const bounds = await G(`(() => ({ w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio || 1 }))()`);
-        const barH = 56;
+        const barH = Math.ceil(118 * (bounds.h / 720));
         const rect = { x: 0, y: 0, width: bounds.w, height: barH };
         let img = await wc.capturePage(rect);
         if (bounds.dpr < 2) {
@@ -71,6 +71,11 @@ async function runTimeArt(win, outDir) {
     await shot('clock-dawn.png');
     await shotTopBar2x('topbar-dawn-6am-2x.png');
     await frame(async () => { await G('g.setGardenTime(12 * 60)'); });
+    const probeNoon = await G('g.probeClockSunToken()');
+    if (!probeNoon || !probeNoon.ok || (probeNoon.pixel && probeNoon.pixel.a < 48)) {
+        console.warn('[capture] clock sun probe', JSON.stringify(probeNoon));
+        throw new Error('sun token not visible on canvas at noon (probe failed)');
+    }
     await shot('clock-noon.png');
     await shotTopBar2x('topbar-noon-2x.png');
     await frame(async () => { await G('g.setGardenTime(17 * 60 + 45)'); });

@@ -616,11 +616,48 @@
         }
 
         function clockPointFromFrame(fx, fy) {
+            const L = typeof window !== 'undefined' ? window.SmileClockLayout : null;
+            if (L && L.framePointToBackdrop) {
+                return L.framePointToBackdrop(fx, fy, {
+                    display: ART.clock.display,
+                    framePixels: ART.clock.framePixels,
+                });
+            }
             const d = ART.clock.display;
-            const ox = d.cx - d.w / 2;
-            const oy = d.cy - d.h / 2;
             const scale = d.w / ART.clock.framePixels[0];
-            return { x: ox + fx * scale, y: oy + fy * scale };
+            return { x: d.cx - d.w / 2 + fx * scale, y: d.cy - d.h / 2 + fy * scale };
+        }
+
+        function blitClockToken(img, p, disp, alpha) {
+            if (alpha < 0.02) return false;
+            ctx.save();
+            ctx.filter = 'none';
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = alpha;
+            ctx.shadowBlur = 0;
+            const [tw, th] = ART.clock.tokenPixels || [64, 64];
+            if (ready(img)) {
+                ctx.drawImage(img, 0, 0, tw, th, p.x - disp / 2, p.y - disp / 2, disp, disp);
+                ctx.restore();
+                return true;
+            }
+            ctx.fillStyle = '#f0b84a';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, disp * 0.32, 0, TAU);
+            ctx.fill();
+            ctx.restore();
+            return true;
+        }
+
+        function sampleBackdrop(x, y) {
+            resize();
+            const px = Math.round((x * view.s + view.ox) * view.dpr);
+            const py = Math.round((y * view.s + view.oy) * view.dpr);
+            if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) {
+                return { r: 0, g: 0, b: 0, a: 0, oob: true, px, py };
+            }
+            const d = ctx.getImageData(px, py, 1, 1).data;
+            return { r: d[0], g: d[1], b: d[2], a: d[3], oob: false, px, py };
         }
 
         function drawClockBitmap(img, alpha, ox, oy, w, h) {
@@ -716,6 +753,15 @@
                 ctx.textBaseline = 'middle';
                 ctx.fillText(gardenClockLabel, rb.cx, rb.cy + 1);
                 ctx.restore();
+            }
+            if (tok) {
+                const paintTok = (img, deg, alpha) => {
+                    if (alpha < 0.03 || !CARC) return;
+                    const fr = CARC.tokenFrameXY(deg);
+                    blitClockToken(img, clockPointFromFrame(fr.x, fr.y), disp, alpha);
+                };
+                paintTok(clockSunImg, tok.sunDeg, tok.sunAlpha);
+                paintTok(clockMoonImg, tok.moonDeg, tok.moonAlpha);
             }
             if (typeof document !== 'undefined' && document.body) {
                 document.body.dataset.paintedClock = painted ? '1' : '0';
@@ -1428,48 +1474,42 @@
             drawClockTokensOnTop();
         }
 
-        /** Sun/moon above the hill mask (noon / upper arc). */
+        /** Final pass: tokens above vignette / HTML (frame → hills → token → front → ribbon → token). */
         function drawClockTokensOnTop() {
             if (!ART.clock || typeof window === 'undefined' || !window.SmileClockArc) return;
-            const cfg = ART.clock;
             const CARC = window.SmileClockArc;
             const tok = CARC.clockTokenState(gardenClockMinutes);
-            const disp = cfg.tokenDisplay || 32;
-            const upper = (deg) => CARC.tokenFrameXY(deg).y < cfg.arc.centerY - 1;
-            const paint = (img, deg, alpha, sun) => {
-                if (alpha < 0.03 || !upper(deg)) return;
+            const disp = ART.clock.tokenDisplay || 32;
+            const paint = (img, deg, alpha) => {
+                if (alpha < 0.03) return;
                 const fr = CARC.tokenFrameXY(deg);
-                const p = clockPointFromFrame(fr.x, fr.y);
-                ctx.save();
-                ctx.globalAlpha = alpha;
-                ctx.shadowColor = sun ? 'rgba(255, 210, 90, 0.65)' : 'rgba(210, 220, 255, 0.45)';
-                ctx.shadowBlur = sun ? 6 : 4;
-                if (ready(img)) ctx.drawImage(img, p.x - disp / 2, p.y - disp / 2, disp, disp);
-                else {
-                    ctx.fillStyle = sun ? '#f0b84a' : '#d8dce8';
-                    ctx.beginPath();
-                    ctx.arc(p.x, p.y, disp * 0.28, 0, TAU);
-                    ctx.fill();
-                }
-                ctx.restore();
+                blitClockToken(img, clockPointFromFrame(fr.x, fr.y), disp, alpha);
             };
-            paint(clockSunImg, tok.sunDeg, tok.sunAlpha, true);
-            paint(clockMoonImg, tok.moonDeg, tok.moonAlpha, false);
-            if (tok.sunAlpha > 0.05) {
-                const fr = CARC.tokenFrameXY(tok.sunDeg);
-                const p = clockPointFromFrame(fr.x, fr.y);
-                ctx.save();
-                ctx.globalAlpha = tok.sunAlpha * 0.45;
-                ctx.fillStyle = '#ffe8a0';
-                ctx.beginPath();
-                ctx.arc(p.x, p.y, disp * 0.55, 0, TAU);
-                ctx.fill();
-                ctx.restore();
-            }
+            paint(clockSunImg, tok.sunDeg, tok.sunAlpha);
+            paint(clockMoonImg, tok.moonDeg, tok.moonAlpha);
+        }
+
+        function probeClockSunToken() {
+            const CARC = typeof window !== 'undefined' ? window.SmileClockArc : null;
+            if (!ART.clock || !CARC) return { ok: false, reason: 'missing-clock' };
+            const tok = CARC.clockTokenState(gardenClockMinutes);
+            const fr = CARC.tokenFrameXY(tok.sunDeg);
+            const center = clockPointFromFrame(fr.x, fr.y);
+            const pixel = sampleBackdrop(center.x, center.y);
+            return {
+                ok: true,
+                gardenClockMinutes,
+                center,
+                deg: tok.sunDeg,
+                sunAlpha: tok.sunAlpha,
+                sunReady: ready(clockSunImg),
+                sunNatural: clockSunImg ? clockSunImg.naturalWidth : 0,
+                pixel,
+            };
         }
 
         return { resize, update, draw, setLighting, setLightingBlend, setSeason, setGardenClock, setBedtimeGlow, setBedtimeDark, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
-            waitForHudArt, hudArtReady,
+            waitForHudArt, hudArtReady, sampleBackdrop, probeClockSunToken,
             get lighting() { return lighting; },
             get reducedMotion() { return reducedMotion; },
             setReducedMotion(v) { reducedMotion = !!v; },

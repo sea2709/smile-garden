@@ -1625,6 +1625,27 @@
         },
         clearSeasonOverride() { hudSeasonOverride = false; syncGardenSeasonFromDay(); renderHud(); },
         waitForHudArt: (ms) => scene.waitForHudArt(ms),
+        probeClockSunToken() {
+            const C = typeof window !== 'undefined' ? window.SmileClockArc : null;
+            if (!ART.clock || !C) {
+                return { ok: false, reason: 'missing-clock', hasArtClock: !!ART.clock, hasSmileClockArc: !!C };
+            }
+            const tok = C.clockTokenState(state.gardenMinutes);
+            const fr = C.tokenFrameXY(tok.sunDeg);
+            const d = ART.clock.display;
+            const scale = ART.clock.display.w / ART.clock.framePixels[0];
+            const center = { x: d.cx - d.w / 2 + fr.x * scale, y: d.cy - d.h / 2 + fr.y * scale };
+            scene.draw(performance.now() / 1000);
+            const pixel = scene.sampleBackdrop ? scene.sampleBackdrop(center.x, center.y) : { a: 0 };
+            return {
+                ok: true,
+                gardenMinutes: state.gardenMinutes,
+                center,
+                deg: tok.sunDeg,
+                sunAlpha: tok.sunAlpha,
+                pixel,
+            };
+        },
         async previewBedtimeGlow() {
             scene.setLighting('night');
             document.body.dataset.lighting = 'night';
