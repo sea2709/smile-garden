@@ -87,4 +87,4 @@ See **`assets/stake-manifest.json`** and staking section in `renderer/art.js` (`
 ## Tests & captures
 
 - `npm test` — `tags art matches assets/tags-manifest.json`
-- `npm run screenshots:tags` — tag/card/soil doc shots (tomato partial, complete + soil, resting leaf, night)
+- `npm run screenshots:tags` — tag/card/soil doc shots (`needs-card-tomato-partial-day.png`, `needs-card-tomato-partial-night.png`, complete + soil, resting leaf, night tag)
