@@ -142,8 +142,16 @@
         let gardenClockLabel = '';
         let bedtimeGlow = 0;
         let bedtimeDark = 0;
-        const seasonParticles = [];
-        for (let i = 0; i < 12; i++) seasonParticles.push(newSeasonParticle(true));
+        const SP = typeof window !== 'undefined' ? window.SmileSeasonParticles : null;
+        const seasonParticleEngine = SP && ART.seasons && ART.seasons.particlePools
+            ? SP.createEngine({
+                width: ART.width,
+                height: ART.height,
+                pools: ART.seasons.particlePools,
+                count: 12,
+                seed: 42,
+            })
+            : null;
         let plots = new Array(8).fill(null);   // { plantId, stage, ready?, pickedSprite? }
         let decorPlacements = {}; // spotId -> decorId
         const harvestAnims = []; // { plot, plantId, t0, pull }
@@ -238,8 +246,10 @@
         }
 
         function setSeason(s) {
-            season = s || 'spring';
-            for (let i = 0; i < seasonParticles.length; i++) seasonParticles[i] = newSeasonParticle(true);
+            const next = s || 'spring';
+            if (next === season) return;
+            season = next;
+            if (seasonParticleEngine) seasonParticleEngine.setSeason(next);
         }
 
         function logoLayerAlphas() {
@@ -294,29 +304,10 @@
         }
 
         function particlePool() {
+            if (seasonParticleEngine) return seasonParticleEngine.particlePool();
             const pools = ART.seasons && ART.seasons.particlePools;
-            if (!pools) return [];
-            const nightW = overlayNightWeight();
-            if (season === 'spring') return pools.spring;
-            if (season === 'autumn') return pools.autumn;
-            if (season === 'winter') return pools.winter;
-            if (season === 'summer') return nightW > 0.55 ? pools.summerNight : pools.summerDay;
-            return [];
-        }
-
-        function newSeasonParticle(anywhere) {
-            const pool = particlePool();
-            const sprite = pool.length ? pool[Math.floor(rnd() * pool.length)] : null;
-            return {
-                sprite,
-                x: rnd() * ART.width,
-                y: anywhere ? rnd() * ART.height * 0.72 : -20 - rnd() * 40,
-                vx: (rnd() - 0.5) * 22,
-                vy: 12 + rnd() * 22,
-                rot: rnd() * TAU,
-                vr: (rnd() - 0.5) * 2.5,
-                ph: rnd() * TAU,
-            };
+            if (!pools || !SP) return [];
+            return SP.particlePool(season, overlayNightWeight(), pools);
         }
 
         function setDecor(decorState) {
@@ -557,17 +548,9 @@
         }
 
         function updateSeasonParticles(dt, t) {
-            if (!particlePool().length) return;
-            const wind = Math.sin(t * 0.35) * 10;
-            for (let i = 0; i < seasonParticles.length; i++) {
-                const p = seasonParticles[i];
-                p.x += (p.vx + wind) * dt;
-                p.y += p.vy * dt;
-                p.rot += p.vr * dt;
-                if (p.y > ART.height * 0.78 || p.x < -40 || p.x > ART.width + 40) {
-                    seasonParticles[i] = newSeasonParticle(false);
-                }
-            }
+            if (!seasonParticleEngine) return;
+            seasonParticleEngine.setNightWeight(overlayNightWeight());
+            seasonParticleEngine.update(dt, t);
         }
 
         function drawSeasonParticleFallback(p) {
@@ -596,13 +579,13 @@
         }
 
         function drawSeasonParticles(t) {
-            if (!ART.seasons || !particlePool().length) return;
+            if (!ART.seasons || !seasonParticleEngine || !particlePool().length) return;
             const scale = ART.seasons.particleScale || 0.5;
             const disp = 64 * scale;
             const nightW = overlayNightWeight();
             ctx.save();
             ctx.globalAlpha = 0.55 + 0.35 * (1 - nightW);
-            for (const p of seasonParticles) {
+            for (const p of seasonParticleEngine.particles) {
                 const img = p.sprite ? particleImgs[p.sprite] : null;
                 if (ready(img)) {
                     ctx.save();
