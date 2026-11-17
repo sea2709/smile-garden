@@ -20,4 +20,4 @@ Heily repainted plant stages **2–5** and **picked** without the painted soil m
 
 ![Night spot-check (back row, stage 2)](plant-center-night.png)
 
-Handoff: `./scripts/apply-plants-handoff.sh /path/to/plants-nomound.zip`
+Handoff (final): `./scripts/apply-plants-handoff.sh /path/to/plants-centered.zip`
