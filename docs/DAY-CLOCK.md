@@ -16,8 +16,11 @@ Smile Garden replaces the one-off “visit” loop with an in-game day that runs
 
 ## Art hooks
 
-- `ART.ui.clock` — optional painted HUD clock (procedural arc today).
-- `ART.seasonOverlays` — optional painted season layers over the backdrop (procedural placeholders in `scene.js` until Heily drops assets).
+Full contract in `docs/ART-NEEDED.md` (paths registered in `renderer/art.js`):
+
+- **Clock** — `assets/ui/clock-frame-{day|night}.png` (320×128 @2x → 160×64 at backdrop 640,40), `clock-sun.png` / `clock-moon.png` on the arc.
+- **Seasons** — `assets/seasons/{season}-{day|night}.png` full-frame overlays; `particle-{petal|leaf|snow}.png` drift above plants.
+- **Bedtime** — `ui/bedtime-window-glow.png`; **morning** — `ui/morning-card.png` (~700×600) for the overnight reveal.
 
 ## Screenshots
 
