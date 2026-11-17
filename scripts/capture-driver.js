@@ -33,6 +33,25 @@ async function run(win, outDir) {
         fs.writeFileSync(path.join(outDir, name), img.toPNG());
         console.log('[capture] wrote', name, img.getSize());
     }
+    async function breathUiShot(name, state, rateText, countDone, total) {
+        const n = total || 4;
+        await js(`(() => {
+            document.getElementById('breath-guide').hidden = false;
+            const el = document.getElementById('breath-rate');
+            el.hidden = false;
+            el.dataset.state = ${JSON.stringify(state)};
+            el.textContent = ${JSON.stringify(rateText)};
+            const bc = document.getElementById('breath-count');
+            bc.textContent = '';
+            for (let i = 0; i < ${n}; i++) {
+                const d = document.createElement('i');
+                if (i < ${countDone}) d.className = 'on';
+                bc.appendChild(d);
+            }
+        })()`);
+        await sleep(400);
+        await shot(name);
+    }
     const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(2000); };
 
     await waitFor('ready', (d) => d.ready === '1');
@@ -73,7 +92,10 @@ async function run(win, outDir) {
     await shot('06-breathing-choice.png');
     await js(`document.getElementById('btn-breathe-start').click()`);
     await waitFor('breathing', (d) => d.step === 'breathe', 5000);
-    await sleep(10200); // second breath, mid in-breath
+    await breathUiShot('07a-breath-rate-warming.png', 'warming', 'Listening for your breath…', 0);
+    await breathUiShot('07b-breath-rate-settling.png', 'settling', 'Settling… ~5.8 breaths/min', 2);
+    await breathUiShot('07c-breath-rate-stable.png', 'stable', '6.1 breaths/min', 3);
+    await sleep(6200);
     await shot('07-breathing-step.png');
     await waitFor('2 breaths', (d) => Number(d.breath) >= 2, 30000);
     await js(`document.getElementById('btn-skip').click()`);

@@ -150,13 +150,6 @@ body[data-step="breathe"] .ring-fg, body[data-step="breathe-offer"] .ring-fg { s
     box-shadow: 0 0 60px rgba(255, 248, 210, 0.55); }
 .breath-halo { width: 300px; height: 300px; border: 2px solid rgba(255, 250, 225, 0.75); box-shadow: 0 0 30px rgba(255, 248, 210, 0.45), inset 0 0 30px rgba(255, 248, 210, 0.35); }
 .breath-word { position: relative; font-family: var(--serif); font-size: 30px; font-weight: 600; color: #3d4a2c; text-shadow: 0 1px 10px rgba(255, 252, 235, 0.95); }
-.breath-sub { font-size: 15px; font-weight: 800; color: var(--ink); background: rgba(251, 245, 230, 0.85); padding: 4px 14px; border-radius: 999px; }
-.breath-rate { font-size: 13.5px; font-weight: 800; color: var(--sage-dark); background: rgba(251, 245, 230, 0.88); padding: 4px 14px; border-radius: 999px; letter-spacing: 0.01em; }
-.breath-rate[data-state="warming"], .breath-rate[data-state="settling"] { color: var(--ink-soft); font-weight: 700; }
-.breath-rate[data-state="stable"] { color: var(--sage-dark); }
-.breath-count { display: flex; gap: 7px; }
-.breath-count i { width: 12px; height: 12px; border-radius: 50%; background: rgba(255, 250, 235, 0.6); border: 1px solid rgba(125, 154, 91, 0.5); }
-.breath-count i.on { background: radial-gradient(circle at 35% 35%, #dbe6b2, #7f9a4a); }
 .breath-safety { max-width: 380px; font-size: 13px; font-weight: 700; color: var(--ink); background: rgba(251, 245, 230, 0.8); padding: 6px 12px; border-radius: 12px; }
 
 /* ---------- idle bar, tips, floats ---------- */
