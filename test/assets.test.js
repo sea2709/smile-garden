@@ -76,18 +76,40 @@ test('decoration art and per-spot scale', () => {
     }
 });
 
+const CRITTER_FILES = {
+    'butterfly-monarch': 'butterfly-monarch-strip.png',
+    'butterfly-white': 'butterfly-white-strip.png',
+    bee: 'bee-strip.png',
+};
+
+function critterManifestEntries(manifest) {
+    if (manifest.strips) {
+        return Object.entries(manifest.strips).map(([key, spec]) => [key, spec]);
+    }
+    return Object.entries(manifest)
+        .filter(([key]) => CRITTER_FILES[key])
+        .map(([key, spec]) => [key, {
+            file: CRITTER_FILES[key],
+            frameW: spec.size[0],
+            frameH: spec.size[1],
+            fps: spec.fps,
+            frames: spec.frames,
+        }]);
+}
+
 test('critter strips and day backdrops without painted insects', () => {
     assert.ok(ART.critters);
     const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'critters', 'manifest.json'), 'utf8'));
-    for (const [key, spec] of Object.entries(manifest.strips)) {
+    for (const [key, spec] of critterManifestEntries(manifest)) {
         assert.ok(ART.critters.strips[key], `art critters ${key}`);
         assert.equal(ART.critters.strips[key].frameW, spec.frameW);
+        assert.equal(ART.critters.strips[key].fps, spec.fps);
         assert.ok(fs.existsSync(path.join(root, 'assets', 'critters', spec.file)), spec.file);
         const buf = fs.readFileSync(path.join(root, 'assets', 'critters', spec.file));
         const w = buf.readUInt32BE(16);
         const Cmod = require('../game/critters.js');
         const frames = Cmod.stripFrameCount(w, spec.frameW);
-        assert.equal(frames, key === 'bee' ? 4 : 8, `${key} frame count`);
+        assert.equal(frames, spec.frames, `${key} frame count`);
     }
     for (const day of ['dawn', 'midday', 'golden-hour']) {
         assert.ok(ART.backgrounds[day].endsWith('.png'), day);
