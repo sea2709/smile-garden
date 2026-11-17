@@ -203,6 +203,22 @@
         document.body.dataset.gardenV = '5';
     }
 
+    function syncHudChipClamp() {
+        if (document.body.dataset.paintedClock !== '1') {
+            document.documentElement.style.removeProperty('--hud-chips-max');
+            return;
+        }
+        const H = typeof window !== 'undefined' ? window.SmileHudLayout : null;
+        if (!H) return;
+        const keep = H.clockKeepOutClientRect(window.innerWidth, window.innerHeight);
+        const chips = document.querySelector('.topbar .chips');
+        if (!chips) return;
+        const chipLeft = chips.getBoundingClientRect().left;
+        const pad = 6;
+        const maxW = Math.floor(Math.max(96, keep.left - chipLeft - pad));
+        document.documentElement.style.setProperty('--hud-chips-max', `${maxW}px`);
+    }
+
     function renderHud() {
         const now = clock.now();
         if (state.version >= 5) {
@@ -251,6 +267,7 @@
         document.body.dataset.planted = String(sc.planted);
         document.body.dataset.mature = String(sc.mature);
         els.devDay.textContent = clock.offsetDays ? `+${clock.offsetDays} day${clock.offsetDays > 1 ? 's' : ''}` : 'today';
+        syncHudChipClamp();
     }
 
     const meterImgs = {};
@@ -1568,6 +1585,7 @@
             refreshLighting();
         }
         document.body.dataset.ready = '1';
+        window.addEventListener('resize', syncHudChipClamp);
     }
 
     // Dev/test hooks (used by scripts/capture-driver.js; harmless otherwise).
@@ -1626,25 +1644,19 @@
         clearSeasonOverride() { hudSeasonOverride = false; syncGardenSeasonFromDay(); renderHud(); },
         waitForHudArt: (ms) => scene.waitForHudArt(ms),
         probeClockSunToken() {
-            const C = typeof window !== 'undefined' ? window.SmileClockArc : null;
-            if (!ART.clock || !C) {
-                return { ok: false, reason: 'missing-clock', hasArtClock: !!ART.clock, hasSmileClockArc: !!C };
-            }
-            const tok = C.clockTokenState(state.gardenMinutes);
-            const fr = C.tokenFrameXY(tok.sunDeg);
-            const d = ART.clock.display;
-            const scale = ART.clock.display.w / ART.clock.framePixels[0];
-            const center = { x: d.cx - d.w / 2 + fr.x * scale, y: d.cy - d.h / 2 + fr.y * scale };
             scene.draw(performance.now() / 1000);
-            const pixel = scene.sampleBackdrop ? scene.sampleBackdrop(center.x, center.y) : { a: 0 };
-            return {
-                ok: true,
-                gardenMinutes: state.gardenMinutes,
-                center,
-                deg: tok.sunDeg,
-                sunAlpha: tok.sunAlpha,
-                pixel,
-            };
+            return scene.probeClockSunToken();
+        },
+        probeClockMoonToken() {
+            scene.draw(performance.now() / 1000);
+            return scene.probeClockMoonToken();
+        },
+        syncHudChipClamp,
+        auditHudLayout() {
+            syncHudChipClamp();
+            const H = typeof window !== 'undefined' ? window.SmileHudLayout : null;
+            if (!H) return { ok: false, reason: 'missing-hud-layout' };
+            return H.auditHudLayoutInDocument();
         },
         async previewBedtimeGlow() {
             scene.setLighting('night');

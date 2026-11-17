@@ -80,11 +80,10 @@ test('clock arc places sun token at 6:00, noon, and 18:00', () => {
     expectSunAt(at(18, 0), 33, false);
     const night = C.clockTokenState(at(21, 0));
     assert.ok(night.moonAlpha > 0.9 && night.sunAlpha < 0.1);
-    const moonAlong = 147 + (33 - 147) * 0.25;
-    assert.ok(Math.abs(night.moonDeg - moonAlong) < 0.05, `moonDeg ${night.moonDeg} at 21:00`);
+    assert.ok(Math.abs(night.moonDeg - 33) < 0.05, `moon at right end at 21:00`);
     const moon = C.tokenFrameXY(night.moonDeg);
-    const expMoon = C.tokenFrameXY(moonAlong);
-    assert.ok(Math.abs(moon.x - expMoon.x) < tol && Math.abs(moon.y - expMoon.y) < tol);
+    const moonRest = C.tokenFrameXY(33);
+    assert.ok(Math.abs(moon.x - moonRest.x) < tol && Math.abs(moon.y - moonRest.y) < tol);
 });
 
 test('season particle pools distinguish spring, summer day, and summer night', () => {

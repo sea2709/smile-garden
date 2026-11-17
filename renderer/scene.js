@@ -1508,8 +1508,27 @@
             };
         }
 
+        function probeClockMoonToken() {
+            const CARC = typeof window !== 'undefined' ? window.SmileClockArc : null;
+            if (!ART.clock || !CARC) return { ok: false, reason: 'missing-clock' };
+            const tok = CARC.clockTokenState(gardenClockMinutes);
+            const fr = CARC.tokenFrameXY(tok.moonDeg);
+            const center = clockPointFromFrame(fr.x, fr.y);
+            const pixel = sampleBackdrop(center.x, center.y);
+            return {
+                ok: true,
+                gardenClockMinutes,
+                center,
+                deg: tok.moonDeg,
+                moonAlpha: tok.moonAlpha,
+                moonReady: ready(clockMoonImg),
+                moonNatural: clockMoonImg ? clockMoonImg.naturalWidth : 0,
+                pixel,
+            };
+        }
+
         return { resize, update, draw, setLighting, setLightingBlend, setSeason, setGardenClock, setBedtimeGlow, setBedtimeDark, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
-            waitForHudArt, hudArtReady, sampleBackdrop, probeClockSunToken,
+            waitForHudArt, hudArtReady, sampleBackdrop, probeClockSunToken, probeClockMoonToken,
             get lighting() { return lighting; },
             get reducedMotion() { return reducedMotion; },
             setReducedMotion(v) { reducedMotion = !!v; },

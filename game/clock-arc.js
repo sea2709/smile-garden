@@ -53,8 +53,7 @@
             sunAlpha = 1 - t;
             moonAlpha = t;
         } else {
-            const t = Math.min(1, (hour - 18) / 12);
-            moonDeg = startDeg + (endDeg - startDeg) * t;
+            moonDeg = endDeg;
             moonAlpha = 1;
         }
 

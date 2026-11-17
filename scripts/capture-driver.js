@@ -16,6 +16,24 @@ async function runTimeArt(win, outDir) {
     const wc = win.webContents;
     const js = (code) => wc.executeJavaScript(code, true);
     const G = (expr) => js(`(() => { const g = window.__smileGarden; return ${expr}; })()`);
+    const assertHudLayouts = async (widths) => {
+        const list = widths || [1280, 1100, 960];
+        for (const w of list) {
+            win.setMinimumSize(720, 640);
+            win.setContentSize(w, 800);
+            await sleep(450);
+            await waitHud();
+            const r = await G('g.auditHudLayout()');
+            if (!r || !r.ok) {
+                console.warn('[capture] hud layout @', w, JSON.stringify(r));
+                throw new Error(`HUD overlaps painted clock at width ${w}`);
+            }
+            console.log('[capture] hud layout ok @', w);
+        }
+        win.setContentSize(1280, 800);
+        await sleep(300);
+        await waitHud();
+    };
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     const waitHud = async () => {
         const t0 = Date.now();
@@ -63,6 +81,7 @@ async function runTimeArt(win, outDir) {
     await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
     await sleep(800);
     await waitHud();
+    await assertHudLayouts([1280, 1100, 960]);
     await frame(async () => {
         await G('g.clearSeasonOverride()');
         await G('g.setGardenTime(6 * 60)');
@@ -84,8 +103,14 @@ async function runTimeArt(win, outDir) {
     await shot('clock-sunset-6pm.png');
     await shotTopBar2x('topbar-dusk-6pm-2x.png');
     await frame(async () => { await G('g.setGardenTime(22 * 60)'); });
+    const probeNight = await G('g.probeClockMoonToken()');
+    if (!probeNight || !probeNight.ok || probeNight.moonAlpha < 0.9 || (probeNight.pixel && probeNight.pixel.a < 48)) {
+        console.warn('[capture] clock moon probe', JSON.stringify(probeNight));
+        throw new Error('moon token not visible on canvas at 22:00 (probe failed)');
+    }
     await shot('clock-night.png');
     await shotTopBar2x('topbar-night-2x.png');
+    await assertHudLayouts([1280, 1100, 960]);
     for (const [season, name] of [['spring', 'season-spring.png'], ['summer', 'season-summer.png'], ['autumn', 'season-autumn.png'], ['winter', 'season-winter.png']]) {
         await frame(async () => {
             await G(`g.setSeason('${season}')`);
