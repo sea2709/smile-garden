@@ -28,4 +28,4 @@ Authoritative file list: **`assets/time-manifest.json`** (wired in `renderer/art
 xvfb-run -a npm run screenshots
 ```
 
-Captures include `clock-{dawn,noon,dusk,night}.png`, `season-*.png`, `bedtime-window-glow.png`, `morning-card.png`, and `logo-{day,night}-full.png` under `docs/`.
+Captures include `clock-dawn.png`, `clock-noon.png`, `clock-dusk.png`, `clock-night.png`, `season-*.png`, `bedtime-window-glow.png`, `morning-card.png`, `logo-{day,night}-full.png`, and `topbar-*-2x.png` under `docs/`.

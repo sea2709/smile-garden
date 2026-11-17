@@ -85,6 +85,19 @@ test('clock arc places sun token at 6:00, noon, and 18:00', () => {
     assert.ok(Math.abs(moon.x - moonRest.x) < tol && Math.abs(moon.y - moonRest.y) < tol);
 });
 
+test('season particle pools distinguish spring, summer day, and summer night', () => {
+    const vm = require('vm');
+    const fs = require('fs');
+    const path = require('path');
+    const sandbox = { window: {} };
+    vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'renderer', 'art.js'), 'utf8'), sandbox);
+    const pools = sandbox.window.SmileArt.seasons.particlePools;
+    assert.ok(pools.spring.includes('petal-1') && !pools.spring.includes('pollen'));
+    assert.equal(pools.summerDay.join(','), 'seed-fluff,pollen');
+    assert.equal(pools.summerNight.join(','), 'firefly');
+    assert.ok(!pools.summerDay.includes('petal-1'));
+});
+
 test('persistence round-trips garden clock fields', () => {
     const s = V.createState(new Date());
     s.dayNumber = 9;

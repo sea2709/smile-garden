@@ -16,7 +16,7 @@
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub', 'meter-sun', 'meter-water', 'meter-fert',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-count', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-count', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -42,7 +42,23 @@
         try { localStorage.setItem(STORE_KEY, V.serializeState(state)); } catch (e) { console.warn('[smile-garden] save failed', e); }
     }
 
+    function artUrl(rel) {
+        try { return new URL(rel, window.location.href).href; } catch { return rel; }
+    }
     const scene = window.SmileScene.createScene(els.garden);
+    if (ART.ui && els.brandLogoDay) {
+        els.brandLogoDay.src = artUrl(ART.ui.logoDay);
+        els.brandLogoNight.src = artUrl(ART.ui.logoNight);
+        const markBrand = () => {
+            if ((els.brandLogoDay.complete && els.brandLogoDay.naturalWidth) ||
+                (els.brandLogoNight.complete && els.brandLogoNight.naturalWidth)) {
+                document.body.dataset.canvasLogo = '1';
+            }
+        };
+        els.brandLogoDay.addEventListener('load', markBrand);
+        els.brandLogoNight.addEventListener('load', markBrand);
+        if (els.brandLogoDay.complete) markBrand();
+    }
     const trace = new L.SmileTrace({ windowSec: 10, capacity: 480 });
     let screen = 'loading';
     let session = null;
@@ -53,6 +69,8 @@
     let currentDay = clock.today();
     let lighting = 'midday';
     let devOpen = false;
+    /** When true, HUD season stays on `state.season` (demo capture); otherwise it tracks `dayNumber`. */
+    let hudSeasonOverride = false;
 
     const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', faceGoneAt: 0 };
 
@@ -165,12 +183,24 @@
         scene.setSeason(state.season);
     }
 
+    function syncGardenSeasonFromDay() {
+        if (state.version < 5 || hudSeasonOverride) return;
+        const canonical = D.seasonForDayNumber(state.dayNumber);
+        if (state.season !== canonical) {
+            state.season = canonical;
+            state.seasonDay = D.seasonDayNumber(state.dayNumber);
+            scene.setSeason(state.season);
+        }
+    }
+
     function syncGardenClockHud() {
         if (state.version < 5) return;
+        syncGardenSeasonFromDay();
         const seasonLabel = D.SEASON_LABELS[state.season] || state.season;
         const label = `Day ${state.dayNumber} · ${seasonLabel} · ${D.formatGardenTime(state.gardenMinutes)}`;
         scene.setGardenClock(state.gardenMinutes, label);
         if (els.gardenClock) els.gardenClock.hidden = true;
+        document.body.dataset.gardenV = '5';
     }
 
     function renderHud() {
@@ -845,6 +875,7 @@
         }
         scene.setBedtimeGlow(0);
         scene.setBedtimeDark(0);
+        hudSeasonOverride = false;
         const night = V.goToBed(state, clock.now());
         state.morningPending = null;
         save();
@@ -1422,7 +1453,12 @@
         }
         scene.update(dt, t);
         scene.draw(t);
-        document.body.dataset.canvasLogo = scene.logoOnCanvas ? '1' : '0';
+        const brandPainted = els.brandLogoDay && els.brandLogoDay.complete && els.brandLogoDay.naturalWidth > 0;
+        const logoVisible = scene.logoOnCanvas || brandPainted;
+        document.body.dataset.canvasLogo = logoVisible ? '1' : '0';
+        if (state.version >= 5 && els.brandLogoDay) {
+            if (els.brandFallback) els.brandFallback.hidden = logoVisible;
+        }
         renderMeters();
         const chartOn = state.settings.chart && screen === 'visit';
         if (els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;
@@ -1486,6 +1522,11 @@
         } else {
             show(state.wellnessAck ? 'idle' : 'wellness');
         }
+        if (state.version >= 5) {
+            document.body.dataset.gardenV = '5';
+            scene.setSeason(state.season);
+            refreshLighting();
+        }
         document.body.dataset.ready = '1';
     }
 
@@ -1494,7 +1535,8 @@
         get state() { return state; },
         get session() { return session; },
         get screen() { return screen; },
-        clock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness,
+        get scene() { return scene; },
+        clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness,
         plant: (id, plot) => plant(id, plot),
         begin: () => (screen === 'greeting' || screen === 'idle' ? beginVisit() : null),
         skip: () => {
@@ -1513,18 +1555,35 @@
         show,
         toggleDev,
         makeAllReady: () => { V.makeAllReady(state); save(); plotsForScene({ instant: true }); renderHud(); },
-        reset() { localStorage.removeItem(STORE_KEY); state = V.createState(new Date()); clock.offsetDays = 0; plotsForScene({ instant: true }); renderHud(); },
+        reset() {
+            localStorage.removeItem(STORE_KEY);
+            hudSeasonOverride = false;
+            state = V.createState(new Date());
+            clock.offsetDays = 0;
+            plotsForScene({ instant: true });
+            scene.setSeason(state.season);
+            refreshLighting();
+            renderHud();
+            document.body.dataset.gardenV = state.version >= 5 ? '5' : '4';
+        },
         setGardenTime(m) {
             state.version = 5;
             state.gardenMinutes = D.clampMinutes(m);
+            gardenClock.pause();
             refreshLighting();
             renderHud();
         },
         setSeason(season) {
+            if (!D.SEASONS.includes(season)) return;
+            hudSeasonOverride = true;
             state.season = season;
+            state.seasonDay = Math.min(D.DAYS_PER_SEASON, Math.max(1, state.seasonDay || 1));
             scene.setSeason(season);
+            refreshLighting();
             renderHud();
         },
+        clearSeasonOverride() { hudSeasonOverride = false; syncGardenSeasonFromDay(); renderHud(); },
+        waitForHudArt: (ms) => scene.waitForHudArt(ms),
         async previewBedtimeGlow() {
             scene.setLighting('night');
             document.body.dataset.lighting = 'night';

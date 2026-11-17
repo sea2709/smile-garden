@@ -17,13 +17,41 @@ async function runTimeArt(win, outDir) {
     const js = (code) => wc.executeJavaScript(code, true);
     const G = (expr) => js(`(() => { const g = window.__smileGarden; return ${expr}; })()`);
     const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const waitHud = async () => {
+        const t0 = Date.now();
+        while (Date.now() - t0 < 35000) {
+            const ok = await G('g.waitForHudArt(800)');
+            const canvasLogo = await js("document.body.dataset.canvasLogo");
+            const brandW = await js("(() => { const i = document.getElementById('brand-logo-day'); return i && i.naturalWidth; })()");
+            if (ok && canvasLogo === '1' && brandW > 0) return;
+            await sleep(150);
+        }
+        throw new Error('timeout waiting for HUD art (logo/clock)');
+    };
     const shot = async (name) => {
-        await sleep(200);
+        await waitHud();
+        await sleep(250);
         const img = await wc.capturePage();
         fs.writeFileSync(path.join(outDir, name), img.toPNG());
         console.log('[capture] wrote', name, img.getSize());
     };
-    const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(2000); };
+    const shotTopBar2x = async (name) => {
+        await waitHud();
+        const bounds = await G(`(() => ({ w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio || 1 }))()`);
+        const barH = 56;
+        const rect = { x: 0, y: 0, width: bounds.w, height: barH };
+        let img = await wc.capturePage(rect);
+        if (bounds.dpr < 2) {
+            const { nativeImage } = require('electron');
+            const resized = nativeImage.createFromBuffer(img.toPNG()).resize({ width: bounds.w * 2, height: barH * 2 });
+            fs.writeFileSync(path.join(outDir, name), resized.toPNG());
+        } else {
+            fs.writeFileSync(path.join(outDir, name), img.toPNG());
+        }
+        console.log('[capture] wrote', name, '(top bar)');
+    };
+    const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(2000); await waitHud(); };
+    const frame = async (fn) => { await fn(); await waitHud(); await sleep(350); };
     const t0 = Date.now();
     while (Date.now() - t0 < 60000) {
         const ready = await js("document.body.dataset.ready === '1'");
@@ -31,30 +59,37 @@ async function runTimeArt(win, outDir) {
         await sleep(120);
     }
     await G('g.reset()');
+    await G('gardenClock.pause()');
     await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
     await sleep(800);
-    await G('g.setGardenTime(6 * 60)');
-    await G(`g.setSeason('spring')`);
-    await G(`g.show('idle')`);
-    await sleep(1200);
-    await shot('clock-dawn-6am.png');
-    await G('g.setGardenTime(12 * 60)');
-    await sleep(900);
+    await waitHud();
+    await frame(async () => {
+        await G('g.clearSeasonOverride()');
+        await G('g.setGardenTime(6 * 60)');
+        await G(`g.show('idle')`);
+    });
+    await shot('clock-dawn.png');
+    await frame(async () => { await G('g.setGardenTime(12 * 60)'); });
     await shot('clock-noon.png');
-    await G('g.setGardenTime(17 * 60 + 45)');
-    await sleep(900);
+    await shotTopBar2x('topbar-noon-2x.png');
+    await frame(async () => { await G('g.setGardenTime(17 * 60 + 45)'); });
     await shot('clock-dusk.png');
-    await G('g.setGardenTime(22 * 60)');
-    await sleep(900);
+    await frame(async () => { await G('g.setGardenTime(18 * 60)'); });
+    await shot('clock-sunset-6pm.png');
+    await frame(async () => { await G('g.setGardenTime(22 * 60)'); });
     await shot('clock-night.png');
     for (const [season, name] of [['spring', 'season-spring.png'], ['summer', 'season-summer.png'], ['autumn', 'season-autumn.png'], ['winter', 'season-winter.png']]) {
-        await G(`g.setSeason('${season}')`);
-        await G('g.setGardenTime(12 * 60)');
-        await sleep(1100);
+        await frame(async () => {
+            await G(`g.setSeason('${season}')`);
+            const mins = season === 'summer' ? 22 * 60 : 12 * 60;
+            await G(`g.setGardenTime(${mins})`);
+        });
         await shot(name);
     }
-    await G('g.setGardenTime(22 * 60)');
-    await G(`g.setSeason('summer')`);
+    await frame(async () => {
+        await G('g.setGardenTime(22 * 60)');
+        await G(`g.setSeason('summer')`);
+    });
     await G('g.previewBedtimeGlow()');
     await sleep(300);
     await shot('bedtime-window-glow.png');
@@ -63,14 +98,22 @@ async function runTimeArt(win, outDir) {
     await sleep(1200);
     await shot('morning-card.png');
     await G(`g.show('idle')`);
-    await G('g.setGardenTime(12 * 60)');
-    await lightingTo('midday');
-    await sleep(1000);
+    await frame(async () => {
+        await G('g.clearSeasonOverride()');
+        await G('g.setGardenTime(12 * 60)');
+        await lightingTo('midday');
+    });
     await shot('logo-day-full.png');
-    await lightingTo('night');
-    await G('g.setGardenTime(22 * 60)');
-    await sleep(1000);
+    await shotTopBar2x('topbar-logo-day-2x.png');
+    await frame(async () => {
+        await lightingTo('night');
+        await G('g.setGardenTime(22 * 60)');
+    });
     await shot('logo-night-full.png');
+    await shotTopBar2x('topbar-logo-night-2x.png');
+    const legacyDawn = path.join(outDir, 'clock-dawn.png');
+    const legacyAlias = path.join(outDir, 'clock-dawn-6am.png');
+    if (fs.existsSync(legacyDawn)) fs.copyFileSync(legacyDawn, legacyAlias);
 }
 
 async function run(win, outDir) {
