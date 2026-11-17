@@ -14,7 +14,7 @@
     'use strict';
     const ART = window.SmileArt;
     const L = window.SmileLogic;
-    const C = window.SmileCareNeeds;
+    const Care = window.SmileCareNeeds;
     const TAU = Math.PI * 2;
 
     function loadImage(src) {
@@ -1241,7 +1241,7 @@
             const fh = (fb[3] - fb[1]) * sf;
             const needs = L.plantNeeds(pl.plantId);
             const prog = pl.tagProgress || { sun: 0, water: 0, fertilizer: 0, stake: false };
-            const allMet = pl.careAllMet || (C && C.allNeedsMet(prog, needs, pl.staked));
+            const allMet = pl.careAllMet || (Care && Care.allNeedsMet(prog, needs, pl.staked));
             if (allMet) {
                 const im = needsFaceImgs[`bloom-${kind}`];
                 if (ready(im)) {
@@ -1260,7 +1260,7 @@
                 }
                 return;
             }
-            const keys = ['sun', 'water', 'fertilizer', 'stake'].filter((k) => C.dotsForNeed(needs, k) > 0);
+            const keys = ['sun', 'water', 'fertilizer', 'stake'].filter((k) => Care.dotsForNeed(needs, k) > 0);
             const iconPx = (ART.needs.tagFaceIconPx || 48) * sf;
             const gap = keys.length > 1 ? (fw - keys.length * iconPx) / (keys.length + 1) : (fw - iconPx) / 2;
             keys.forEach((key, idx) => {
@@ -1268,9 +1268,9 @@
                 const iy = fy0 + 4 * sf;
                 const im = needsFaceImgs[`${key}-${kind}`];
                 if (ready(im)) ctx.drawImage(im, ix, iy, iconPx, iconPx);
-                const req = C.dotsForNeed(needs, key);
+                const req = Care.dotsForNeed(needs, key);
                 const got = key === 'stake'
-                    ? (C.stakeNeedMet(prog, pl.staked) ? 1 : 0)
+                    ? (Care.stakeNeedMet(prog, pl.staked) ? 1 : 0)
                     : Math.min(req, Math.floor((Number(prog[key]) || 0) + 1e-6));
                 const dotPx = (ART.needs.tagFaceDotPx || 16) * sf;
                 const dotY = iy + iconPx + 3 * sf;

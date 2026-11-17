@@ -1,5 +1,6 @@
 // game/day.js — Stardew-style in-game day clock, seasons, overnight growth.
 'use strict';
+(function () {
 
 const SEASONS = Object.freeze(['spring', 'summer', 'autumn', 'winter']);
 const SEASON_LABELS = Object.freeze({ spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' });
@@ -258,3 +259,5 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.SmileDay = api;
 }
+
+})();

@@ -328,6 +328,8 @@
             ringFullNight: '../assets/ui/stretch/ring-full-night.png',
             ringStripDay: '../assets/ui/stretch/ring-day-strip.png',
             ringStripNight: '../assets/ui/stretch/ring-night-strip.png',
+            ringFramesDay: '../assets/ui/stretch/ring-day-frames/',
+            ringFramesNight: '../assets/ui/stretch/ring-night-frames/',
             ringFrames: 12,
             ringFrameDisplay: Object.freeze([200, 200]),
             ringOffsetInGuide: Object.freeze([-20, 12]),

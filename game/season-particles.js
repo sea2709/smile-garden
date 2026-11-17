@@ -1,5 +1,6 @@
 // game/season-particles.js — drifting season particles (pool pick, reseed rules, night swap).
 'use strict';
+(function () {
 
 const TAU = Math.PI * 2;
 const NIGHT_POOL_THRESHOLD = 0.55;
@@ -153,3 +154,5 @@ if (typeof module !== 'undefined' && module.exports) {
 if (typeof window !== 'undefined') {
     window.SmileSeasonParticles = api;
 }
+
+})();

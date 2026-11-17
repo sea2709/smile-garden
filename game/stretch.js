@@ -1,5 +1,6 @@
 // game/stretch.js — neck-stretch detector from face landmarks (head roll).
 'use strict';
+(function () {
 
 const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
@@ -254,3 +255,5 @@ if (typeof self !== 'undefined') {
 } else if (typeof window !== 'undefined') {
     window.SmileStretch = api;
 }
+
+})();

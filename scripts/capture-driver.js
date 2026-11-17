@@ -12,6 +12,37 @@ const { app } = require('electron');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+async function waitTagPixels(wc, spotKey) {
+    const spot = await wc.executeJavaScript(`(() => {
+        const ART = window.SmileArt;
+        const s = ART && ART.needs && ART.needs.tagSpots['${spotKey}'];
+        return s ? { x: s.anchor[0], y: s.anchor[1] } : null;
+    })()`, true);
+    if (!spot) throw new Error('tag spot missing');
+    const buf = await wc.capturePage();
+    const { nativeImage } = require('electron');
+    const img = nativeImage.createFromBuffer(buf.toPNG());
+    const { width: w, height: h } = img.getSize();
+    const data = img.toBitmap();
+    const sx = Math.round((w / 1280) * spot.x);
+    const sy = Math.round((h / 720) * spot.y);
+    let nonWood = 0;
+    for (let dy = -8; dy <= 8; dy++) {
+        for (let dx = -8; dx <= 8; dx++) {
+            const x = sx + dx;
+            const y = sy + dy;
+            if (x < 0 || y < 0 || x >= w || y >= h) continue;
+            const off = (y * w + x) * 4;
+            const b = data[off];
+            const g = data[off + 1];
+            const r = data[off + 2];
+            if (r + g + b > 55 && !(r > 175 && g > 130 && b < 110)) nonWood++;
+        }
+    }
+    if (nonWood < 6) throw new Error(`tag pixels weak at ${spotKey} (${nonWood})`);
+    return nonWood;
+}
+
 async function runTimeArt(win, outDir) {
     const wc = win.webContents;
     const js = (code) => wc.executeJavaScript(code, true);
@@ -176,35 +207,36 @@ async function runTagsArt(win, outDir) {
     await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
     await sleep(700);
     await lightingTo('midday');
-    const safe = async (label, fn) => {
-        try { await fn(); } catch (e) { console.warn('[capture] tags:', label, e.message); }
-    };
-    await safe('plant', () => G(`g.plant('tomato', 2)`));
-    try {
-        await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
-        await sleep(500);
-        await shot('needs-card-tomato-partial-day.png');
-    } catch (e) {
-        console.warn('[capture] partial needs card skipped:', e.message);
-    }
-    await safe('idle', () => js(`window.__smileGarden.show('idle')`));
-    await safe('complete', () => js(`window.__smileGarden.prepTagGardenDemo('complete')`));
-    await sleep(1200);
+    const planted = await G('g.prepCaptureGarden()');
+    if (!planted || planted < 3) throw new Error(`prepCaptureGarden planted ${planted}`);
+    await sleep(1600);
+    await G(`g.prepTagGardenDemo('partial')`);
+    await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
+    await sleep(600);
+    await shot('needs-card-tomato-partial-day.png');
+    await G(`g.show('idle')`);
+    await G(`g.prepTagGardenDemo('complete')`);
+    await sleep(1400);
+    await waitTagPixels(wc, 'bed3');
     await shot('needs-tag-complete-soil-day.png');
-    await safe('resting', () => js(`window.__smileGarden.prepTagGardenDemo('resting')`));
-    await sleep(900);
+    await G(`g.prepTagGardenDemo('resting')`);
+    await sleep(1000);
+    await waitTagPixels(wc, 'bed3');
     await shot('needs-tag-resting-morning-day.png');
     await lightingTo('night');
-    await safe('night', () => js(`window.__smileGarden.prepTagGardenDemo('complete')`));
-    await sleep(900);
+    await G(`g.prepTagGardenDemo('complete')`);
+    await sleep(1200);
+    await waitTagPixels(wc, 'bed3');
     await shot('needs-tag-night.png');
-    try {
-        await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
-        await sleep(500);
-        await shot('needs-card-tomato-partial-night.png');
-    } catch (e) {
-        console.warn('[capture] partial needs card (night) skipped:', e.message);
-    }
+    await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
+    await sleep(600);
+    await shot('needs-card-tomato-partial-night.png');
+    await G(`g.show('idle')`);
+    await lightingTo('midday');
+    await G(`g.prepTagGardenDemo('garden')`);
+    await sleep(1400);
+    await waitTagPixels(wc, 'bed3');
+    await shot('needs-garden-tags-midday.png');
 }
 
 async function runStakeArt(win, outDir) {
@@ -230,21 +262,29 @@ async function runStakeArt(win, outDir) {
     await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
     await sleep(700);
     await lightingTo('midday');
+    await G('g.prepCaptureGarden()');
+    await sleep(900);
     await G(`g.setStretchHudDemo('left-hold')`);
-    await sleep(500);
+    await sleep(1200);
+    const ringSum = await js(`(() => {
+        const c = document.getElementById('stretch-ring-left');
+        if (!c) return 0;
+        const ctx = c.getContext('2d');
+        const d = ctx.getImageData(80, 80, 40, 40).data;
+        let sum = 0;
+        for (let i = 0; i < d.length; i += 4) sum += d[i] + d[i + 1] + d[i + 2];
+        return sum;
+    })()`);
+    if (ringSum < 800) throw new Error(`stretch vine ring empty (sum=${ringSum})`);
     await shot('stake-guide-tilted.png');
     await shot('stake-ring-midfill.png');
     await G('g.clearStretchHudDemo()');
     await G(`g.show('idle')`);
-    await G(`g.plant('tomato', 2)`);
-    await G('g.simulateDays(5)');
     await G('g.setStakedBed(2, true)');
-    await sleep(900);
+    await sleep(1200);
     await shot('garden-staked-tomato.png');
-    await G(`g.plant('sunflower', 0)`);
-    await G('g.simulateDays(14)');
-    await G('g.setStakedBed(0, true)');
-    await sleep(900);
+    await G('g.setStakedBed(6, true)');
+    await sleep(1200);
     await shot('garden-staked-sunflower.png');
 }
 
