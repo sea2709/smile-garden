@@ -130,6 +130,7 @@
                 tendedToday: D.plotTendedToday(state, i),
                 staked: !!p.staked,
                 careAllMet,
+                soilTended: !!(careAllMet || tendedAllMet),
                 tagResting: !!p.tagResting && !careAllMet && !tendedAllMet,
             };
         });

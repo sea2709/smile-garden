@@ -129,6 +129,13 @@
                 ringImgs.night[b] = loadImage(ART.selection.src('night', b - 1));
             }
         }
+        const tendedSoilImgs = { day: [], night: [] };
+        if (ART.tendedSoil) {
+            for (let b = 1; b <= 8; b++) {
+                tendedSoilImgs.day[b] = loadImage(resolveArt(ART.plantTendedSoilSrc('day', b - 1)));
+                tendedSoilImgs.night[b] = loadImage(resolveArt(ART.plantTendedSoilSrc('night', b - 1)));
+            }
+        }
         // one-shot absorb plays per plot: { kind, t0, i }
         const absorbs = [];
         const SPRITE_KINDS = { sun: 'sun', water: 'water', fert: 'fertilizer' };
@@ -1123,6 +1130,52 @@
             return pl.stage;
         }
 
+        function drawTendedSoil(i) {
+            const pl = plots[i];
+            if (!pl || !pl.soilTended) return;
+            const bed = ART.plots[i];
+            if (!bed) return;
+            const kind = lighting === 'night' ? 'night' : 'day';
+            const img = tendedSoilImgs[kind][i + 1];
+            const box = bed.box;
+            const bw = box[2] - box[0];
+            const bh = box[3] - box[1];
+            if (ready(img)) {
+                const ax = (ART.tendedSoil && ART.tendedSoil.anchor && ART.tendedSoil.anchor.x) || 0.5;
+                const ay = (ART.tendedSoil && ART.tendedSoil.anchor && ART.tendedSoil.anchor.y) || 1;
+                const w = img.naturalWidth;
+                const h = img.naturalHeight;
+                const dispW = bw;
+                const dispH = (h / w) * dispW;
+                const dx = bed.x - dispW * ax;
+                const dy = bed.y - dispH * ay;
+                ctx.save();
+                ctx.globalAlpha = lighting === 'night' ? 0.88 : 0.92;
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.drawImage(img, 0, 0, w, h, dx, dy, dispW, dispH);
+                ctx.restore();
+                return;
+            }
+            ctx.save();
+            roundRect(ctx, box[0], box[1], bw, bh, 10);
+            ctx.clip();
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.fillStyle = lighting === 'night' ? 'rgba(42, 68, 52, 0.38)' : 'rgba(62, 42, 26, 0.32)';
+            ctx.fillRect(box[0], box[1], bw, bh);
+            const gloss = ctx.createLinearGradient(box[0], box[1], box[0], box[3]);
+            gloss.addColorStop(0, 'rgba(255, 248, 235, 0.14)');
+            gloss.addColorStop(0.45, 'rgba(255, 255, 255, 0)');
+            gloss.addColorStop(1, 'rgba(30, 20, 10, 0.1)');
+            ctx.globalCompositeOperation = 'soft-light';
+            ctx.fillStyle = gloss;
+            ctx.fillRect(box[0], box[1], bw, bh);
+            ctx.restore();
+        }
+
+        function drawTendedSoils() {
+            for (let i = 0; i < ART.plots.length; i++) drawTendedSoil(i);
+        }
+
         function drawSelectionRing(i, t) {
             if (!ART.selection || tendPlot !== i) return;
             const bed = i + 1;
@@ -1507,6 +1560,7 @@
             drawBackdrop();
             drawDecorations(t);
             drawSunShafts(t);
+            drawTendedSoils();
             drawPlants(t);
             drawSeasonParticles(t);
             drawCritters(t);

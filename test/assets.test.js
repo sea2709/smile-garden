@@ -164,6 +164,9 @@ test('stretch UI art: manifest paths, css, and art spec doc', () => {
     assert.ok(ART.needs.plantTag.includes('needs/'));
     assert.ok(ART.needs.bloomStamp.includes('bloom'));
     assert.ok(ART.needs.restingLeaf.includes('resting-leaf'));
+    assert.ok(ART.tendedSoil);
+    assert.ok(ART.plantTendedSoilSrc('day', 0).includes('tended-soil-day-bed1'));
+    assert.ok(ART.plantTendedSoilSrc('night', 7).includes('tended-soil-night-bed8'));
     assert.ok(fs.existsSync(path.join(root, 'renderer', 'needs-ui.css')));
     assert.ok(ART.stretch);
     assert.ok(ART.stretch.guideSunflower.includes('stretch/'));

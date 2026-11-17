@@ -11,6 +11,24 @@ All source art **2×**; game displays at **1×** unless noted. Paths and anchors
 | Fertilizer | ~15 s guided breath |
 | Stake | one completed neck stretch (persists until harvest) |
 
+## Tended soil (damp bed, all needs met today)
+
+Shown when a bed’s **tag is complete** for the garden day (`dailyTends[plot].allMet` or live session progress). **Clears each morning** when `dailyTends` resets at bedtime. Plants never change sprite for incomplete care; **no withering** on season change.
+
+| Asset | Path pattern |
+|-------|----------------|
+| Day, beds 1–8 | `assets/plots/tended-soil-day-bed{N}.png` |
+| Night, beds 1–8 | `assets/plots/tended-soil-night-bed{N}.png` |
+
+- **Anchor (`tendedSoil.anchor` in `art.js`):** **(0.5, 1)** — bottom-centre on `ART.plots[i].x` / `.y` (soil centroid, same as plant stake line).
+- **Display width:** match `ART.plots[i].box` width (backdrop px); height scales from painted aspect.
+- **Source (2×):** width = `2 × (box[2] − box[0])`, height = `2 × (box[3] − box[1])` per bed (see `art.js` `plots[]` boxes).
+- **Clip region (code fallback):** `plots[i].box` rounded rect; darker **multiply** + soft gloss; no red, no droop.
+
+Example bed 1 box clip: x 266–435, y 338–396 (1280×720).
+
+---
+
 ## Wooden plant tag
 
 | Asset | Path |

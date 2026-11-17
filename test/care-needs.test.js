@@ -123,6 +123,34 @@ test('tagResting clears at next bedtime even if needs still incomplete', () => {
     assert.equal(s.plots[0].tagResting, true, 'still resting after another night without growth');
 });
 
+test('plotTendedToday (damp soil) is allMet only and clears after bedtime', () => {
+    const d = new Date(2026, 10, 16);
+    const s = V.createState(d);
+    V.plantSeed(s, 0, 'lettuce', d);
+    const needs = L.plantNeeds('lettuce');
+    assert.equal(D.plotTendedToday(s, 0), false);
+    V.applyVisit(s, {
+        careMode: true,
+        careBeds: [{
+            plot: 0,
+            progress: { sun: needs.sun, water: 1, fertilizer: 0, stake: false },
+            allMet: false,
+        }],
+    }, d);
+    assert.equal(D.plotTendedToday(s, 0), false);
+    V.applyVisit(s, {
+        careMode: true,
+        careBeds: [{
+            plot: 0,
+            progress: { sun: needs.sun, water: needs.water, fertilizer: needs.fertilizer, stake: false },
+            allMet: true,
+        }],
+    }, d);
+    assert.equal(D.plotTendedToday(s, 0), true);
+    V.goToBed(s, d);
+    assert.equal(D.plotTendedToday(s, 0), false);
+});
+
 test('morning reset clears daily tends', () => {
     const s = V.createState(new Date(2026, 10, 16));
     s.dailyTends[0] = { day: 1, sun: 2, water: 1, fertilizer: 0, allMet: false };

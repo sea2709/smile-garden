@@ -185,6 +185,20 @@
             return '../assets/effects/harvest-' + kind + '-strip.png';
         },
         basketHud: Object.freeze({ x: 1195, y: 68, w: 36, h: 36 }),
+        tendedSoil: Object.freeze({
+            /** Per-bed damp soil overlay (day/night); anchor on plot soil centroid (plots[].x/y). */
+            src(kind, bedIndex) {
+                const b = Math.max(1, Math.min(8, Math.round(Number(bedIndex) || 0) + 1));
+                return '../assets/plots/tended-soil-' + (kind === 'night' ? 'night' : 'day') + '-bed' + b + '.png';
+            },
+            /** Bottom-centre of overlay aligns to ART.plots[i].x / .y (same as plant soil anchor). */
+            anchor: Object.freeze({ x: 0.5, y: 1 }),
+            /** Clip to plots[i].box when using code fallback (backdrop px). */
+        }),
+        plantTendedSoilSrc(lighting, bedIndex) {
+            const kind = lighting === 'night' ? 'night' : 'day';
+            return this.tendedSoil.src(kind, bedIndex);
+        },
         needs: Object.freeze({
             scale2x: true,
             plantTag: '../assets/ui/needs/plant-tag.png',
