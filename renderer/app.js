@@ -16,7 +16,7 @@
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub', 'meter-sun', 'meter-water', 'meter-fert',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-sunflower', 'stretch-ring-left', 'stretch-ring-right', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-sunflower', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -474,8 +474,8 @@
         talk: { title: 'Talk: water', text: 'Tell this plant about your day, out loud or in a whisper. Talking fills its watering can.' },
         'breathe-offer': { title: 'Calm breaths: fertilizer', text: 'Optional. A few soft breaths through your nose give the beds a little fertilizer, which only speeds growth.' },
         breathe: { title: 'Breathe with the light', text: 'Follow the glow: in as it grows, out as it fades. No holding, no straining.' },
-        'stretch-offer': { title: 'Neck stretch: stake the plant', text: 'Optional. Tip each ear toward a shoulder and hold briefly — like giving the plant a gentle stake. Skip anytime; your visit still counts.' },
-        stretch: { title: 'Easy neck stretch', text: 'Tilt toward one shoulder (~15°) and hold about 3 seconds, then the other. Order does not matter.' },
+        'stretch-offer': { title: 'Stake this plant', text: 'Optional neck stretch — tip each ear toward a shoulder and hold briefly, like setting a gentle stake. Skip anytime.' },
+        stretch: { title: 'Neck stretch', text: 'Tilt toward one shoulder (~15°) and hold about 3 seconds, then the other. Order does not matter.' },
     };
     const TALK_PROMPTS = ['What made you smile today?', 'Tell the tomatoes about your morning.', 'What are you looking forward to?',
         'Describe the weather where you are.', 'Say hello to each bed.', 'What would you cook with this harvest?'];
@@ -571,6 +571,10 @@
             s.classList.toggle('done', i < idx);
         });
         if (step === 'summary') { finishVisit(); return; }
+        const stretchCare = step === 'stretch-offer' || step === 'stretch';
+        document.body.dataset.stretchCare = stretchCare ? '1' : '0';
+        els.stretchCarePanel.hidden = !stretchCare;
+        if (stretchCare) renderStretchCarePanel(step);
         const copy = STEP_COPY[step] || STEP_COPY.smile;
         const who = selectedPlantLabel();
         els.stepTitle.textContent = step === 'pick' ? copy.title : (who ? `${copy.title} · ${who}` : copy.title);
@@ -611,18 +615,13 @@
             const skip = mkBtn('Finish visit', 'btn btn-ghost', () => { onStep(session.go('summary')); });
             skip.id = 'btn-skip';
             box.append(skip, go);
-        } else if (step === 'stretch-offer') {
-            const skip = mkBtn(session.hasMorePlants() ? 'Next plant' : 'Skip stretch', 'btn btn-ghost', () => { onStep(session.skip()); });
-            skip.id = 'btn-skip';
-            const go = mkBtn('Try a neck stretch', 'btn btn-primary', () => { onStep(session.startStretch()); });
-            go.id = 'btn-stretch-start';
-            box.append(skip, go);
-        } else if (step === 'stretch') {
-            const skip = mkBtn('Skip', 'btn btn-ghost', () => { onStep(session.skip()); });
-            skip.id = 'btn-skip';
-            const done = mkBtn('I stretched', 'btn btn-soft', () => { onStep(session.confirmStretchManual()); });
-            done.id = 'btn-stretch-done';
-            box.append(skip, done);
+            if (session.selectedPlantNeedsStake()) {
+                const stake = mkBtn('Neck stretch (stake)', 'btn btn-soft', () => { onStep(session.launchStretchCare('pick')); });
+                stake.id = 'btn-stretch-launch';
+                box.append(stake);
+            }
+        } else if (step === 'stretch-offer' || step === 'stretch') {
+            /* actions rendered in stretch-care-panel */
         } else if (step === 'breathe-offer') {
             const group = document.createElement('div');
             group.className = 'opt-group';
@@ -668,6 +667,30 @@
         b.type = 'button'; b.className = cls; b.textContent = text;
         b.addEventListener('click', fn);
         return b;
+    }
+
+    function renderStretchCarePanel(step) {
+        if (!els.stretchCareActions || !session) return;
+        const copy = STEP_COPY[step] || STEP_COPY.stretch;
+        const who = selectedPlantLabel();
+        els.stretchCareTitle.textContent = who ? `${copy.title} · ${who}` : copy.title;
+        els.stretchCareText.textContent = copy.text;
+        els.stretchCareLive.textContent = step === 'stretch' && session.stretchSnap && session.stretchSnap.complete
+            ? 'Lovely — your plant is staked for harvest.'
+            : '';
+        const box = els.stretchCareActions;
+        box.innerHTML = '';
+        const back = mkBtn('Back to plant', 'btn btn-ghost', () => { onStep(session.skipStretchCare()); });
+        back.id = 'btn-stretch-back';
+        if (step === 'stretch-offer') {
+            const go = mkBtn('Start neck stretch', 'btn btn-primary', () => { onStep(session.startStretchCare()); });
+            go.id = 'btn-stretch-start';
+            box.append(back, go);
+        } else {
+            const done = mkBtn('I stretched', 'btn btn-primary', () => { onStep(session.completeStretchCare()); });
+            done.id = 'btn-stretch-done';
+            box.append(back, done);
+        }
     }
     function renderBreathCount(done) {
         if (breathHudDemoLock) return;
@@ -802,10 +825,13 @@
             document.body.dataset.hint = '';
         }
         const side = snap.activeSide;
-        els.stepLive.textContent = snap.complete ? 'Lovely — your plant is staked for harvest.'
+        const live = snap.complete ? 'Lovely — your plant is staked for harvest.'
             : side === 'left' ? 'Hold toward your left shoulder…'
                 : side === 'right' ? 'Hold toward your right shoulder…'
                     : 'Tip each ear toward a shoulder and hold gently.';
+        els.stepLive.textContent = live;
+        if (els.stretchCareLive) els.stretchCareLive.textContent = live;
+        renderStretchCarePanel('stretch');
     }
 
     function updateVisit(dt, t) {
@@ -1757,6 +1783,18 @@
             return step;
         },
         startBreathing: (o) => session && session.startBreathing(o || {}),
+        launchStretchCare(returnStep) {
+            if (!session) return null;
+            const step = session.launchStretchCare(returnStep || 'pick');
+            onStep(step);
+            return step;
+        },
+        skipStretchCare() {
+            if (!session) return null;
+            const step = session.skipStretchCare();
+            onStep(step);
+            return step;
+        },
         show,
         toggleDev,
         makeAllReady: () => { V.makeAllReady(state); save(); plotsForScene({ instant: true }); renderHud(); },
@@ -1847,6 +1885,8 @@
             stretchDemoSnap = modes[mode] || modes['left-hold'];
             show('visit');
             document.body.dataset.step = 'stretch';
+            document.body.dataset.stretchCare = '1';
+            els.stretchCarePanel.hidden = false;
             const copy = STEP_COPY.stretch;
             els.stepTitle.textContent = copy.title;
             els.stepText.textContent = copy.text;

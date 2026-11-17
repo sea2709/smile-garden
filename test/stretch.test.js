@@ -64,7 +64,26 @@ test('visit offers stretch only for plants that need a stake', () => {
     const tomato = new V.VisitSession({ plots: [{ plantId: 'tomato', stage: 2, sunBank: 0 }], plantedBeds: [0] });
     tomato.selectedPlot = 0;
     tomato.go('breathe-offer');
-    assert.equal(tomato.skip(), 'stretch-offer');
+    assert.equal(tomato.skip(), 'summary', 'breath no longer chains stretch by default');
+    tomato.go('pick');
+    assert.equal(tomato.launchStretchCare('pick'), 'stretch-offer');
+    assert.equal(tomato.skipStretchCare(), 'pick');
+    assert.equal(tomato.launchStretchCare('pick'), 'stretch-offer');
+    tomato.startStretchCare();
+    assert.equal(tomato.completeStretchCare(), 'pick');
+});
+
+test('maybeChainStretchAfterBreathing is the single breath→stretch rewire point', () => {
+    const tomato = new V.VisitSession({ plots: [{ plantId: 'tomato', stage: 2, sunBank: 0 }], plantedBeds: [0] });
+    tomato.selectedPlot = 0;
+    tomato.go('breathe-offer');
+    const prev = V.chainStretchAfterBreath;
+    try {
+        V.chainStretchAfterBreath = true;
+        assert.equal(tomato.skip(), 'stretch-offer');
+    } finally {
+        V.chainStretchAfterBreath = prev;
+    }
 });
 
 test('lighting-style refresh without season change keeps stretch sample positions', () => {

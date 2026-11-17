@@ -62,3 +62,49 @@ body[data-step="stretch"] .ring-wrap { display: none; }
 body[data-step="stretch-offer"] .ring-wrap { display: none; }
 body[data-step="stretch"] #stretch-guide { display: block; }
 body[data-step="stretch-offer"] #stretch-guide { display: none; }
+
+.stretch-care-panel {
+    position: absolute;
+    left: 50%;
+    bottom: 108px;
+    transform: translateX(-50%);
+    width: min(420px, 92vw);
+    padding: 18px 20px 16px;
+    z-index: 32;
+    box-shadow: 0 12px 36px rgba(48, 32, 12, 0.18);
+}
+.stretch-care-tag {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--ink-soft);
+    margin-bottom: 6px;
+}
+.stretch-care-head h2 {
+    margin: 0 0 8px;
+    font-size: 22px;
+}
+.stretch-care-text {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.45;
+    color: var(--ink-soft);
+}
+.stretch-care-sub {
+    margin: 12px 0 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--ink);
+    min-height: 1.2em;
+}
+.stretch-care-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+body[data-stretch-care="1"] #step-panel { display: none !important; }
+body[data-stretch-care="1"] #stretch-care-panel { display: block; }

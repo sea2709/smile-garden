@@ -699,6 +699,9 @@
     // ------------------------------------------------------------------
     const STEPS = Object.freeze(['greeting', 'pick-harvest', 'harvest-hold', 'pick', 'smile', 'talk', 'breathe-offer', 'breathe', 'stretch-offer', 'stretch', 'summary']);
 
+    /** When true, maybeChainStretchAfterBreathing() opens stretch after breath (rewire hook). */
+    let chainStretchAfterBreath = false;
+
     function emptyBedTally() {
         return {
             smileWeighted: 0, smileSecondsRaw: 0, talkSecondsRaw: 0,
@@ -765,6 +768,9 @@
             if (!Stretch && typeof globalThis !== 'undefined') Stretch = globalThis.SmileStretch;
             this.stretchFlow = Stretch ? Stretch.createStretchFlow() : null;
             this.stretchSnap = { leftProgress: 0, rightProgress: 0, rollDeg: 0, needsFaceHint: false };
+            /** @type {'pick'|'summary'|'advance'|string} */
+            this._stretchReturnStep = 'pick';
+            this._stretchAfterBreathChained = false;
         }
 
         bedInfo(plot) {
@@ -781,9 +787,54 @@
             return L.plantNeedsStake(p && p.plantId);
         }
 
-        /** After breathing (or skipping it), offer stretch only for climbing/tall crops. */
-        _goAfterBreathing() {
-            return this.selectedPlantNeedsStake() ? this.go('stretch-offer') : this.advanceToNextPlant();
+        isStretchCareStep() {
+            return this.step === 'stretch-offer' || this.step === 'stretch';
+        }
+
+        /**
+         * Standalone neck-stretch / stake care for the selected stake-eligible plant.
+         * @param {string} [returnStep='pick'] step to resume after skip/complete
+         */
+        launchStretchCare(returnStep) {
+            if (!this.selectedPlantNeedsStake()) return this.step;
+            this._stretchAfterBreathChained = false;
+            this._stretchReturnStep = returnStep || 'pick';
+            return this.go('stretch-offer');
+        }
+
+        startStretchCare() {
+            return this.startStretch();
+        }
+
+        skipStretchCare() {
+            if (!this.isStretchCareStep()) return this.step;
+            this.live.stretchSkipped = true;
+            this._saveLiveToTally();
+            return this._endStretchCare();
+        }
+
+        completeStretchCare() {
+            if (this.step !== 'stretch') return this.step;
+            this.live.stretchDone = true;
+            this._saveLiveToTally();
+            return this._endStretchCare();
+        }
+
+        _endStretchCare() {
+            if (this._stretchAfterBreathChained) return this.advanceToNextPlant();
+            const back = this._stretchReturnStep || 'pick';
+            if (back === 'advance') return this.advanceToNextPlant();
+            if (back === 'summary') return this.go('summary');
+            return this.go(back);
+        }
+
+        /** Single rewire point: optional stretch offer immediately after breathing. */
+        maybeChainStretchAfterBreathing() {
+            if (!chainStretchAfterBreath) return this.advanceToNextPlant();
+            if (!this.selectedPlantNeedsStake()) return this.advanceToNextPlant();
+            this._stretchAfterBreathChained = true;
+            this._stretchReturnStep = null;
+            return this.go('stretch-offer');
         }
 
         _syncLiveFromTally() {
@@ -994,19 +1045,14 @@
             if (this.step === 'pick') return this.confirmPick();
             if (this.step === 'smile') return this.go('talk');
             if (this.step === 'talk') return this.go('breathe-offer');
-            if (this.step === 'breathe-offer') return this._goAfterBreathing();
+            if (this.step === 'breathe-offer') return this.maybeChainStretchAfterBreathing();
             if (this.step === 'breathe') {
                 this.breathSkipped = true;
                 this.live.breathSkipped = true;
                 this._saveLiveToTally();
-                return this._goAfterBreathing();
+                return this.maybeChainStretchAfterBreathing();
             }
-            if (this.step === 'stretch-offer') return this.advanceToNextPlant();
-            if (this.step === 'stretch') {
-                this.live.stretchSkipped = true;
-                this._saveLiveToTally();
-                return this.advanceToNextPlant();
-            }
+            if (this.step === 'stretch-offer' || this.step === 'stretch') return this.skipStretchCare();
             return this.step;
         }
 
@@ -1017,15 +1063,12 @@
         }
 
         startStretch() {
-            if (!this.selectedPlantNeedsStake()) return this.advanceToNextPlant();
+            if (!this.selectedPlantNeedsStake()) return this._endStretchCare();
             return this.go('stretch');
         }
 
         confirmStretchManual() {
-            if (this.step !== 'stretch') return this.step;
-            this.live.stretchDone = true;
-            this._saveLiveToTally();
-            return this.advanceToNextPlant();
+            return this.completeStretchCare();
         }
 
         update(dt, input) {
@@ -1066,16 +1109,12 @@
                 this.live.breathsDone = this.breathsDone;
                 if (this.breathT >= this.pacer.total) {
                     this._saveLiveToTally();
-                    this._goAfterBreathing();
+                    this.maybeChainStretchAfterBreathing();
                 }
             } else if (this.step === 'stretch' && this.stretchFlow) {
                 const snap = this.stretchFlow.update(step, input && input.stretch ? input.stretch : {});
                 this.stretchSnap = snap;
-                if (snap.complete) {
-                    this.live.stretchDone = true;
-                    this._saveLiveToTally();
-                    this.advanceToNextPlant();
-                }
+                if (snap.complete) this.completeStretchCare();
             }
             const ev = this.events;
             this.events = [];
@@ -1192,6 +1231,8 @@
         emptyPlots, plantedCount, matureCount, score, plantSeed, weeklyVisits, visitedToday, applyVisit,
         applyOvernightGrowth, goToBed,
         clampBreaths, BreathPacer, VisitSession, waitingText, simulateDays,
+        get chainStretchAfterBreath() { return chainStretchAfterBreath; },
+        set chainStretchAfterBreath(v) { chainStretchAfterBreath = !!v; },
         neighborPlot, movePlotSelection, plantedPlotIndices, firstPlantedPlot, perBedStepSeconds, visitBedResults,
         advanceRegrowPlots, applySessionHarvests, newUnlocksAfterHarvest,
     }, {
