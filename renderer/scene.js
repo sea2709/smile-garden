@@ -40,10 +40,18 @@
         if (ART.decor) for (const id of ART.decor.ids) {
             decorImgs[id] = { day: loadImage(ART.decor.src(id, 'day')), night: loadImage(ART.decor.src(id, 'night')) };
         }
-        const harvestStrip = { day: null, night: null };
-        if (ART.harvestFx) {
-            harvestStrip.day = loadImage(ART.harvestFxSrc('day'));
-            harvestStrip.night = loadImage(ART.harvestFxSrc('night'));
+        const readyStrips = { day: null, night: null };
+        const harvestStrips = {};
+        const basketImg = (ART.produce && ART.produce.basket) ? loadImage(ART.produce.basket) : null;
+        if (ART.harvest) {
+            readyStrips.day = loadImage(ART.readyStripSrc('day'));
+            readyStrips.night = loadImage(ART.readyStripSrc('night'));
+            for (const id of ART.harvest.plantIds) {
+                harvestStrips[id] = {
+                    day: loadImage(ART.harvestStripSrc(id, 'day')),
+                    night: loadImage(ART.harvestStripSrc(id, 'night')),
+                };
+            }
         }
 
         const fxImgs = {};
@@ -68,7 +76,7 @@
         let lightFade = 1;
         let plots = new Array(8).fill(null);   // { plantId, stage, ready?, pickedSprite? }
         let decorPlacements = {}; // spotId -> decorId
-        const harvestFlies = []; // { plot, plantId, t0, dur }
+        const harvestAnims = []; // { plot, plantId, t0, pull }
         let basketFlash = 0;
         const anims = new Array(8).fill(null); // stage / plant transitions
         const swayPhase = ART.plots.map((_, i) => i * 1.7 + 0.4);
@@ -368,10 +376,41 @@
         function resolveSprite(id, stage) {
             if (stage === 'picked') {
                 const pi = pickedImgs[id];
-                if (ready(pi)) return { img: pi, meta: ART.plants[id].stages[3] };
-                return { img: plantImgs[id] && plantImgs[id][4], meta: ART.plants[id].stages[3] };
+                const meta = (ART.plants[id] && ART.plants[id].picked)
+                    || (ART.plants[id] && ART.plants[id].stages[3]);
+                if (ready(pi)) return { img: pi, meta };
+                return { img: plantImgs[id] && plantImgs[id][4], meta };
             }
             return { img: plantImgs[id] && plantImgs[id][stage], meta: ART.plants[id] && ART.plants[id].stages[stage - 1] };
+        }
+
+        function harvestAnimFrame(anim, now) {
+            const H = ART.harvest;
+            if (!H || !anim) return -1;
+            return Math.floor((now - anim.t0) * H.fps);
+        }
+
+        function activeHarvestAnim(plot) {
+            const now = performance.now() / 1000;
+            for (const a of harvestAnims) {
+                if (a.plot !== plot) continue;
+                const f = harvestAnimFrame(a, now);
+                if (f >= 0 && f < ART.harvest.harvestCount) return a;
+            }
+            return null;
+        }
+
+        function drawHarvestFrame(i, frame, img, alpha) {
+            const H = ART.harvest;
+            if (!ready(img) || !H || alpha <= 0.01) return;
+            const p = ART.plots[i];
+            const s = p.w / 180;
+            ctx.save();
+            ctx.globalAlpha = Math.min(1, alpha);
+            ctx.translate(p.x, p.y - 4);
+            ctx.scale(s, s);
+            ctx.drawImage(img, frame * H.frameW, 0, H.frameW, H.frameH, -H.frameW / 2, -H.soilY, H.frameW, H.frameH);
+            ctx.restore();
         }
 
         function drawSprite(id, stage, i, t, alpha, scaleMul) {
@@ -408,9 +447,17 @@
             'golden-hour': 'sepia(0.20) saturate(1.08) brightness(0.98)',
             night: 'brightness(0.58) saturate(0.62) hue-rotate(8deg) contrast(0.95)',
         };
-        function drawReadyTwinkle(i, t) {
+        function drawReadyLoop(i, t) {
             const pl = plots[i];
-            if (!pl || !pl.ready) return;
+            if (!pl || !pl.ready || activeHarvestAnim(i)) return;
+            const H = ART.harvest;
+            const kind = lighting === 'night' ? 'night' : 'day';
+            const img = readyStrips[kind];
+            if (ready(img) && H) {
+                const frame = Math.floor(t * H.fps + i * 2) % H.readyCount;
+                drawHarvestFrame(i, frame, img, 1);
+                return;
+            }
             const p = ART.plots[i];
             const tw = 0.55 + 0.45 * Math.sin(t * 3.2 + i * 0.7);
             ctx.save();
@@ -423,12 +470,6 @@
             ctx.beginPath();
             ctx.ellipse(p.x, p.y - 36, p.w * 0.85, p.h * 1.1, 0, 0, TAU);
             ctx.fill();
-            for (let k = 0; k < 4; k++) {
-                const a = t * 1.8 + k * (TAU / 4) + i;
-                const rx = p.x + Math.cos(a) * p.w * 0.55;
-                const ry = p.y - 70 + Math.sin(a) * 14;
-                glowDot(rx, ry, 2.2 + tw, [255, 244, 200], 0.5 * tw);
-            }
             ctx.restore();
         }
 
@@ -474,69 +515,62 @@
             return (ART.produce && ART.produce.placeholder && ART.produce.placeholder[id]) || '#c4a574';
         }
 
-        function playHarvestAnim(plot, plantId) {
-            harvestFlies.push({ plot, plantId, t0: performance.now() / 1000, dur: 1.1 });
+        function playHarvestAnim(plot, plantId, opts) {
+            const o = opts || {};
+            const pull = o.pull === true;
+            harvestAnims.push({ plot, plantId, t0: performance.now() / 1000, pull });
             basketFlash = 1;
         }
 
-        function drawHarvestFlies(t) {
+        function drawHarvestAnims() {
+            const H = ART.harvest;
+            if (!H) return;
             const now = performance.now() / 1000;
-            const bx = ART.basketHud.x;
-            const by = ART.basketHud.y;
-            for (let i = harvestFlies.length - 1; i >= 0; i--) {
-                const h = harvestFlies[i];
-                const k = (now - h.t0) / h.dur;
-                if (k >= 1) { harvestFlies.splice(i, 1); continue; }
-                const p = ART.plots[h.plot];
-                const x0 = p.x;
-                const y0 = p.y - 120;
-                const ease = easeInOut(k);
-                const arc = Math.sin(Math.PI * k) * 90;
-                const x = x0 + (bx - x0) * ease;
-                const y = y0 + (by - y0) * ease - arc;
-                const col = produceColor(h.plantId);
-                ctx.save();
-                ctx.globalCompositeOperation = 'lighter';
-                glowDot(x, y, 10, [255, 240, 200], 0.35 * (1 - k * 0.3));
-                ctx.fillStyle = col;
-                ctx.strokeStyle = 'rgba(60, 40, 20, 0.45)';
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.arc(x, y, 12 + 4 * (1 - k), 0, TAU);
-                ctx.fill();
-                ctx.stroke();
-                ctx.font = '800 11px Nunito, sans-serif';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillStyle = '#fffaf0';
-                ctx.fillText((h.plantId[0] || '?').toUpperCase(), x, y + 0.5);
-                ctx.restore();
+            const kind = lighting === 'night' ? 'night' : 'day';
+            for (let n = harvestAnims.length - 1; n >= 0; n--) {
+                const a = harvestAnims[n];
+                const f = harvestAnimFrame(a, now);
+                if (f >= H.harvestCount) { harvestAnims.splice(n, 1); continue; }
+                if (f < 0) continue;
+                const pack = harvestStrips[a.plantId];
+                const img = pack && pack[kind];
+                if (ready(img)) drawHarvestFrame(a.plot, f, img, 1);
             }
-            if (basketFlash > 0) basketFlash = Math.max(0, basketFlash - 0.03);
+            if (basketFlash > 0) basketFlash = Math.max(0, basketFlash - 0.04);
         }
 
         function drawBasketIcon(t) {
             const b = ART.basketHud;
-            const pulse = basketFlash > 0 ? basketFlash : 0.15 + 0.05 * Math.sin(t * 1.5);
+            const pulse = basketFlash > 0 ? basketFlash : 0.1;
+            if (ready(basketImg)) {
+                const w = b.w || 36;
+                ctx.save();
+                ctx.globalAlpha = 0.85 + 0.15 * pulse;
+                ctx.drawImage(basketImg, b.x - w / 2, b.y - w / 2, w, w);
+                ctx.restore();
+                return;
+            }
             ctx.save();
             ctx.translate(b.x, b.y);
             ctx.fillStyle = 'rgba(90, 60, 30, 0.85)';
-            ctx.strokeStyle = 'rgba(40, 28, 12, 0.5)';
-            ctx.lineWidth = 2;
             ctx.beginPath();
-            ctx.moveTo(-16, 6);
-            ctx.quadraticCurveTo(-18, -8, 0, -10);
-            ctx.quadraticCurveTo(18, -8, 16, 6);
-            ctx.lineTo(14, 14);
-            ctx.quadraticCurveTo(0, 20, -14, 14);
-            ctx.closePath();
+            ctx.arc(0, 0, 14, 0, TAU);
             ctx.fill();
-            ctx.stroke();
-            if (pulse > 0.2) {
-                ctx.globalCompositeOperation = 'lighter';
-                glowDot(0, 2, 14, [255, 220, 150], 0.25 * pulse);
-            }
             ctx.restore();
+        }
+
+        function plantSpriteStage(pl, plotIndex) {
+            const H = ART.harvest;
+            const anim = activeHarvestAnim(plotIndex);
+            if (anim && H) {
+                const f = harvestAnimFrame(anim, performance.now() / 1000);
+                if (f >= H.swapFrame) {
+                    if (anim.pull) return null;
+                    return 'picked';
+                }
+            }
+            if (pl.pickedSprite) return 'picked';
+            return pl.stage;
         }
 
         function drawSelectionRing(i, t) {
@@ -565,7 +599,7 @@
                     if (tendPlot === i) drawSelectionRing(i, t);
                     continue;
                 }
-                drawReadyTwinkle(i, t);
+                drawReadyLoop(i, t);
                 if (tendPlot === i) drawSelectionRing(i, t);
                 const an = anims[i];
                 if (an) {
@@ -592,8 +626,8 @@
                     }
                     continue;
                 }
-                const st = pl.pickedSprite ? 'picked' : pl.stage;
-                drawSprite(pl.plantId, st, i, t, 1, 1);
+                const st = plantSpriteStage(pl, i);
+                if (st != null) drawSprite(pl.plantId, st, i, t, 1, 1);
             }
             ctx.filter = 'none';
         }
@@ -768,7 +802,7 @@
             drawPlants(t);
             drawEffectSprites(t);
             drawParticles(t);
-            drawHarvestFlies(t);
+            drawHarvestAnims();
             drawBasketIcon(t);
             drawVignette();
         }

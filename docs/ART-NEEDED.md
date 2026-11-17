@@ -1,77 +1,61 @@
-# Smile Garden — art drop-in list (harvests milestone)
+# Smile Garden — art inventory (harvests milestone)
 
-Paths are relative to `assets/`. The renderer loads each path from `renderer/art.js` and falls back to code-drawn placeholders when a file is missing.
+Paths are relative to `assets/`. The renderer loads from `renderer/art.js`.
 
-## Produce icons (pantry)
+## Shipped (designer deliverables)
 
-| Path | Size | Notes |
-|------|------|--------|
-| `produce/lettuce.png` | 128×128, transparent | Circle icon on pantry shelf |
-| `produce/mint.png` | 128×128 | |
-| `produce/cucumber.png` | 128×128 | |
-| `produce/tomato.png` | 128×128 | |
-| `produce/sunflower.png` | 128×128 | |
-| `produce/apple.png` | 128×128 | |
+### Harvest effect strips — `assets/harvest/`
 
-Manifest: `SmileArt.produce.src(id)`.
+| File | Frames | Loop | Notes |
+|------|--------|------|--------|
+| `ready-day-loop-strip.png` | 12 | yes | Ready-bed cue; 200×320/frame, soil y=282, 12 fps |
+| `ready-night-loop-strip.png` | 12 | yes | Night variant |
+| `harvest-<plant>-day-strip.png` | **16** | no | One-shot per plant |
+| `harvest-<plant>-night-strip.png` | **16** | no | `<plant>`: lettuce, mint, cucumber, tomato, sunflower, apple |
 
-## Picked plant sprites (regrow state)
+Manifest: `docs/harvest-manifest.json` (from design handoff). Basket is drawn in-frame at **(150, 286)** in strip space. Sprite swap at **frame 5** (pull → empty soil; regrow → `picked.png`).
 
-| Path | Notes |
-|------|--------|
-| `plants/lettuce/picked.png` | Same anchor scheme as `stage-*.png` (soil base in `art.js` stages) |
-| `plants/mint/picked.png` | Fallback: stage-4 sprite |
-| `plants/cucumber/picked.png` | |
-| `plants/tomato/picked.png` | |
-| `plants/apple-tree/picked.png` | |
-| `plants/sunflower/picked.png` | |
+### Produce & basket — `assets/produce/`
 
-Manifest: `SmileArt.plantPickedSrc(id)`.
+| File | Size | Use |
+|------|------|-----|
+| `<plant>.png` | 160px | Pantry tab, unlock popups |
+| `<plant>-64.png` | 64px | HUD / compact UI (reserved) |
+| `basket.png` | — | Top-bar harvest basket chip + canvas HUD fallback |
 
-## Harvest effect strip
+### Picked sprites — `assets/plants/<dir>/picked.png`
 
-| Path | Format |
-|------|--------|
-| `effects/harvest-day-strip.png` | 12 frames × 200×320 px, soil line y=282, 12 fps, bottom-centre on bed |
-| `effects/harvest-night-strip.png` | Same layout as other effect strips |
+| Plant | File | Canvas | Anchor (`picked` in `art.js`) |
+|-------|------|--------|-------------------------------|
+| tomato | `plants/tomato/picked.png` | 312×484 | base 475, top 16 (alpha bbox) |
+| mint | `plants/mint/picked.png` | 312×484 | base 475, top 35 |
+| cucumber | `plants/cucumber/picked.png` | 312×484 | base 475, top 16 |
+| apple | `plants/apple-tree/picked.png` | 312×484 | base 475, top 16 |
 
-Manifest: `SmileArt.harvestFx` + `harvestFxSrc('day'|'night')`. Until present: particle pop + fly to basket.
+Lettuce / sunflower are **pull** crops (no picked sprite; bed clears at harvest frame 5).
 
-## UI
+**Alignment note:** Mature **apple-tree** stage-5 art is **356×538** (base ~511) while `picked.png` is **312×484** (base 475). The stub may read slightly smaller on the bed until a size-matched picked asset ships.
 
-| Path | Notes |
-|------|--------|
-| `ui/pantry-shelf.png` | Background for pantry journal tab (wide shelf) |
-| `ui/unlock-seed-card.png` | “New seed” reveal card (fallback: `ui/card-blank.png`) |
+## Still placeholder (designer)
 
-## Decorations (day + night)
+### UI
+| Path | Purpose |
+|------|---------|
+| `ui/pantry-shelf.png` | Pantry journal background |
+| `ui/unlock-seed-card.png` | Seed unlock reveal (fallback: `ui/card-blank.png`) |
 
-Each decoration: bottom-centre anchor at spot coordinates below. Night variants for `lantern` and `fairy-lights` should read as glowing (renderer adds soft additive glow at night).
+### Decorations — `assets/decor/<id>-{day|night}.png`
 
-| Path | Pair |
-|------|------|
-| `decor/lantern-day.png` / `decor/lantern-night.png` | night glow |
-| `decor/birdbath-day.png` / `decor/birdbath-night.png` | |
-| `decor/bench-day.png` / `decor/bench-night.png` | |
-| `decor/scarecrow-day.png` / `decor/scarecrow-night.png` | |
-| `decor/fairy-lights-day.png` / `decor/fairy-lights-night.png` | night glow |
+lantern, birdbath, bench, scarecrow, fairy-lights — night glow for lantern & fairy-lights.
 
-Manifest: `SmileArt.decor.src(id, 'day'|'night')`.
+### Decoration spots (backdrop 1280×720, bottom-centre)
 
-## Decoration spots (backdrop 1280×720 px)
-
-Chosen to avoid the eight bed boxes in `SmileArt.plots`. Anchor: **bottom-centre** at `(x, y)`.
-
-| Spot id | Label | x | y |
-|---------|--------|---|---|
-| `nw-path` | Northwest path | 168 | 298 |
-| `ne-hedge` | Northeast hedge | 1110 | 310 |
-| `sw-corner` | Southwest corner | 145 | 580 |
-| `se-path` | Southeast path | 1155 | 575 |
-| `mid-left` | Mid-left lawn | 218 | 460 |
+| Spot id | x | y |
+|---------|---|---|
+| `nw-path` | 168 | 298 |
+| `ne-hedge` | 1110 | 310 |
+| `sw-corner` | 145 | 580 |
+| `se-path` | 1155 | 575 |
+| `mid-left` | 218 | 460 |
 
 Defined in `renderer/art.js` → `decorSpots`.
-
-## Basket HUD
-
-Canvas-drawn basket at `SmileArt.basketHud` **(1195, 68)** until optional art is added.

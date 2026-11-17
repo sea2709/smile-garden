@@ -1,0 +1,100 @@
+{
+ "frame_size": [
+  200,
+  320
+ ],
+ "fps_suggested": 12,
+ "anchor": "same as effects: bottom-centre on bed soil (soil line y=282)",
+ "basket_in_frame_at": [
+  150,
+  286
+ ],
+ "sets": {
+  "ready-day-loop": {
+   "frames": "ready-day-loop/00..11.png",
+   "strip": "ready-day-loop-strip.png",
+   "count": 12,
+   "loop": true
+  },
+  "harvest-lettuce-day": {
+   "frames": "harvest-lettuce-day/00..15.png",
+   "strip": "harvest-lettuce-day-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "harvest-mint-day": {
+   "frames": "harvest-mint-day/00..15.png",
+   "strip": "harvest-mint-day-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "harvest-cucumber-day": {
+   "frames": "harvest-cucumber-day/00..15.png",
+   "strip": "harvest-cucumber-day-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "harvest-tomato-day": {
+   "frames": "harvest-tomato-day/00..15.png",
+   "strip": "harvest-tomato-day-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "harvest-sunflower-day": {
+   "frames": "harvest-sunflower-day/00..15.png",
+   "strip": "harvest-sunflower-day-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "harvest-apple-day": {
+   "frames": "harvest-apple-day/00..15.png",
+   "strip": "harvest-apple-day-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "ready-night-loop": {
+   "frames": "ready-night-loop/00..11.png",
+   "strip": "ready-night-loop-strip.png",
+   "count": 12,
+   "loop": true
+  },
+  "harvest-lettuce-night": {
+   "frames": "harvest-lettuce-night/00..15.png",
+   "strip": "harvest-lettuce-night-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "harvest-mint-night": {
+   "frames": "harvest-mint-night/00..15.png",
+   "strip": "harvest-mint-night-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "harvest-cucumber-night": {
+   "frames": "harvest-cucumber-night/00..15.png",
+   "strip": "harvest-cucumber-night-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "harvest-tomato-night": {
+   "frames": "harvest-tomato-night/00..15.png",
+   "strip": "harvest-tomato-night-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "harvest-sunflower-night": {
+   "frames": "harvest-sunflower-night/00..15.png",
+   "strip": "harvest-sunflower-night-strip.png",
+   "count": 16,
+   "loop": false
+  },
+  "harvest-apple-night": {
+   "frames": "harvest-apple-night/00..15.png",
+   "strip": "harvest-apple-night-strip.png",
+   "count": 16,
+   "loop": false
+  }
+ },
+ "produce_icons": "produce/<name>.png (160px) and <name>-64.png; basket.png",
+ "picked_sprites": "picked/<plant>-picked.png, same 312x484 canvas and anchoring as plants/<plant>/stage-N.png"
+}

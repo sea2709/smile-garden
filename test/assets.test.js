@@ -38,6 +38,28 @@ test('every plant in the game has 5 painted stages and UI cards exist', () => {
     assert.ok(fs.existsSync(fromRenderer(ART.card)));
 });
 
+test('harvest art: ready loops and per-plant harvest strips', () => {
+    assert.ok(ART.harvest);
+    for (const kind of ['day', 'night']) {
+        assert.ok(fs.existsSync(fromRenderer(ART.readyStripSrc(kind))), `ready ${kind}`);
+    }
+    for (const id of ART.harvest.plantIds) {
+        for (const kind of ['day', 'night']) {
+            assert.ok(fs.existsSync(fromRenderer(ART.harvestStripSrc(id, kind))), `${id} ${kind}`);
+        }
+    }
+    assert.ok(fs.existsSync(fromRenderer(ART.produce.basket)));
+    for (const p of L.PLANTS) {
+        assert.ok(fs.existsSync(fromRenderer(ART.produce.src(p.id))), `produce ${p.id}`);
+        assert.ok(fs.existsSync(fromRenderer(ART.produce.src64(p.id))), `produce-64 ${p.id}`);
+    }
+    for (const id of ['tomato', 'mint', 'cucumber', 'apple']) {
+        const src = ART.plantPickedSrc(id);
+        assert.ok(src && fs.existsSync(fromRenderer(src)), `picked ${id}`);
+        assert.ok(ART.plants[id].picked, `picked meta ${id}`);
+    }
+});
+
 test('selection ring art: 8 day/night sprites and backdrop offsets', () => {
     assert.ok(ART.selection);
     for (let b = 1; b <= 8; b++) {

@@ -539,7 +539,10 @@
             if (ev.type === 'step' && ev.step !== lastStep) onStep(ev.step);
             if (ev.type === 'harvest-ready' && ev.plot != null) {
                 const pl = state.plots[ev.plot];
-                if (pl) scene.playHarvestAnim(ev.plot, pl.plantId);
+                if (pl) {
+                    const mode = (V.PLANT_HARVEST[pl.plantId] || {}).mode;
+                    scene.playHarvestAnim(ev.plot, pl.plantId, { pull: mode === 'pull' });
+                }
                 refreshBasketChip(session.pendingHarvests.length);
             }
         }
@@ -840,13 +843,16 @@
                     slot.className = 'pantry-slot';
                     const icon = document.createElement('div');
                     icon.className = 'produce-icon';
-                    icon.style.background = (ART.produce.placeholder && ART.produce.placeholder[id]) || '#c4a574';
-                    icon.textContent = (id[0] || '?').toUpperCase();
                     const img = document.createElement('img');
                     img.src = ART.produce.src(id);
-                    img.alt = '';
+                    img.alt = L.plantById(id).name;
+                    img.width = ART.produce.size || 160;
                     img.className = 'produce-img';
-                    img.onerror = () => { img.hidden = true; };
+                    img.onerror = () => {
+                        icon.style.background = (ART.produce.placeholder && ART.produce.placeholder[id]) || '#c4a574';
+                        icon.style.borderRadius = '50%';
+                        icon.textContent = (id[0] || '?').toUpperCase();
+                    };
                     icon.appendChild(img);
                     const cap = document.createElement('h3');
                     cap.textContent = `${L.plantById(id).name} × ${it.count}`;
