@@ -23,13 +23,16 @@
     const harvest = (typeof module === 'object' && module.exports)
         ? require('./harvest.js')
         : root.SmileHarvest;
-    const api = factory(logic, harvest);
+    const day = (typeof module === 'object' && module.exports)
+        ? require('./day.js')
+        : root.SmileDay;
+    const api = factory(logic, harvest, day);
     if (typeof module === 'object' && module.exports) module.exports = api;
     else root.SmileVisit = api;
-})(typeof self !== 'undefined' ? self : this, function (L, H) {
+})(typeof self !== 'undefined' ? self : this, function (L, H, D) {
     'use strict';
 
-    const STATE_VERSION = 4;
+    const STATE_VERSION = 5;
     const PLOTS = 8;
     const MAX_STAGE = 5;
     const DAY_MS = 86400000;
@@ -199,6 +202,7 @@
 
     function createState(now) {
         const d = now instanceof Date ? now : new Date(now === undefined ? Date.now() : now);
+        const g = D.defaultGardenFields();
         return {
             version: STATE_VERSION,
             createdDay: dayKey(d),
@@ -206,10 +210,18 @@
             plots: new Array(PLOTS).fill(null),
             visitDays: [],
             journal: [],
-            settings: { pace: 'standard', breaths: 4, chart: true, lighting: 'auto', offsetDays: 0 },
+            settings: { pace: 'standard', breaths: 4, chart: true, lighting: 'auto', offsetDays: 0,
+                realMsPerGardenMinute: D.DEFAULT_DAY_CONFIG.realMsPerGardenMinute },
             pantry: H.emptyPantry(),
             decor: H.emptyDecor(),
             spareSeeds: H.emptySpareSeeds(),
+            dayNumber: g.dayNumber,
+            gardenMinutes: g.gardenMinutes,
+            season: g.season,
+            seasonDay: g.seasonDay,
+            dailyTends: g.dailyTends,
+            morningPending: g.morningPending,
+            daysCompleted: g.daysCompleted,
         };
     }
 
@@ -227,6 +239,7 @@
             pickDay: p.pickDay,
             matureWater: p.matureWater,
             matureFert: p.matureFert,
+            tendedDay: p.tendedDay,
         });
     }
 
@@ -253,14 +266,15 @@
         }
         const fresh = createState(now);
         if (!obj || typeof obj !== 'object') return fresh;
-        if (obj.version !== STATE_VERSION && obj.version !== 3) return fresh;
+        if (obj.version !== STATE_VERSION && obj.version !== 3 && obj.version !== 4) return fresh;
         const s = fresh;
         s.createdDay = typeof obj.createdDay === 'string' ? obj.createdDay : s.createdDay;
         s.wellnessAck = obj.wellnessAck === true;
         const plots = Array.isArray(obj.plots) ? obj.plots : [];
         for (let i = 0; i < PLOTS; i++) s.plots[i] = sanitizePlot(plots[i]);
         s.visitDays = Array.isArray(obj.visitDays)
-            ? Array.from(new Set(obj.visitDays.filter((k) => typeof k === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(k)))).sort()
+            ? Array.from(new Set(obj.visitDays.filter((k) => typeof k === 'string' &&
+                (/^\d{4}-\d{2}-\d{2}$/.test(k) || /^garden-\d+$/.test(k))))).sort()
             : [];
         s.journal = Array.isArray(obj.journal) ? obj.journal.filter((e) => e && typeof e.kind === 'string').slice(-400) : [];
         const st = obj.settings || {};
@@ -277,15 +291,50 @@
             s.decor = H.emptyDecor();
             s.spareSeeds = H.emptySpareSeeds();
         }
+        if (obj.version === 4) {
+            D.migrateGardenFields(s);
+            s.dayNumber = 1;
+            s.gardenMinutes = D.DEFAULT_DAY_CONFIG.startMinutes;
+            s.season = 'spring';
+            s.seasonDay = 1;
+            s.dailyTends = {};
+            s.morningPending = null;
+            s.daysCompleted = 0;
+        } else {
+            s.dayNumber = Math.max(1, Math.round(Number(obj.dayNumber) || 1));
+            s.gardenMinutes = D.clampMinutes(obj.gardenMinutes);
+            s.season = D.SEASONS.includes(obj.season) ? obj.season : D.seasonForDayNumber(s.dayNumber);
+            s.seasonDay = D.seasonDayNumber(s.dayNumber);
+            s.dailyTends = obj.dailyTends && typeof obj.dailyTends === 'object' ? obj.dailyTends : {};
+            s.morningPending = obj.morningPending || null;
+            s.daysCompleted = Math.max(0, Math.round(Number(obj.daysCompleted) || s.dayNumber - 1));
+        }
+        const st2 = obj.settings || {};
+        if (Number.isFinite(Number(st2.realMsPerGardenMinute))) {
+            s.settings.realMsPerGardenMinute = Math.max(100, Number(st2.realMsPerGardenMinute));
+        }
         s.version = STATE_VERSION;
-        advanceRegrowPlots(s, dayKey(now instanceof Date ? now : new Date(now === undefined ? Date.now() : now)));
+        const todayKey = s.version >= 5 ? D.gardenDayKey(s.dayNumber) : dayKey(now instanceof Date ? now : new Date(now === undefined ? Date.now() : now));
+        advanceRegrowPlots(s, todayKey);
         H.syncDecorUnlocks(s);
         return s;
     }
 
     function serializeState(state) { return JSON.stringify(state); }
 
-    function visitCount(state) { return state.visitDays.length; }
+    function visitCount(state) {
+        if (state.version >= 5) {
+            const completed = Number.isFinite(state.daysCompleted) ? state.daysCompleted : Math.max(0, state.dayNumber - 1);
+            const tendedToday = state.dailyTends && Object.values(state.dailyTends).some(
+                (t) => t && t.day === state.dayNumber);
+            return completed + (tendedToday ? 1 : 0);
+        }
+        return state.visitDays.length;
+    }
+
+    function calendarKey(state, now) {
+        return state.version >= 5 ? D.gardenDayKey(state.dayNumber) : dayKey(now instanceof Date ? now : new Date(now));
+    }
 
     function isUnlocked(state, plantId) {
         return H.isSeedUnlocked(state, plantId, visitCount);
@@ -321,7 +370,7 @@
         if (!kind) return { ok: false, reason: 'unknown-plant' };
         if (!isUnlocked(state, plantId)) return { ok: false, reason: 'locked' };
         const d = now instanceof Date ? now : new Date(now);
-        const day = dayKey(d);
+        const day = calendarKey(state, d);
         state.plots[i] = {
             plantId, plantedDay: day, stage: 1, sunBank: 0, lastGrowDay: null, matureDay: null,
             picked: false, pickDay: null, matureWater: null, matureFert: null,
@@ -334,6 +383,9 @@
 
     /** Distinct visit days in the current local week (Mon–Sun). No streaks. */
     function weeklyVisits(state, now) {
+        if (state.version >= 5) {
+            return state.visitDays.filter((k) => /^garden-\d+$/.test(k)).length;
+        }
         const d = now instanceof Date ? now : new Date(now);
         const start = weekStartKey(d);
         const end = addDaysKey(start, 6);
@@ -341,6 +393,7 @@
     }
 
     function visitedToday(state, now) {
+        if (state.version >= 5) return state.visitDays.includes(D.gardenDayKey(state.dayNumber));
         return state.visitDays.includes(dayKey(now instanceof Date ? now : new Date(now)));
     }
 
@@ -412,24 +465,14 @@
         return out;
     }
 
-    /**
-     * Apply a finished visit: bank sunlight per bed, grow qualifying plants by at most
-     * one stage per local day, record the visit and journal entries.
-     * result.beds = [{ plot, sunHours, water, fertilizer, breaths? }, ...].
-     * Returns { day, grew, waiting, tended, weekly, firstVisitToday, unlocked, ... }.
-     */
-    function applyVisit(state, result, now) {
-        const d = now instanceof Date ? now : new Date(now);
-        const day = dayKey(d);
-        const bedResults = visitBedResults(result);
+  function growPlotsFromTends(state, dayKeyStr, d, bedResults) {
         const byPlot = Object.create(null);
         for (const b of bedResults) byPlot[b.plot] = b;
-
         const grew = [];
         const waiting = [];
         const tended = [];
-
-        advanceRegrowPlots(state, day);
+        const season = state.season || D.seasonForDayNumber(state.dayNumber);
+        advanceRegrowPlots(state, dayKeyStr);
         state.plots.forEach((p, i) => {
             if (!p || p.stage >= MAX_STAGE || p.picked) return;
             const kind = L.plantById(p.plantId);
@@ -442,19 +485,23 @@
             if (sun > 0 || water > 0 || fert > 0) {
                 tended.push({ plot: i, plantId: p.plantId, name: kind.name, sunHours: sun, water, fertilizer: fert });
             }
+            if (state.version >= 5 && !D.isPlantInSeason(p.plantId, season)) {
+                waiting.push({ plot: i, plantId: p.plantId, name: kind.name, reason: 'out-of-season' });
+                return;
+            }
             const banked = sun * (1 + TUNING.fertilizerBoost * fert);
             const watered = water >= TUNING.waterToGrow;
             p.sunBank = Math.min(cost, p.sunBank + banked);
             const info = { plot: i, plantId: p.plantId, name: kind.name, stage: p.stage, sunBank: p.sunBank, cost };
-            if (p.lastGrowDay === day) { waiting.push(Object.assign(info, { reason: 'grew-today' })); return; }
+            if (p.lastGrowDay === dayKeyStr) { waiting.push(Object.assign(info, { reason: 'grew-today' })); return; }
             if (p.sunBank + 1e-9 < cost) { waiting.push(Object.assign(info, { reason: 'needs-sun', short: cost - p.sunBank })); return; }
             if (!watered) { waiting.push(Object.assign(info, { reason: 'needs-water' })); return; }
             const from = p.stage;
             p.stage += 1;
             p.sunBank = 0;
-            p.lastGrowDay = day;
+            p.lastGrowDay = dayKeyStr;
             if (p.stage >= MAX_STAGE) {
-                p.matureDay = day;
+                p.matureDay = dayKeyStr;
                 p.matureWater = water;
                 p.matureFert = fert;
                 p.picked = false;
@@ -462,12 +509,79 @@
             }
             grew.push({ plot: i, plantId: p.plantId, name: kind.name, from, to: p.stage, mature: p.stage >= MAX_STAGE });
             addJournal(state, {
-                day, ts: d.getTime(), kind: p.stage >= MAX_STAGE ? 'mature' : 'stage', plantId: p.plantId, plot: i, stage: p.stage,
+                day: dayKeyStr, ts: d.getTime(), kind: p.stage >= MAX_STAGE ? 'mature' : 'stage', plantId: p.plantId, plot: i, stage: p.stage,
                 text: `${kind.name} in bed ${i + 1} ${STAGE_PHRASE[p.stage]}.`,
             });
         });
+        return { grew, waiting, tended };
+    }
 
+    /** Apply overnight growth from daily tends (v5 day loop). */
+    function applyOvernightGrowth(state, now) {
+        const d = now instanceof Date ? now : new Date(now);
+        const gkey = D.gardenDayKey(state.dayNumber);
+        const beds = [];
+        for (let i = 0; i < PLOTS; i++) {
+            const t = state.dailyTends && state.dailyTends[i];
+            if (t && t.day === state.dayNumber) beds.push(Object.assign({ plot: i }, t));
+        }
+        return growPlotsFromTends(state, gkey, d, beds);
+    }
+
+    function goToBed(state, now) {
+        const d = now instanceof Date ? now : new Date(now);
+        const out = applyOvernightGrowth(state, d);
+        const completedDay = state.dayNumber;
+        const completedKey = D.gardenDayKey(completedDay);
+        state.morningPending = Object.assign({ day: completedDay + 1 }, out);
+        state.daysCompleted = completedDay;
+        state.dayNumber += 1;
+        state.season = D.seasonForDayNumber(state.dayNumber);
+        state.seasonDay = D.seasonDayNumber(state.dayNumber);
+        state.gardenMinutes = D.DEFAULT_DAY_CONFIG.startMinutes;
+        state.dailyTends = {};
+        const day = completedKey;
+        if (!state.visitDays.includes(day)) {
+            state.visitDays.push(day);
+            state.visitDays.sort();
+        }
+        addJournal(state, {
+            day, ts: d.getTime(), kind: 'bedtime',
+            text: out.grew.length ? `Overnight: ${out.grew.length} plant(s) grew.` : 'A quiet night in the garden.',
+        });
+        return out;
+    }
+
+    /**
+     * Apply a finished visit / daily tend: record per-plant care; grow immediately on v4,
+     * defer growth to bedtime on v5.
+     */
+    function applyVisit(state, result, now) {
+        const d = now instanceof Date ? now : new Date(now);
+        const day = state.version >= 5 ? D.gardenDayKey(state.dayNumber) : dayKey(d);
+        const bedResults = visitBedResults(result);
+        const byPlot = Object.create(null);
+        for (const b of bedResults) byPlot[b.plot] = b;
+
+        let grew = [];
+        let waiting = [];
+        let tended = [];
         const before = unlockedPlants(state);
+
+        if (state.version >= 5) {
+            D.recordDayTending(state, bedResults, state.dayNumber, (id) => L.plantById(id));
+            for (const b of bedResults) {
+                const p = state.plots[b.plot];
+                if (!p) continue;
+                const kind = L.plantById(p.plantId);
+                if (b.sunHours > 0 || b.water > 0 || b.fertilizer > 0) {
+                    tended.push({ plot: b.plot, plantId: p.plantId, name: kind.name, sunHours: b.sunHours, water: b.water, fertilizer: b.fertilizer });
+                }
+            }
+        } else {
+            ({ grew, waiting, tended } = growPlotsFromTends(state, day, d, bedResults));
+        }
+
         const firstVisitToday = !state.visitDays.includes(day);
         if (firstVisitToday) {
             state.visitDays.push(day);
@@ -952,7 +1066,7 @@
     function applySessionHarvests(state, plotIndices, now) {
         const out = [];
         for (const plot of plotIndices || []) {
-            const r = H.harvestPlot(state, plot, now, L.plantById);
+            const r = H.harvestPlot(state, plot, calendarKey(state, now), L.plantById);
             if (r.ok) out.push(r);
         }
         return out;
@@ -980,7 +1094,7 @@
         const out = [];
         for (let i = 0; i < days; i++) {
             clock.nextDay();
-            advanceRegrowPlots(state, clock.today());
+            advanceRegrowPlots(state, calendarKey(state, clock.now()));
             const beds = [];
             state.plots.forEach((p, plot) => {
                 if (!p || H.isPlotRegrowing(p, clock.today()) || p.picked) return;
@@ -994,9 +1108,14 @@
                 });
             });
             const visitOut = applyVisit(state, { beds }, clock.now());
+            if (state.version >= 5) {
+                const night = goToBed(state, clock.now());
+                visitOut.grew = night.grew;
+                visitOut.waiting = night.waiting;
+            }
             const harvested = [];
-            for (const plot of H.readyPlotIndices(state.plots, clock.today())) {
-                const h = H.harvestPlot(state, plot, clock.now(), L.plantById);
+            for (const plot of H.readyPlotIndices(state.plots, calendarKey(state, clock.now()))) {
+                const h = H.harvestPlot(state, plot, calendarKey(state, clock.now()), L.plantById);
                 if (h.ok) harvested.push(h);
             }
             out.push(Object.assign(visitOut, { harvested }));
@@ -1009,8 +1128,9 @@
         PACES, MIN_BREATHS, MAX_BREATHS, STEPS,
         dayKey, dayStart, daysBetween, addDaysKey, weekStartKey,
         lightingForHour, lightingFor, greetingFor, GameClock,
-        plantInfo, createState, loadState, serializeState, visitCount, isUnlocked, unlockedPlants,
+        plantInfo, createState, loadState, serializeState, visitCount, calendarKey, isUnlocked, unlockedPlants,
         emptyPlots, plantedCount, matureCount, score, plantSeed, weeklyVisits, visitedToday, applyVisit,
+        applyOvernightGrowth, goToBed,
         clampBreaths, BreathPacer, VisitSession, waitingText, simulateDays,
         neighborPlot, movePlotSelection, plantedPlotIndices, firstPlantedPlot, perBedStepSeconds, visitBedResults,
         advanceRegrowPlots, applySessionHarvests, newUnlocksAfterHarvest,
@@ -1020,7 +1140,7 @@
         readyPlotIndices: H.readyPlotIndices,
         tendablePlotIndices: H.tendablePlotIndices,
         computeYield: H.computeYield,
-        harvestPlot: (s, i, now) => H.harvestPlot(s, i, now, L.plantById),
+        harvestPlot: (s, i, now) => H.harvestPlot(s, i, calendarKey(s, now), L.plantById),
         placeDecor: H.placeDecor,
         makeAllReady: H.makeAllReady,
         decorUnlocked: (s) => H.decorUnlocked(s),
@@ -1029,5 +1149,17 @@
         DECOR_UNLOCKS: H.DECOR_UNLOCKS,
         HARVEST_HOLD_SECONDS: H.HARVEST_HOLD_SECONDS,
         PLANT_HARVEST: H.PLANT_HARVEST,
+        SmileDay: D,
+        tendableForState(state, now) {
+            if (state.version >= 5) {
+                return D.tendablePlotIndicesDay(state, { isPlotReady: H.isPlotReady, isPlotRegrowing: H.isPlotRegrowing, MAX_STAGE });
+            }
+            const k = dayKey(now instanceof Date ? now : new Date(now));
+            return H.tendablePlotIndices(state.plots, k);
+        },
+        lightingForGardenMinutes(minutes, override) {
+            if (override && LIGHTINGS.includes(override)) return override;
+            return D.lightingBlend(minutes).primary;
+        },
     });
 });

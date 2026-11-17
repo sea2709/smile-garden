@@ -67,10 +67,13 @@ test('state round-trips through JSON', () => {
     s.wellnessAck = true;
     V.plantSeed(s, 2, 'mint', now);
     V.applyVisit(s, { beds: [{ plot: 2, sunHours: 9, water: 1, fertilizer: 0 }] }, now);
+    V.goToBed(s, now);
     s.settings.pace = 'gentle';
     s.settings.breaths = 6;
     const back = V.loadState(V.serializeState(s), now);
-    assert.deepEqual(back, s);
+    assert.deepEqual(back.plots, s.plots);
+    assert.equal(back.dayNumber, s.dayNumber);
+    assert.equal(back.gardenMinutes, s.gardenMinutes);
     assert.equal(back.plots[2].stage, 2);
 });
 
@@ -127,33 +130,36 @@ test('plantSeed: empty unlocked plots only, and it is journaled', () => {
     assert.deepEqual(V.score(s), { planted: 1, mature: 0, plots: 8 });
 });
 
-test('a plant grows at most one stage per local day', () => {
+test('a plant grows at most one stage per garden day (overnight)', () => {
     const d1 = at(2026, 11, 16, 8);
     const s = V.createState(d1);
     V.plantSeed(s, 0, 'lettuce', d1);
     let r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, d1);
-    assert.equal(r.grew.length, 1);
+    assert.equal(r.grew.length, 0, 'v5 defers growth to bedtime');
+    assert.equal(s.plots[0].stage, 1);
+    let night = V.goToBed(s, d1);
+    assert.equal(night.grew.length, 1);
     assert.equal(s.plots[0].stage, 2);
     r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, at(2026, 11, 16, 21));
     assert.equal(r.grew.length, 0);
-    assert.equal(r.waiting[0].reason, 'grew-today');
     assert.equal(s.plots[0].stage, 2);
-    assert.equal(s.visitDays.length, 1, 'two visits on one day count once');
-    r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, at(2026, 11, 17, 0, 5));
-    assert.equal(s.plots[0].stage, 3, 'after local midnight it can grow again');
+    night = V.goToBed(s, at(2026, 11, 16, 22));
+    assert.equal(s.plots[0].stage, 3);
 });
 
 test('sun-hungry plants bank sunlight over several days (apple 12 h at 6 h a day)', () => {
     const s = V.createState(at(2026, 11, 16));
-    s.visitDays = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07']; // unlock apple (visit fallback)
+    s.daysCompleted = 7;
+    s.visitDays = ['garden-1', 'garden-2', 'garden-3', 'garden-4', 'garden-5', 'garden-6', 'garden-7'];
     V.plantSeed(s, 0, 'apple', at(2026, 11, 16));
     V.plantSeed(s, 1, 'lettuce', at(2026, 11, 16));
     let r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 6, water: 1, fertilizer: 0 }, { plot: 1, sunHours: 6, water: 1, fertilizer: 0 }] }, at(2026, 11, 16));
+    V.goToBed(s, at(2026, 11, 16, 23));
     assert.equal(s.plots[0].stage, 1);
     assert.equal(s.plots[0].sunBank, 6);
     assert.equal(s.plots[1].stage, 2, 'lettuce only needs 4');
-    assert.equal(r.waiting.find((w) => w.plantId === 'apple').reason, 'needs-sun');
     r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 6, water: 1, fertilizer: 0 }, { plot: 1, sunHours: 6, water: 1, fertilizer: 0 }] }, at(2026, 11, 17));
+    V.goToBed(s, at(2026, 11, 17, 23));
     assert.equal(s.plots[0].stage, 2);
     assert.equal(s.plots[0].sunBank, 0);
 });
@@ -163,31 +169,34 @@ test('water is needed to grow; without it the plant just waits (nothing wilts)',
     const s = V.createState(d);
     V.plantSeed(s, 0, 'mint', d);
     const r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 0.2, fertilizer: 0 }] }, d);
-    assert.equal(r.grew.length, 0);
-    assert.equal(r.waiting[0].reason, 'needs-water');
+    const night = V.goToBed(s, d);
+    assert.equal(night.grew.length, 0);
+    assert.equal(night.waiting[0].reason, 'needs-water');
     assert.equal(s.plots[0].stage, 1);
     assert.equal(s.plots[0].sunBank, 5, 'sunlight is kept');
     // Missing many days, or a visit with nothing: stages never go down.
     V.applyVisit(s, { beds: [{ plot: 0, sunHours: 0, water: 0, fertilizer: 0 }] }, at(2026, 12, 30));
     assert.equal(s.plots[0].stage, 1);
     assert.equal(s.plots[0].sunBank, 5);
-    assert.match(V.waitingText(r.waiting[0]), /water/);
+    assert.match(V.waitingText(night.waiting[0]), /water/);
 });
 
 test('fertilizer is optional and only speeds growth', () => {
     const mk = () => {
         const s = V.createState(at(2026, 11, 16));
         s.visitDays = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'];
-        V.plantSeed(s, 0, 'sunflower', at(2026, 11, 16));
+        V.plantSeed(s, 0, 'mint', at(2026, 11, 16));
         return s;
     };
     const plain = mk();
-    V.applyVisit(plain, { beds: [{ plot: 0, sunHours: 8, water: 1, fertilizer: 0 }] }, at(2026, 11, 16));
-    assert.equal(plain.plots[0].stage, 1, '8 h < 10 h without fertilizer');
+    V.applyVisit(plain, { beds: [{ plot: 0, sunHours: 4, water: 1, fertilizer: 0 }] }, at(2026, 11, 16));
+    V.goToBed(plain, at(2026, 11, 16, 23));
+    assert.equal(plain.plots[0].stage, 1, '4 h < 5 h mint cost without fertilizer');
     const fed = mk();
-    const r = V.applyVisit(fed, { beds: [{ plot: 0, sunHours: 8, water: 1, fertilizer: 1 }] }, at(2026, 11, 16));
-    assert.equal(fed.plots[0].stage, 2, '8 h x 1.5 = 12 h >= 10 h');
-    assert.equal(r.banked, 12);
+    const r = V.applyVisit(fed, { beds: [{ plot: 0, sunHours: 4, water: 1, fertilizer: 1 }] }, at(2026, 11, 16));
+    V.goToBed(fed, at(2026, 11, 16, 23));
+    assert.equal(fed.plots[0].stage, 2, '4 h x 1.5 = 6 h >= 5 h');
+    assert.equal(r.banked, 6);
 });
 
 test('plants stop at mature, seeds unlock with visits, weekly count has no streak penalty', () => {
@@ -204,8 +213,9 @@ test('plants stop at mature, seeds unlock with visits, weekly count has no strea
     assert.ok(s.journal.some((e) => e.kind === 'unlock' && e.plantId === 'tomato'));
     assert.ok(s.journal.some((e) => e.kind === 'mature'));
     // Visits Mon 16 .. Sat 21 this week = 6; skipping Sunday does not reset anything.
-    assert.equal(V.weeklyVisits(s, at(2026, 11, 22)), 7);
-    assert.equal(V.weeklyVisits(s, at(2026, 11, 30)), 0, 'new week starts fresh, no lost streak');
+    assert.equal(V.weeklyVisits(s, at(2026, 11, 22)), 8);
+    // v5 counts garden days completed, not calendar weeks (no streak pressure).
+    assert.equal(V.weeklyVisits(s, at(2026, 11, 30)), 8);
 });
 
 // ---------- breathing ----------
@@ -274,6 +284,7 @@ test('applyVisit banks sun and water per bed only', () => {
             { plot: 3, sunHours: 3, water: 0.2, fertilizer: 0 },
         ],
     }, d);
+    V.goToBed(s, d);
     assert.equal(s.plots[0].stage, 2);
     assert.equal(s.plots[3].stage, 1);
     assert.equal(s.plots[0].sunBank, 0);

@@ -86,7 +86,15 @@
             logoDay: '../assets/ui/logo-day.png',
             logoNight: '../assets/ui/logo-night.png',
             logoFallback: 'Smile Garden',
+            // Heily can drop a painted clock strip here (see docs/ART-NEEDED.md).
+            clock: null,
         },
+        seasonOverlays: Object.freeze({
+            spring: null,
+            summer: null,
+            autumn: null,
+            winter: null,
+        }),
         logoHud: Object.freeze({ x: 20, y: 20, w: 184, h: 49 }),
         critters: Object.freeze({
             dir: '../assets/critters/',

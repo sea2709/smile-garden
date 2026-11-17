@@ -54,6 +54,8 @@ body[data-canvas-logo="1"] .brand-fallback { opacity: 0; position: absolute; wid
     font-size: 13px; font-weight: 700; color: var(--ink-soft); white-space: nowrap;
 }
 .chip-score { color: var(--sage-dark); }
+.chip-day .garden-clock { flex: none; }
+#btn-bed.suggest { box-shadow: 0 0 0 2px rgba(240, 196, 96, 0.55); }
 .week-dots { display: inline-flex; gap: 3px; }
 .week-dots i { width: 9px; height: 9px; border-radius: 50%; background: rgba(160, 140, 110, 0.25); display: inline-block; }
 .week-dots i.on { background: radial-gradient(circle at 35% 35%, #f6d77c, var(--honey)); }

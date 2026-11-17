@@ -99,6 +99,7 @@
             pickDay: typeof p.pickDay === 'string' ? p.pickDay : null,
             matureWater: p.matureWater == null ? null : Math.max(0, Math.min(1, Number(p.matureWater) || 0)),
             matureFert: p.matureFert == null ? null : Math.max(0, Math.min(1, Number(p.matureFert) || 0)),
+            tendedDay: Number.isFinite(Number(p.tendedDay)) ? Math.round(Number(p.tendedDay)) : p.tendedDay,
         });
     }
 
@@ -119,7 +120,14 @@
         return daysBetween(p.pickDay, today) < cfg.regrowDays;
     }
 
+    function parseGardenDayKey(key) {
+        const m = /^garden-(\d+)$/.exec(String(key));
+        return m ? Number(m[1]) : null;
+    }
+
     function daysBetween(a, b) {
+        const ga = parseGardenDayKey(a), gb = parseGardenDayKey(b);
+        if (ga != null && gb != null) return gb - ga;
         const da = dayStart(a), db = dayStart(b);
         const DAY_MS = 86400000;
         return Math.round((Date.UTC(db.getFullYear(), db.getMonth(), db.getDate()) -
@@ -210,7 +218,7 @@
      * Returns { plot, plantId, name, yield, mode }.
      */
     function dayKeyFrom(now) {
-        if (typeof now === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(now)) return now;
+        if (typeof now === 'string' && (/^\d{4}-\d{2}-\d{2}$/.test(now) || /^garden-\d+$/.test(now))) return now;
         const dt = now instanceof Date ? now : new Date(now);
         return `${dt.getFullYear()}-${pad2(dt.getMonth() + 1)}-${pad2(dt.getDate())}`;
     }
