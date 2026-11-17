@@ -1,6 +1,6 @@
 // game/care-needs.js — per-plant daily need dots (pure logic).
-(function () {
 'use strict';
+(function () {
 
 const CARE_DOT_SECONDS = Object.freeze({
     sun: 10,
@@ -128,12 +128,13 @@ const api = {
     readProgressFromDailyTend,
 };
 
-if (typeof window !== 'undefined') {
-    window.SmileCareNeeds = api;
-} else if (typeof self !== 'undefined') {
-    self.SmileCareNeeds = api;
-}
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
 }
+if (typeof self !== 'undefined') {
+    self.SmileCareNeeds = api;
+} else if (typeof window !== 'undefined') {
+    window.SmileCareNeeds = api;
+}
+
 })();

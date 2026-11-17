@@ -17,7 +17,9 @@
     "check": "node scripts/check-syntax.js",
     "screenshots": "node scripts/capture-screenshots.js",
     "screenshots:camera": "SMILE_GARDEN_CAPTURE_CAMERA_ONLY=1 node scripts/capture-screenshots.js",
-    "screenshots:time": "SMILE_GARDEN_TIME_SHOTS=1 node scripts/capture-screenshots.js"
+    "screenshots:time": "SMILE_GARDEN_TIME_SHOTS=1 node scripts/capture-screenshots.js",
+    "screenshots:stake": "SMILE_GARDEN_STAKE_SHOTS=1 node scripts/capture-screenshots.js",
+    "screenshots:tags": "SMILE_GARDEN_TAGS_SHOTS=1 node scripts/capture-screenshots.js"
   },
   "dependencies": {
     "@smartspectra/node-sdk": "^3.5.0",

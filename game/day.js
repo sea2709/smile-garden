@@ -1,6 +1,6 @@
 // game/day.js — Stardew-style in-game day clock, seasons, overnight growth.
-(function () {
 'use strict';
+(function () {
 
 const SEASONS = Object.freeze(['spring', 'summer', 'autumn', 'winter']);
 const SEASON_LABELS = Object.freeze({ spring: 'Spring', summer: 'Summer', autumn: 'Autumn', winter: 'Winter' });
@@ -253,10 +253,11 @@ const api = {
     tendablePlotIndicesDay,
 };
 
-if (typeof window !== 'undefined') {
-    window.SmileDay = api;
-}
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
 }
+if (typeof window !== 'undefined') {
+    window.SmileDay = api;
+}
+
 })();

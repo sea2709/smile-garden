@@ -16,10 +16,10 @@
     const $ = (id) => document.getElementById(id);
     const els = {};
     for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-live',
-        'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub', 'meter-sun', 'meter-water', 'meter-fert',
-        'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
+        'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
+        'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-sunflower', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-plant-name', 'needs-icons', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'needs-tag-img', 'needs-tag-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-card-bg', 'needs-card-fallback', 'needs-plant-name', 'needs-rows', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
@@ -29,10 +29,6 @@
         'brand-logo-day', 'brand-logo-night', 'brand-fallback',
         'error-banner', 'error-title', 'error-message', 'btn-error-keyboard', 'btn-error-dismiss']) {
         els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = $(id);
-    }
-
-    function artUrl(rel) {
-        try { return new URL(rel, window.location.href).href; } catch { return rel; }
     }
 
     // ------------------------------------------------------------------
@@ -88,6 +84,7 @@
     let cameraCheckSession = null;
     let lastCameraCheckSnap = null;
     let cameraDeniedDemo = false;
+    let cameraCheckDemoLock = false;
     let pipHome = null;
 
     // ------------------------------------------------------------------
@@ -100,8 +97,17 @@
         for (const o of overlays) els[o].hidden = true;
         els.stepPanel.hidden = name !== 'visit';
         els.idleBar.hidden = name !== 'idle';
-        if (name !== 'visit' && name !== 'camera-check') { els.breathGuide.hidden = true; els.hint.hidden = true; }
-        if (name !== 'camera-check') els.stretchGuide.hidden = true;
+        if (name !== 'visit' && name !== 'camera-check') {
+            els.breathGuide.hidden = true;
+            els.hint.hidden = true;
+        }
+        if (name !== 'visit') {
+            if (els.needsCard) els.needsCard.hidden = true;
+            if (els.stretchCarePanel) els.stretchCarePanel.hidden = true;
+            document.body.dataset.stretchCare = '0';
+            document.body.dataset.step = '';
+        }
+        if (name !== 'visit' && name !== 'camera-check' && els.stretchGuide) els.stretchGuide.hidden = true;
         if (name === 'wellness') els.screenWellness.hidden = false;
         if (name === 'camera-check') els.screenCameraCheck.hidden = false;
         if (name === 'greeting') { renderGreeting(); els.screenGreeting.hidden = false; }
@@ -131,6 +137,19 @@
                 p.staked,
             );
             const tendedAllMet = state.version >= 6 && D.plotTendedToday(state, i);
+            const needs = L.plantNeeds(p.plantId);
+            let tagProgress = { sun: 0, water: 0, fertilizer: 0, stake: false };
+            let offlineCareAll = false;
+            if (session) tagProgress = session.careProgressFor(i);
+            else if (state.dailyTends && state.dailyTends[i]) {
+                const rec = state.dailyTends[i];
+                tagProgress = C.readProgressFromDailyTend(rec, needs, p.staked);
+                offlineCareAll = rec.allMet === true
+                    || C.allNeedsMet(tagProgress, needs, p.staked);
+            }
+            const careAll = session
+                ? careAllMet
+                : offlineCareAll;
             return {
                 plantId: p.plantId,
                 stage: p.stage,
@@ -138,9 +157,10 @@
                 ready: V.isPlotReady(p, today),
                 tendedToday: D.plotTendedToday(state, i),
                 staked: !!p.staked,
-                careAllMet,
-                soilTended: !!(careAllMet || tendedAllMet),
-                tagResting: !!p.tagResting && !careAllMet && !tendedAllMet,
+                careAllMet: careAll,
+                soilTended: !!(careAll || tendedAllMet),
+                tagResting: !!p.tagResting && !careAll && !tendedAllMet,
+                tagProgress,
             };
         });
         scene.setPlots(view, instant ? { instant: true } : undefined);
@@ -268,7 +288,7 @@
             if (active === 'breath') renderBreathRate();
             if (active === 'stretch') renderStretchHud();
             CCUI.renderStatus(els.ccStatusFace, els.ccStatusLight, els.ccStatusCamera, snap);
-            CCUI.renderPackets(els.ccPackets, snap, active, ART, artUrl);
+            CCUI.renderPackets(els.ccPackets, snap, active, ART, artUrl, { denied: cameraDeniedDemo });
         }
         if (els.ccFaceOutline) {
             els.ccFaceOutline.classList.toggle('found', !!snap.faceFound);
@@ -300,6 +320,7 @@
 
     async function openCameraCheck() {
         mountCameraCheckGrid();
+        cameraCheckDemoLock = false;
         cameraCheckSession = CC.createCameraCheckSession({
             smileOn: L.DEFAULTS.smileOn,
             Stretch: window.SmileStretch,
@@ -342,6 +363,10 @@
 
     function updateCameraCheckScreen(dt) {
         if (!cameraCheckSession) return;
+        if (cameraCheckDemoLock) {
+            renderCameraCheckUI(lastCameraCheckSnap);
+            return;
+        }
         const snap = cameraCheckSession.update(dt, buildCameraCheckInput());
         if (cameraCheckSession.active && source && source.setPhase) {
             source.setPhase(`camera-check-${cameraCheckSession.active}`);
@@ -351,8 +376,10 @@
 
     function renderStretchHudFromSnap(snap) {
         const s = snap || {};
-        drawStretchRing(els.stretchRingLeft, s.leftProgress, s.leftDone);
-        drawStretchRing(els.stretchRingRight, s.rightProgress, s.rightDone);
+        const ringSide = s.activeSide === 'right' ? 'right' : 'left';
+        const ringProg = ringSide === 'right' ? s.rightProgress : s.leftProgress;
+        const ringDone = ringSide === 'right' ? s.rightDone : s.leftDone;
+        drawStretchRing(els.stretchRing, ringProg, ringDone);
         const roll = s.rollDeg || 0;
         const pivot = els.stretchFlowerPivot || document.getElementById('stretch-flower-pivot');
         if (pivot) pivot.style.transform = `rotate(${(-roll * 0.85).toFixed(2)}deg)`;
@@ -412,7 +439,7 @@
         const label = `Day ${state.dayNumber} · ${seasonLabel} · ${D.formatGardenTime(state.gardenMinutes)}`;
         scene.setGardenClock(state.gardenMinutes, label);
         if (els.gardenClock) els.gardenClock.hidden = true;
-        document.body.dataset.gardenV = '5';
+        document.body.dataset.gardenV = state.version >= 6 ? '6' : '5';
     }
 
     function syncHudChipClamp() {
@@ -483,11 +510,46 @@
     }
 
     const meterImgs = {};
-    for (const k of ['sun', 'water', 'fertilizer']) {
+    for (const k of ['sun', 'water', 'fertilizer', 'stake']) {
         meterImgs[k] = new Image();
-        meterImgs[k].src = `../assets/ui/meter-${k}.png`;
+        meterImgs[k].src = k === 'stake' ? '../assets/ui/meter-stake.png' : `../assets/ui/meter-${k}.png`;
     }
-    const METER_COLORS = { sun: ['#fbe29a', '#e3a22a'], water: ['#d2e5f4', '#5b92c6'], fertilizer: ['#dfe8b8', '#7b9646'] };
+    const METER_COLORS = { sun: ['#fbe29a', '#e3a22a'], water: ['#d2e5f4', '#5b92c6'], fertilizer: ['#dfe8b8', '#7b9646'], stake: ['#ece2b8', '#9c8c4c'] };
+    const stretchRingArt = { framesDay: null, framesNight: null, loadPromise: null };
+    const STRETCH_RING_FRAMES = 12;
+    function loadStretchImg(src) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve(img);
+            img.onerror = () => resolve(null);
+            img.src = artUrl(src);
+        });
+    }
+    async function loadStretchRingFrames(dir, frameCount) {
+        const frames = [];
+        for (let i = 0; i < frameCount; i++) {
+            const img = await loadStretchImg(`${dir}frame-${String(i).padStart(2, '0')}.png`);
+            if (!img || !img.naturalWidth) return null;
+            frames.push(img);
+        }
+        return frames;
+    }
+    function ensureStretchRingArt() {
+        if (!ART.stretch) return Promise.resolve(false);
+        if (stretchRingArt.loadPromise) return stretchRingArt.loadPromise;
+        const s = ART.stretch;
+        const dayDir = (s.ringFramesDay || '../assets/ui/stretch/ring-day-frames/').replace(/\/?$/, '/');
+        const nightDir = (s.ringFramesNight || '../assets/ui/stretch/ring-night-frames/').replace(/\/?$/, '/');
+        stretchRingArt.loadPromise = Promise.all([
+            loadStretchRingFrames(dayDir, STRETCH_RING_FRAMES),
+            loadStretchRingFrames(nightDir, STRETCH_RING_FRAMES),
+        ]).then(([day, night]) => {
+            stretchRingArt.framesDay = day;
+            stretchRingArt.framesNight = night;
+            return !!((day && day.length) || (night && night.length));
+        });
+        return stretchRingArt.loadPromise;
+    }
     function drawMeter(canvas, kind, frac) {
         const meta = ART.meters[kind];
         const img = meterImgs[kind];
@@ -543,11 +605,17 @@
         if (lastResult && lastResult.day === dayKey) return { sun: lastResult.sunHours, water: lastResult.water, fert: lastResult.fertilizer, fertUsed: lastResult.fertilizer > 0 };
         return { sun: 0, water: 0, fert: 0, fertUsed: false };
     }
+    function stakeMeterFrac() {
+        if (!session) return 0;
+        const snap = stretchHudDemoLock && stretchDemoSnap ? stretchDemoSnap : (session.stretchSnap || {});
+        return Math.max(0, Math.min(1, ((snap.leftProgress || 0) + (snap.rightProgress || 0)) / 2));
+    }
     function renderMeters() {
         const m = meterValues();
         drawMeter(els.meterSun, 'sun', m.sun / V.TUNING.maxSunHours);
         drawMeter(els.meterWater, 'water', m.water);
         drawMeter(els.meterFert, 'fertilizer', m.fert);
+        if (els.meterStake) drawMeter(els.meterStake, 'stake', stakeMeterFrac());
         const step = session ? session.step : '';
         const care = step.startsWith('care-');
         if (care && session && session.selectedPlot != null) {
@@ -569,6 +637,15 @@
         els.meterSunWrap.classList.toggle('active', step === 'smile' || step === 'care-sun');
         els.meterWaterWrap.classList.toggle('active', step === 'talk' || step === 'care-water');
         els.meterFertWrap.classList.toggle('active', step === 'breathe' || step === 'breathe-offer' || step === 'care-breathe');
+        if (els.meterStakeWrap) {
+            els.meterStakeWrap.classList.toggle('active', step === 'stretch' || step === 'stretch-offer');
+            const stakeVal = stakeMeterFrac();
+            if (els.meterStakeVal) {
+                els.meterStakeVal.textContent = step === 'stretch' || step === 'stretch-offer'
+                    ? `${Math.round(stakeVal * 100)}%`
+                    : '—';
+            }
+        }
     }
 
     // ------------------------------------------------------------------
@@ -616,7 +693,10 @@
             else if (!tendable.length && !ready) msg = 'Every plant is tended for today. Rest, harvest, or go to bed when ready.';
         }
         els.idleText.textContent = msg;
-        els.btnVisit.textContent = tendable.length ? 'Tend your plants' : (ready ? 'Tend (harvest)' : 'Tend your plants');
+        els.btnVisit.hidden = state.version >= 6 || document.body.dataset.captureTags === '1';
+        if (!els.btnVisit.hidden) {
+            els.btnVisit.textContent = tendable.length ? 'Tend your plants' : (ready ? 'Tend (harvest)' : 'Tend your plants');
+        }
         els.btnPlantIdle.hidden = !V.emptyPlots(state).length;
         els.btnBed.hidden = state.version < 5;
     }
@@ -735,11 +815,12 @@
         const prog = session.careProgressFor(plot);
         const kind = L.plantById(pl.plantId);
         els.needsPlantName.textContent = `${kind.name} · bed ${plot + 1}`;
-        bindNeedsArt(els.needsTagImg, ART.needs.plantTag, els.needsTagFallback);
+        bindNeedsArt(els.needsCardBg, ART.needsCardSrc(lighting), els.needsCardFallback);
+        const cardCareLight = 'midday';
         const allMet = C.allNeedsMet(prog, needs, pl.staked);
         const showResting = !!pl.tagResting && !allMet;
         if (els.needsBloomStamp) {
-            if (ART.needs.bloomStamp) bindNeedsArt(els.needsBloomStamp, ART.needs.bloomStamp, null);
+            bindNeedsArt(els.needsBloomStamp, ART.needs.bloomStamp, null);
             els.needsBloomStamp.hidden = !allMet;
         }
         if (els.needsRestingStamp) {
@@ -747,43 +828,77 @@
             els.needsRestingStamp.hidden = !showResting;
             if (els.needsRestingFallback) els.needsRestingFallback.hidden = !showResting || !els.needsRestingStamp.hidden;
         }
-        const box = els.needsIcons;
-        box.textContent = '';
-        const keys = ['sun', 'water', 'fertilizer', 'stake'];
-        for (const key of keys) {
-            const req = C.dotsForNeed(needs, key);
-            if (req <= 0) continue;
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'need-btn' + (C.fillFraction(prog, needs, key, pl.staked) >= 1 ? ' need-done' : '');
-            const iconPath = key === 'sun' ? ART.needs.iconSun
-                : key === 'water' ? ART.needs.iconWater
-                    : key === 'fertilizer' ? ART.needs.iconFertilizer
-                        : ART.needs.iconStake;
-            const icon = document.createElement('img');
-            icon.className = 'need-icon';
-            icon.alt = '';
-            icon.src = artUrl(iconPath);
-            icon.onerror = () => { icon.replaceWith(document.createTextNode(NEED_EMOJI[key] || '•')); };
-            const lab = document.createElement('span');
-            lab.style.fontSize = '0.72rem';
-            lab.textContent = NEED_LABELS[key];
-            const dots = document.createElement('span');
-            dots.className = 'need-dots';
-            const got = key === 'stake'
-                ? (C.stakeNeedMet(prog, pl.staked) ? 1 : 0)
-                : Math.min(req, Math.floor((Number(prog[key]) || 0) + 1e-6));
-            for (let d = 0; d < req; d++) {
-                const dot = document.createElement('span');
-                dot.className = `need-dot ${key}${d < got ? ' on' : ''}`;
-                dots.appendChild(dot);
+        const rowsEl = els.needsRows;
+        if (rowsEl) {
+            rowsEl.textContent = '';
+            const half = (n) => n / 2;
+            const rowsOriginY = half(ART.needs.cardRows[0].row[1]);
+            for (const rowSpec of ART.needs.cardRows) {
+                const key = rowSpec.key;
+                const req = C.dotsForNeed(needs, key);
+                if (req <= 0) continue;
+                const done = C.fillFraction(prog, needs, key, pl.staked) >= 1;
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'need-row' + (done ? ' need-row--done' : '');
+                const [rx0, ry0, rx1, ry1] = rowSpec.row;
+                const rowAbsTop = half(ry0);
+                const rowTop = rowAbsTop - rowsOriginY;
+                btn.style.top = `${rowTop}px`;
+                btn.style.height = `${half(ry1 - ry0)}px`;
+                const [ix0, iy0, ix1, iy1] = rowSpec.icon;
+                const icon = document.createElement('img');
+                icon.className = 'need-row-icon';
+                icon.alt = '';
+                icon.src = artUrl(ART.needsIconSrc(key, cardCareLight));
+                icon.style.left = `${half(ix0)}px`;
+                icon.style.top = `${half(iy0) - rowAbsTop}px`;
+                icon.style.width = `${half(ix1 - ix0)}px`;
+                icon.style.height = `${half(iy1 - iy0)}px`;
+                icon.onerror = () => { icon.replaceWith(document.createTextNode(NEED_EMOJI[key] || '•')); };
+                const dotsWrap = document.createElement('span');
+                dotsWrap.className = 'need-row-dots';
+                const got = key === 'stake'
+                    ? (C.stakeNeedMet(prog, pl.staked) ? 1 : 0)
+                    : Math.min(req, Math.floor((Number(prog[key]) || 0) + 1e-6));
+                const dotSz = half(rowSpec.dotSize);
+                rowSpec.dots.slice(0, req).forEach((cent, d) => {
+                    const dot = document.createElement('img');
+                    dot.className = 'need-row-dot';
+                    dot.alt = '';
+                    dot.src = artUrl(ART.needsDotSrc(d < got, cardCareLight));
+                    dot.style.width = `${dotSz}px`;
+                    dot.style.height = `${dotSz}px`;
+                    dot.style.left = `${half(cent[0]) - dotSz / 2}px`;
+                    dot.style.top = `${half(cent[1]) - rowAbsTop - dotSz / 2}px`;
+                    dot.style.position = 'absolute';
+                    dot.onerror = () => {
+                        const span = document.createElement('span');
+                        span.className = `need-dot-fallback ${key}${d < got ? ' on' : ''}`;
+                        dotsWrap.appendChild(span);
+                        return;
+                    };
+                    dotsWrap.appendChild(dot);
+                });
+                if (done) {
+                    const [sx0, sy0, sx1, sy1] = rowSpec.status;
+                    const check = document.createElement('img');
+                    check.className = 'need-row-check';
+                    check.alt = '';
+                    check.src = artUrl(ART.needsDoneSrc(cardCareLight));
+                    check.style.left = `${half(sx0)}px`;
+                    check.style.top = `${half(sy0) - rowAbsTop}px`;
+                    check.style.width = `${half(sx1 - sx0)}px`;
+                    check.style.height = `${half(sy1 - sy0)}px`;
+                    btn.append(check);
+                }
+                btn.append(icon, dotsWrap);
+                btn.addEventListener('click', () => {
+                    if (key === 'stake' && needs.stake) onStep(session.launchStretchCare('care-hub'));
+                    else onStep(session.startCare(key));
+                });
+                rowsEl.appendChild(btn);
             }
-            btn.append(icon, lab, dots);
-            btn.addEventListener('click', () => {
-                if (key === 'stake' && needs.stake) onStep(session.launchStretchCare('care-hub'));
-                else onStep(session.startCare(key));
-            });
-            box.appendChild(btn);
         }
         plotsForScene();
     }
@@ -829,19 +944,46 @@
         return true;
     }
 
-    async function beginVisit() {
-        if (!(await ensureSource())) return;
-        const today = gardenTodayKey();
-        session = new V.VisitSession({
+    function newVisitSession() {
+        return new V.VisitSession({
             fast: config.fast,
             pace: state.settings.pace,
             breaths: state.settings.breaths,
             plots: state.plots,
-            today,
+            today: gardenTodayKey(),
             gardenDay: state.dayNumber,
             dailyTends: state.dailyTends,
             tendBeds: V.tendableForState(state, clock.now()),
         });
+    }
+
+    async function beginVisitAtPlot(plotIndex) {
+        if (!(await ensureSource())) return;
+        session = newVisitSession();
+        refreshBasketChip(0);
+        els.basketChip.hidden = session.harvestQueue.length === 0;
+        trace.clear();
+        signal.breathing = null;
+        talkPromptIdx = Math.floor(Math.random() * TALK_PROMPTS.length);
+        const step = session.begin();
+        if (session.step === 'care-hub' || session.step === 'pick') {
+            session.setSelectedPlot(plotIndex);
+        } else if (session.step === 'pick-harvest') {
+            session.setSelectedPlot(plotIndex);
+        }
+        show('visit');
+        onStep(session.step);
+        try {
+            await source.start();
+            sourceReady = true;
+        } catch (e) {
+            showError('Camera could not start', String(e && e.message || e), !config.mock);
+        }
+    }
+
+    async function beginVisit() {
+        if (!(await ensureSource())) return;
+        session = newVisitSession();
         refreshBasketChip(0);
         els.basketChip.hidden = session.harvestQueue.length === 0;
         trace.clear();
@@ -900,7 +1042,7 @@
         els.stepText.textContent = copy.text;
         els.breathGuide.hidden = step !== 'breathe' && step !== 'care-breathe';
         els.stretchGuide.hidden = step !== 'stretch';
-        els.stepPanel.hidden = step === 'stretch-offer' || step === 'stretch';
+        els.stepPanel.hidden = careMode || step === 'stretch-offer' || step === 'stretch';
         renderStepActions(step);
         if (step !== 'breathe') {
             els.breathRate.hidden = true;
@@ -1078,32 +1220,68 @@
         };
     }
 
+    let stretchRingScratch = null;
+    function softenRingFrameAlpha(ctx, img) {
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+        if (!stretchRingScratch || stretchRingScratch.width !== iw || stretchRingScratch.height !== ih) {
+            stretchRingScratch = document.createElement('canvas');
+            stretchRingScratch.width = iw;
+            stretchRingScratch.height = ih;
+        }
+        const sctx = stretchRingScratch.getContext('2d');
+        sctx.clearRect(0, 0, iw, ih);
+        sctx.drawImage(img, 0, 0);
+        const d = sctx.getImageData(0, 0, iw, ih);
+        const data = d.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            let a = data[i + 3];
+            const mx = Math.max(r, g, b);
+            const mn = Math.min(r, g, b);
+            const isPlate = mx < 120 && mx - mn < 36;
+            const isVegetal = g > r + 5 && g > b + 3;
+            const isFill = isVegetal && mx > 90;
+            if (isPlate && !isFill) a = 0;
+            else if (a < 64 && !isFill) a = 0;
+            else if (mx < 90 && !isFill) a = 0;
+            data[i + 3] = a;
+        }
+        sctx.putImageData(d, 0, 0);
+        ctx.drawImage(stretchRingScratch, 0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+
     function drawStretchRing(canvas, progress, done) {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         const w = canvas.width;
         const h = canvas.height;
         ctx.clearRect(0, 0, w, h);
-        const cx = w / 2;
-        const cy = h / 2;
-        const r = w * 0.38;
-        ctx.lineWidth = 5;
-        ctx.strokeStyle = 'rgba(150, 120, 80, 0.35)';
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.stroke();
+        const night = lighting === 'night';
+        const frames = night ? stretchRingArt.framesNight : stretchRingArt.framesDay;
         const p = done ? 1 : Math.max(0, Math.min(1, progress));
-        if (p > 0.01) {
-            ctx.strokeStyle = done ? 'rgba(125, 154, 91, 0.95)' : 'rgba(125, 154, 91, 0.75)';
+        let frame = Math.max(1, Math.round(p * (STRETCH_RING_FRAMES - 1)));
+        if (stretchHudDemoLock && stretchDemoSnap && Number.isFinite(stretchDemoSnap.ringFrame)) {
+            frame = Math.max(0, Math.min(STRETCH_RING_FRAMES - 1, Math.round(stretchDemoSnap.ringFrame)));
+        }
+        const frameImg = frames && frames[frame];
+        if (frameImg && frameImg.naturalWidth > 0) {
+            softenRingFrameAlpha(ctx, frameImg);
+        } else if (!frames) {
+            ctx.strokeStyle = 'rgba(150, 120, 80, 0.35)';
+            ctx.lineWidth = 6;
             ctx.beginPath();
-            ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p);
+            ctx.arc(w / 2, h / 2, w * 0.38, 0, Math.PI * 2);
             ctx.stroke();
         }
         if (done) {
-            ctx.fillStyle = 'rgba(125, 154, 91, 0.9)';
-            ctx.font = 'bold 22px Nunito, sans-serif';
+            ctx.fillStyle = 'rgba(125, 154, 91, 0.92)';
+            ctx.font = `bold ${Math.round(w * 0.11)}px Nunito, sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText('✓', cx, cy + 8);
+            ctx.textBaseline = 'middle';
+            ctx.fillText('✓', w / 2, h / 2 + w * 0.02);
         }
     }
 
@@ -1116,35 +1294,68 @@
                 ? (lastCameraCheckSnap.stretchSnap || {})
                 : (session && session.stretchSnap) || {};
         const roll = snap.rollDeg || 0;
-        const img = els.stretchSunflower;
-        if (ART.stretch && img && !img.dataset.fallback) {
-            img.onerror = () => {
-                img.dataset.fallback = '1';
-                const fb = document.createElement('div');
-                fb.className = 'stretch-flower-fallback';
-                fb.textContent = '🌻';
-                img.replaceWith(fb);
+        const s = ART.stretch;
+        const theta = Math.max(-(s && s.headRollClamp) || 28, Math.min((s && s.headRollClamp) || 28, roll));
+        const rad = (theta * Math.PI) / 180;
+        const arm = (s && s.headArmLength) || 143;
+        const pv = (s && s.stemPivotInBox) || [80, 216];
+        const night = lighting === 'night';
+        const stemEl = els.stretchSunflowerStem || document.getElementById('stretch-sunflower-stem');
+        const headEl = els.stretchSunflower;
+        const fullEl = els.stretchGuideFull;
+        if (s && stemEl && headEl && !stemEl.dataset.fallback) {
+            const stemSrc = night ? s.guideStemNight : s.guideStem;
+            const headSrc = night ? s.guideHeadNight : s.guideHead;
+            stemEl.onerror = () => {
+                stemEl.dataset.fallback = '1';
+                stemEl.hidden = true;
+                headEl.hidden = true;
+                if (fullEl) {
+                    fullEl.hidden = false;
+                    fullEl.src = artUrl(s.guideFull);
+                    fullEl.onerror = () => {
+                        fullEl.replaceWith(Object.assign(document.createElement('div'), {
+                            className: 'stretch-flower-fallback',
+                            textContent: '🌻',
+                        }));
+                    };
+                }
             };
-            const stemEl = document.getElementById('stretch-sunflower-stem');
-            const headSrc = ART.stretch.guideSunflowerHead;
-            const stemSrc = ART.stretch.guideSunflowerStem;
-            const pv = ART.stretch.guidePivot || { x: 0.5, y: 0.75 };
-            if (img) {
-                img.style.transformOrigin = `${pv.x * 100}% ${pv.y * 100}%`;
-                if (!img.src) img.src = artUrl(headSrc || ART.stretch.guideSunflower);
-            }
-            if (stemEl && stemSrc && !stemEl.dataset.fallback) {
-                stemEl.onerror = () => { stemEl.dataset.fallback = '1'; stemEl.hidden = true; };
-                if (!stemEl.src) stemEl.src = artUrl(stemSrc);
-                stemEl.hidden = false;
+            if (!stemEl.src) stemEl.src = artUrl(stemSrc);
+            if (!headEl.src) headEl.src = artUrl(headSrc);
+            stemEl.hidden = false;
+            headEl.hidden = false;
+            const piv = s.stemPivotInStem || [64, 152];
+            stemEl.style.transformOrigin = `${piv[0]}px ${piv[1]}px`;
+            stemEl.style.transform = `rotate(${theta}deg)`;
+            const hx = pv[0] + arm * Math.sin(rad);
+            const hy = pv[1] + arm * (-Math.cos(rad));
+            headEl.style.left = `${hx}px`;
+            headEl.style.top = `${hy}px`;
+            headEl.style.transform = `translate(-50%, -50%) rotate(${theta * (s.headRollGain || 1.15)}deg)`;
+        }
+        const hintL = els.stretchHintLeft;
+        const hintR = els.stretchHintRight;
+        if (hintL && hintR && s) {
+            const hl = night ? s.hintLeftNight : s.hintLeft;
+            const hr = night ? s.hintRightNight : s.hintRight;
+            if (!hintL.src) hintL.src = artUrl(hl);
+            if (!hintR.src) hintR.src = artUrl(hr);
+            hintL.hidden = false;
+            hintR.hidden = false;
+            const showLeft = !snap.leftDone && (!snap.rightDone || snap.activeSide === 'left');
+            const showRight = !snap.rightDone && snap.leftDone;
+            hintL.style.opacity = showLeft ? '0.92' : '0';
+            hintR.style.opacity = showRight || (!snap.leftDone && snap.activeSide === 'right') ? '0.92' : (snap.leftDone && !snap.rightDone ? '0.92' : '0');
+            if (!snap.leftDone && !snap.rightDone && !snap.activeSide) {
+                hintL.style.opacity = '0.55';
+                hintR.style.opacity = '0';
             }
         }
-        const flowerEl = document.querySelector('.stretch-flower-fallback') || img;
-        if (flowerEl && flowerEl.tagName !== 'DIV') {
-            flowerEl.style.transform = `rotate(${Math.max(-32, Math.min(32, roll * 1.4))}deg)`;
-        }
-        drawStretchRing(els.stretchRingLeft, snap.leftProgress, snap.leftDone);
-        drawStretchRing(els.stretchRingRight, snap.rightProgress, snap.rightDone);
+        const ringSide = snap.activeSide === 'right' ? 'right' : 'left';
+        const ringProg = ringSide === 'right' ? snap.rightProgress : snap.leftProgress;
+        const ringDone = ringSide === 'right' ? snap.rightDone : snap.leftDone;
+        drawStretchRing(els.stretchRing, ringProg, ringDone);
         if (snap.needsFaceHint) {
             els.hint.hidden = false;
             els.hintTitle.textContent = 'Face the camera';
@@ -1156,8 +1367,8 @@
         }
         const side = snap.activeSide;
         const live = snap.complete ? 'Lovely — your plant is staked for harvest.'
-            : side === 'left' ? 'Hold toward your left shoulder…'
-                : side === 'right' ? 'Hold toward your right shoulder…'
+            : side === 'left' ? 'Hold toward your left shoulder and keep a gentle stretch.'
+                : side === 'right' ? 'Hold toward your right shoulder and keep a gentle stretch.'
                     : 'Tip each ear toward a shoulder and hold gently.';
         els.stepLive.textContent = live;
         if (els.stretchCareLive) els.stretchCareLive.textContent = live;
@@ -1258,11 +1469,16 @@
         const on = L.DEFAULTS.smileOn;
         const smileAmt = (step === 'smile' || step === 'care-sun' || step === 'harvest-hold') && session.smiling
             ? 0.45 + 0.55 * L.clamp01((session.h - on) / (1 - on)) : 0;
+        const stretchSnap = session.stretchSnap || {};
+        const stakeAmt = step === 'stretch'
+            ? Math.max(stretchSnap.leftProgress || 0, stretchSnap.rightProgress || 0)
+            : 0;
         scene.setEffects({
             plot: session.selectedPlot,
             sun: smileAmt,
             water: (step === 'talk' || step === 'care-water') && session.talking ? 1 : 0,
             fert: (step === 'breathe' || step === 'care-breathe') ? 0.9 : 0,
+            stake: stakeAmt,
         });
         renderNeedsCard();
         renderMeters();
@@ -1879,7 +2095,12 @@
             }
             return;
         }
-        if (state.plots[i]) return;
+        if (state.plots[i]) {
+            if (state.version >= 6 && screen === 'idle') {
+                beginVisitAtPlot(i);
+            }
+            return;
+        }
         if (screen === 'picker') { pickerTarget = i; scene.setHighlight(i); els.pickerTarget.textContent = `for bed ${i + 1}`; }
         else if (screen === 'idle' || screen === 'greeting') openPicker(i);
     });
@@ -2136,8 +2357,8 @@
         } else {
             show('wellness');
         }
+        document.body.dataset.gardenV = String(state.version >= 6 ? 6 : state.version >= 5 ? 5 : 4);
         if (state.version >= 5) {
-            document.body.dataset.gardenV = '5';
             scene.setSeason(state.season);
             refreshLighting();
         }
@@ -2151,11 +2372,13 @@
         get session() { return session; },
         get screen() { return screen; },
         get scene() { return scene; },
-        clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker,         ackWellness: () => ackWellness(),
+        get stretchDemoSnap() { return stretchDemoSnap; },
+        clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness: () => ackWellness(),
         openCameraCheck: () => openCameraCheck(),
         finishCameraCheck: () => finishCameraCheckFlow(),
         selectCameraCheck(key) {
             if (!cameraCheckSession || !key) return;
+            cameraCheckDemoLock = false;
             cameraCheckSession.select(key);
             if (source && source.setPhase) source.setPhase(`camera-check-${key}`);
             renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
@@ -2167,24 +2390,45 @@
         },
         markAllCameraChecksPassed() {
             if (!cameraCheckSession) return;
+            cameraCheckDemoLock = true;
             for (const k of CC.CHECKS) cameraCheckSession.markPassed(k);
             renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
         },
         /** Capture/helper: fix packet visuals to match docs/camera-check-mockup.png */
         setCameraCheckDemo(opts) {
-            if (!cameraCheckSession) return;
             const o = opts || {};
+            cameraDeniedDemo = false;
+            cameraCheckDemoLock = true;
+            signal.validation = 'Ok';
+            signal.breathing = null;
+            cameraCheckSession = CC.createCameraCheckSession({
+                smileOn: L.DEFAULTS.smileOn,
+                Stretch: window.SmileStretch,
+            });
             for (const k of (o.passed || [])) cameraCheckSession.markPassed(k);
             if (o.active) cameraCheckSession.select(o.active);
             signal.h = 0.82;
-            signal.validation = 'Ok';
-            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
+            signal.talking = o.active === 'talk';
+            signal.hAt = performance.now();
+            signal.talkAt = performance.now();
+            if (source && source.setPhase && o.active) source.setPhase(`camera-check-${o.active}`);
+            const input = buildCameraCheckInput();
+            input.breathing = null;
+            renderCameraCheckUI(cameraCheckSession.update(0, input));
         },
         setCameraDeniedDemo(on) {
+            cameraCheckDemoLock = on;
             cameraDeniedDemo = !!on;
             signal.validation = on ? 'CameraPermissionDenied' : 'Ok';
             signal.faceGoneAt = on ? performance.now() : 0;
             signal.hAt = 0;
+            signal.talking = false;
+            if (on && screen === 'camera-check') {
+                cameraCheckSession = CC.createCameraCheckSession({
+                    smileOn: L.DEFAULTS.smileOn,
+                    Stretch: window.SmileStretch,
+                });
+            }
             if (screen === 'camera-check' && cameraCheckSession) {
                 renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
             }
@@ -2238,6 +2482,174 @@
             if (needs.stake && !p.staked) session.setCareProgress(plot, Object.assign(session.careProgressFor(plot), { stake: true }));
             renderNeedsCard();
         },
+        /** Mock capture: fill one care meter then return to the hub without waiting on face input. */
+        setNeedsCardDemo(plot, progress) {
+            const i = Number(plot);
+            if (!(i >= 0 && i < state.plots.length && state.plots[i] && state.plots[i].plantId)) return null;
+            const planted = state.plots.map((p, idx) => (p ? idx : -1)).filter((idx) => idx >= 0);
+            if (!planted.includes(i)) planted.push(i);
+            session = new V.VisitSession({
+                fast: config.fast,
+                pace: state.settings.pace,
+                breaths: state.settings.breaths,
+                plots: state.plots,
+                today: gardenTodayKey(),
+                gardenDay: state.dayNumber,
+                dailyTends: state.dailyTends,
+                tendBeds: planted,
+            });
+            session.phase = 'tend';
+            session.plantRound = planted.indexOf(i);
+            session.go('care-hub');
+            session.selectedPlot = i;
+            session.setCareProgress(i, Object.assign(C.emptyProgress(), progress));
+            show('visit');
+            onStep('care-hub');
+            els.needsCard.hidden = false;
+            renderNeedsCard();
+            refreshLighting();
+            renderHud();
+            plotsForScene({ instant: true });
+            return i;
+        },
+        clearCaptureVisit() {
+            session = null;
+            stretchHudDemoLock = false;
+            stretchDemoSnap = null;
+            syncTendRing();
+            plotsForScene({ instant: true });
+            show('idle');
+        },
+        captureRedraw() {
+            plotsForScene({ instant: true });
+            renderHud();
+            try {
+                scene.draw(performance.now() / 1000);
+            } catch (e) {
+                console.error('[captureRedraw] scene.draw failed', e);
+            }
+            return document.body.dataset.planted;
+        },
+        /** Mock capture: garden tag/soil states without a live visit session. */
+        unlockSeedsForCapture() {
+            if (!state.pantry) state.pantry = V.emptyPantry();
+            state.pantry.totalHarvests = Math.max(state.pantry.totalHarvests || 0, 12);
+            if (!state.visitDays) state.visitDays = [];
+            while (state.visitDays.length < 4) state.visitDays.push(gardenTodayKey());
+            save();
+        },
+        prepCaptureGarden() {
+            if (!state.pantry) state.pantry = V.emptyPantry();
+            state.pantry.totalHarvests = Math.max(state.pantry.totalHarvests || 0, 12);
+            if (!state.visitDays) state.visitDays = [];
+            while (state.visitDays.length < 4) state.visitDays.push(gardenTodayKey());
+            show('idle');
+            const beds = [
+                ['lettuce', 0, 2],
+                ['mint', 1, 2],
+                ['tomato', 2, 4],
+                ['cucumber', 4, 3],
+                ['sunflower', 6, 4],
+            ];
+            for (const [id, plot, stage] of beds) {
+                if (!state.plots[plot]) {
+                    const res = V.plantSeed(state, plot, id, clock.now());
+                    if (!res.ok) continue;
+                }
+                state.plots[plot].stage = stage;
+                state.plots[plot].tagResting = false;
+            }
+            save();
+            plotsForScene({ instant: true });
+            renderHud();
+            return state.plots.filter(Boolean).length;
+        },
+        applyTagGardenDemo(mode) {
+            session = null;
+            document.body.dataset.captureTags = '1';
+            if (els.btnVisit) els.btnVisit.hidden = true;
+            const day = state.dayNumber;
+            if (!state.dailyTends) state.dailyTends = {};
+            const setBed = (plot, cfg) => {
+                const p = state.plots[plot];
+                if (!p || !p.plantId) return;
+                const needs = L.plantNeeds(p.plantId);
+                state.plots[plot].staked = !!cfg.staked;
+                state.plots[plot].tagResting = !!cfg.resting;
+                const prog = cfg.progress || {
+                    sun: cfg.allMet ? needs.sun : 0,
+                    water: cfg.allMet ? needs.water : 0,
+                    fertilizer: cfg.allMet ? needs.fertilizer : 0,
+                    stake: cfg.staked && needs.stake,
+                };
+                state.dailyTends[plot] = Object.assign({ day, allMet: !!cfg.allMet }, prog, {
+                    stake: !!cfg.staked || !!prog.stake,
+                });
+            };
+            if (mode === 'complete') {
+                setBed(2, { allMet: true, staked: true, resting: false });
+            } else if (mode === 'resting') {
+                setBed(2, { allMet: false, resting: true, progress: { sun: 0, water: 0, fertilizer: 0, stake: false } });
+            } else if (mode === 'partial') {
+                setBed(2, { allMet: false, progress: { sun: 1, water: 0, fertilizer: 0, stake: false } });
+            } else if (mode === 'garden') {
+                setBed(0, { allMet: false, progress: { sun: 2, water: 1, fertilizer: 0, stake: false } });
+                setBed(1, { allMet: false, progress: { sun: 0, water: 2, fertilizer: 0, stake: false } });
+                setBed(2, { allMet: true, staked: true, resting: false });
+                setBed(6, { allMet: false, progress: { sun: 3, water: 2, fertilizer: 1, stake: false } });
+            }
+            save();
+            show('idle');
+            plotsForScene({ instant: true });
+            renderHud();
+            return mode;
+        },
+        prepTagGardenDemo(mode) {
+            if (state.plots.filter(Boolean).length < 4) prepCaptureGarden();
+            return applyTagGardenDemo(mode);
+        },
+        prepStakedTomatoCapture() {
+            session = null;
+            stretchHudDemoLock = false;
+            stretchDemoSnap = null;
+            syncTendRing();
+            show('idle');
+            state.plots = new Array(state.plots.length).fill(null);
+            const res = V.plantSeed(state, 2, 'tomato', clock.now());
+            if (res.ok && state.plots[2]) {
+                state.plots[2].stage = 4;
+                state.plots[2].staked = true;
+                state.plots[2].tagResting = false;
+            }
+            if (!state.dailyTends) state.dailyTends = {};
+            state.dailyTends[2] = {
+                day: state.dayNumber,
+                sun: 2,
+                water: 1,
+                fertilizer: 0,
+                stake: true,
+                allMet: false,
+            };
+            save();
+            plotsForScene({ instant: true });
+            renderHud();
+        },
+        completeCareNeedForCapture(needKey) {
+            if (!session || session.selectedPlot == null) return null;
+            const plot = session.selectedPlot;
+            const p = state.plots[plot];
+            if (!p || !p.plantId) return null;
+            const needs = L.plantNeeds(p.plantId);
+            const prog = Object.assign({}, session.careProgressFor(plot));
+            if (needKey === 'sun') prog.sun = needs.sun;
+            else if (needKey === 'water') prog.water = needs.water;
+            else if (needKey === 'fertilizer') prog.fertilizer = needs.fertilizer;
+            else return null;
+            session.setCareProgress(plot, prog);
+            const step = session.skip();
+            onStep(step);
+            return step;
+        },
         startBreathing: (o) => session && session.startBreathing(o || {}),
         launchStretchCare(returnStep) {
             if (!session) return null;
@@ -2268,11 +2680,10 @@
             scene.setSeason(state.season);
             refreshLighting();
             renderHud();
-            document.body.dataset.gardenV = state.version >= 5 ? '5' : '4';
-            show('wellness');
+            document.body.dataset.gardenV = String(state.version >= 6 ? 6 : state.version >= 5 ? 5 : 4);
+            show(state.wellnessAck ? 'idle' : 'wellness');
         },
         setGardenTime(m) {
-            state.version = 5;
             state.gardenMinutes = D.clampMinutes(m);
             gardenClock.pause();
             refreshLighting();
@@ -2338,27 +2749,43 @@
         },
         setStretchHudDemo(mode) {
             const modes = {
-                'left-hold': { leftProgress: 0.68, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -21, activeSide: 'left', complete: false, needsFaceHint: false },
+                'tilted-guide': { leftProgress: 0.12, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -26, activeSide: 'left', ringFrame: 2, complete: false, needsFaceHint: false },
+                'ring-midfill': { leftProgress: 7 / 11, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -4, activeSide: 'left', ringFrame: 7, complete: false, needsFaceHint: false },
+                'left-hold': { leftProgress: 7 / 11, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -22, activeSide: 'left', complete: false, needsFaceHint: false },
                 'right-hold': { leftProgress: 1, rightProgress: 0.72, leftDone: true, rightDone: false, rollDeg: 19, activeSide: 'right', complete: false, needsFaceHint: false },
                 done: { leftProgress: 1, rightProgress: 1, leftDone: true, rightDone: true, rollDeg: 2, activeSide: null, complete: true, needsFaceHint: false },
             };
-            stretchHudDemoLock = true;
-            stretchDemoSnap = modes[mode] || modes['left-hold'];
-            show('visit');
-            document.body.dataset.step = 'stretch';
-            document.body.dataset.stretchCare = '1';
-            els.stretchCarePanel.hidden = false;
-            const copy = STEP_COPY.stretch;
-            els.stepTitle.textContent = copy.title;
-            els.stepText.textContent = copy.text;
-            els.stretchGuide.hidden = false;
-            els.stepPanel.querySelector('.step-actions').innerHTML = '';
-            renderStretchHud();
+        stretchHudDemoLock = true;
+        stretchDemoSnap = modes[mode] || modes['left-hold'];
+        show('visit');
+        document.body.dataset.step = 'stretch';
+        document.body.dataset.stretchCare = '1';
+        els.stretchCarePanel.hidden = false;
+        els.stretchGuide.hidden = false;
+        els.stepPanel.hidden = true;
+        if (els.stretchCareLive) {
+            const snap = stretchDemoSnap;
+            els.stretchCareLive.textContent = snap.activeSide === 'left'
+                ? 'Hold toward your left shoulder and keep a gentle stretch.'
+                : 'Hold toward your right shoulder and keep a gentle stretch.';
+        }
+        const back = mkBtn('Back to needs', 'btn btn-ghost', () => clearStretchHudDemo());
+        if (els.stretchCareActions) {
+            els.stretchCareActions.textContent = '';
+            els.stretchCareActions.appendChild(back);
+        }
+        scene.setEffects({ plot: null, sun: 0, water: 0, fert: 0, stake: 0 });
+        return ensureStretchRingArt().then(() => renderStretchHud());
         },
         clearStretchHudDemo() {
             stretchHudDemoLock = false;
             stretchDemoSnap = null;
+            if (els.stretchCarePanel) els.stretchCarePanel.hidden = true;
+            if (els.stretchGuide) els.stretchGuide.hidden = true;
+            document.body.dataset.stretchCare = '0';
+            document.body.dataset.step = '';
             if (session) onStep(session.step);
+            else show('idle');
         },
         setStakedBed(plot, staked) {
             const p = state.plots[plot];

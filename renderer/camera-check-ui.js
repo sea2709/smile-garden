@@ -4,6 +4,13 @@
 
     const CHECKS = Object.freeze(['smile', 'talk', 'breath', 'stretch']);
 
+    const PACKET_TITLES = Object.freeze({
+        smile: 'Smile',
+        talk: 'Talk',
+        breath: 'Breathe',
+        stretch: 'Neck stretch',
+    });
+
     const FALLBACK_ICON = Object.freeze({ smile: '☀', talk: '💬', breath: '🍃', stretch: '🌻' });
 
     function firstOpenCheck(snap) {
@@ -13,7 +20,19 @@
         return null;
     }
 
-    function packetState(key, snap, active) {
+    function queuedNextCheck(snap, active) {
+        if (active && CHECKS.includes(active)) {
+            const start = CHECKS.indexOf(active) + 1;
+            for (let i = start; i < CHECKS.length; i++) {
+                const k = CHECKS[i];
+                if (!snap.passed?.[k] && !snap.skipped?.[k]) return k;
+            }
+        }
+        return firstOpenCheck(snap);
+    }
+
+    function packetState(key, snap, active, denied) {
+        if (denied) return 'closed';
         if (snap.passed && snap.passed[key]) return 'sprouted';
         if (active === key) return 'listening';
         return 'closed';
@@ -49,30 +68,59 @@
             lab.className = 'cc-packet-label';
             lab.dataset.check = key;
             lab.style.left = `${cx}px`;
-            lab.textContent = 'ready';
+            renderPacketLabel(lab, key, { passed: {}, skipped: {} }, null, false);
             container.appendChild(btn);
             container.appendChild(lab);
         }
     }
 
-    function labelText(key, snap, active) {
-        if (snap.passed && snap.passed[key]) return '';
+    function statusText(key, snap, active, denied) {
+        if (denied) {
+            const next = firstOpenCheck(snap);
+            return next === key ? 'next' : 'waiting';
+        }
         if (snap.skipped && snap.skipped[key]) return 'Skipped';
+        if (snap.passed && snap.passed[key]) return 'ready';
         if (active === key) return 'listening…';
-        const next = firstOpenCheck(snap);
-        if (next === key) return 'next';
-        return 'ready';
+        const next = queuedNextCheck(snap, active);
+        return next === key ? 'next' : 'waiting';
     }
 
-    function renderPackets(container, snap, active, ART, artUrl) {
+    function renderPacketLabel(lab, key, snap, active, denied) {
+        const title = PACKET_TITLES[key] || key;
+        const status = statusText(key, snap, active, denied);
+        lab.textContent = '';
+        lab.classList.toggle('ready', status === 'ready');
+        const name = document.createElement('strong');
+        name.className = 'cc-packet-name';
+        name.textContent = title;
+        const line = document.createElement('small');
+        line.className = 'cc-packet-status';
+        lab.append(name, line);
+        if (active === key && !denied && !(snap.passed && snap.passed[key]) && (key === 'smile' || key === 'talk')) {
+            line.textContent = 'listening…';
+            const frac = key === 'smile' ? snap.smileMeter : snap.talkMeter;
+            const meter = document.createElement('div');
+            meter.className = 'cc-meter';
+            const fill = document.createElement('i');
+            fill.style.width = `${Math.round((frac || 0) * 100)}%`;
+            meter.appendChild(fill);
+            lab.appendChild(meter);
+        } else {
+            line.textContent = status;
+        }
+    }
+
+    function renderPackets(container, snap, active, ART, artUrl, opts) {
         if (!container) return;
+        const denied = !!(opts && opts.denied);
         const cc = ART.cameraCheck || {};
         container.querySelectorAll('.cc-packet').forEach((btn) => {
             const k = btn.dataset.check;
-            const passed = !!(snap.passed && snap.passed[k]);
+            const passed = !denied && !!(snap.passed && snap.passed[k]);
             const done = passed || !!(snap.skipped && snap.skipped[k]);
-            const state = packetState(k, snap, active);
-            btn.classList.toggle('on', k === active);
+            const state = packetState(k, snap, active, denied);
+            btn.classList.toggle('on', !denied && k === active);
             btn.classList.toggle('done', done);
             btn.classList.toggle('passed', passed);
             btn.dataset.state = state;
@@ -83,26 +131,7 @@
         });
         container.querySelectorAll('.cc-packet-label').forEach((lab) => {
             const k = lab.dataset.check;
-            const text = labelText(k, snap, active);
-            lab.textContent = '';
-            lab.classList.toggle('ready', text === 'ready');
-            if (!text) {
-                lab.textContent = '';
-                return;
-            }
-            if (active === k && (k === 'smile' || k === 'talk')) {
-                const frac = k === 'smile' ? snap.smileMeter : snap.talkMeter;
-                const cap = document.createElement('span');
-                cap.textContent = 'listening…';
-                const meter = document.createElement('div');
-                meter.className = 'cc-meter';
-                const fill = document.createElement('i');
-                fill.style.width = `${Math.round((frac || 0) * 100)}%`;
-                meter.appendChild(fill);
-                lab.append(cap, meter);
-            } else {
-                lab.textContent = text;
-            }
+            renderPacketLabel(lab, k, snap, active, denied);
         });
     }
 

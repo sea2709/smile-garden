@@ -1,0 +1,304 @@
+{
+ "note": "Neck-stretch staking care. All UI art is painted at 2x (draw at half the pixel size). Coordinates are in the PNG pixels unless marked display.",
+ "meter": {
+  "file": "ui/meter-stake.png",
+  "w": 444,
+  "h": 283,
+  "dots": [
+   [
+    73.8,
+    195.8,
+    19.2
+   ],
+   [
+    124.2,
+    195.8,
+    19.2
+   ],
+   [
+    173.8,
+    196.2,
+    19.2
+   ],
+   [
+    222.8,
+    196.0,
+    18.8
+   ],
+   [
+    271.5,
+    196.2,
+    18.5
+   ],
+   [
+    320.2,
+    196.2,
+    18.8
+   ],
+   [
+    369.2,
+    196.2,
+    18.8
+   ]
+  ],
+  "colors": [
+   "#e8dcb0",
+   "#9a8a4a"
+  ],
+  "dotCss": "radial-gradient(circle at 35% 35%, #ece2b8, #9c8c4c)",
+  "night": "none (sun/water/fertilizer meter cards have no night variant either)"
+ },
+ "icon": {
+  "files": [
+   "ui/care/stake-icon.png",
+   "ui/care/stake-icon-night.png"
+  ],
+  "px": [
+   128,
+   128
+  ],
+  "display": [
+   64,
+   64
+  ]
+ },
+ "guide": {
+  "box": {
+   "px": [
+    320,
+    440
+   ],
+   "display": [
+    160,
+    220
+   ]
+  },
+  "stem": {
+   "file": "ui/stretch/guide-stem.png",
+   "night": "ui/stretch/guide-stem-night.png",
+   "px": [
+    249,
+    306
+   ],
+   "pivot": [
+    128,
+    304
+   ],
+   "pivotNote": "stem foot; rotate the stem around this point",
+   "tip": [
+    129,
+    10
+   ],
+   "placeInBox": [
+    32,
+    128
+   ],
+   "pivotInBox": [
+    160,
+    432
+   ]
+  },
+  "head": {
+   "file": "ui/stretch/guide-head.png",
+   "night": "ui/stretch/guide-head-night.png",
+   "px": [
+    160,
+    160
+   ],
+   "pivot": [
+    80,
+    80
+   ],
+   "restCentreInBox": [
+    160,
+    146
+   ],
+   "armLength": 286,
+   "howTo": "theta = player head roll (deg, + = toward right shoulder, mirrored like a selfie). Stem: rotate theta around pivotInBox. Head centre = pivotInBox + armLength*(sin theta, -cos theta); rotate head by theta*1.15. Clamp theta to +-28."
+  },
+  "full": "ui/stretch/guide-full.png (upright composite preview / fallback)"
+ },
+ "hints": {
+  "files": [
+   "ui/stretch/hint-left.png",
+   "ui/stretch/hint-right.png"
+  ],
+  "nightFiles": [
+   "ui/stretch/hint-left-night.png",
+   "ui/stretch/hint-right-night.png"
+  ],
+  "px": [
+   150,
+   67
+  ],
+  "note": "soft curved swoop + leaf tip; show the side the player should lean toward next; fade in/out, no text"
+ },
+ "ring": {
+  "strip": "ui/stretch/ring-{day|night}-strip.png",
+  "frames": 12,
+  "framePx": [
+   400,
+   400
+  ],
+  "display": [
+   200,
+   200
+  ],
+  "frameFor": "frame = round(progress*11); frame 0 = faint track only (never shown as an empty failure state)",
+  "mask": {
+   "full": "ui/stretch/ring-full.png",
+   "track": "ui/stretch/ring-track.png",
+   "css": ".ring-fill{-webkit-mask:conic-gradient(#000 calc(var(--p)*1turn), transparent calc(var(--p)*1turn + 8deg));} over .ring-track; --p 0..1, starts at 12 o'clock, clockwise",
+   "canvas": "draw track; then ctx.save(); beginPath(); moveTo(cx,cy); arc(cx,cy,R,-PI/2,-PI/2+p*TAU); clip(); draw ring-full; restore()"
+  },
+  "placeOverGuide": "ring centre at guide box display (80,112): ring box left=-20, top=12 relative to the 160x220 guide box; draw ring behind the guide",
+  "fps": "driven by hold progress, not time"
+ },
+ "stake": {
+  "drawLike": "plant sprites: ctx.translate(p.x + offsetX*p.scale, p.y); ctx.scale(p.scale,p.scale); drawImage(img,-w/2,-base,w,h)",
+  "offsetX": 56,
+  "offsetNote": "sprite px right of the plot centre; draw BEFORE the plant so leaves overlap the cane. Use -56 to put it on the left.",
+  "pick": "tall for stage>=4 or tall plants (sunflower, tomato, cucumber, apple); short for stages 1-3 and lettuce/mint",
+  "nightNote": "drawPlants() already applies SPRITE_FILTER.night, so inside that pass draw the DAY file; *-night files are pre-darkened for places drawn without the filter",
+  "sprites": {
+   "tall": {
+    "day": "plants/stake/stake-tall-day.png",
+    "night": "plants/stake/stake-tall-night.png",
+    "w": 50,
+    "h": 304,
+    "base": 293,
+    "top": 4
+   },
+   "short": {
+    "day": "plants/stake/stake-short-day.png",
+    "night": "plants/stake/stake-short-night.png",
+    "w": 52,
+    "h": 225,
+    "base": 214,
+    "top": 4
+   }
+  }
+ },
+ "effects": {
+  "frameW": 200,
+  "frameH": 320,
+  "soilY": 282,
+  "count": 12,
+  "fps": 12,
+  "anchor": "same as sun/water/fertilizer: bottom-centre on plot (p.x, p.y-4), scale p.w/180, source-over blend",
+  "names": [
+   "stake-day-loop",
+   "stake-day-absorb",
+   "stake-night-loop",
+   "stake-night-absorb"
+  ],
+  "files": "effects/<name>-strip.png (2400x320)",
+  "look": "loop: pale twine slowly spiralling up a soft green column with green motes and sparkles; absorb: twine wraps upward from the soil, sparkles rise, two little light-leaves tick upward at the top, then fades"
+ },
+ "files": {
+  "effects/stake-day-absorb-strip.png": [
+   2400,
+   320
+  ],
+  "effects/stake-day-loop-strip.png": [
+   2400,
+   320
+  ],
+  "effects/stake-night-absorb-strip.png": [
+   2400,
+   320
+  ],
+  "effects/stake-night-loop-strip.png": [
+   2400,
+   320
+  ],
+  "plants/stake/stake-short-day.png": [
+   52,
+   225
+  ],
+  "plants/stake/stake-short-night.png": [
+   52,
+   225
+  ],
+  "plants/stake/stake-tall-day.png": [
+   50,
+   304
+  ],
+  "plants/stake/stake-tall-night.png": [
+   50,
+   304
+  ],
+  "ui/care/stake-icon-night.png": [
+   128,
+   128
+  ],
+  "ui/care/stake-icon.png": [
+   128,
+   128
+  ],
+  "ui/meter-stake.png": [
+   444,
+   283
+  ],
+  "ui/stretch/guide-full.png": [
+   320,
+   440
+  ],
+  "ui/stretch/guide-head-night.png": [
+   160,
+   160
+  ],
+  "ui/stretch/guide-head.png": [
+   160,
+   160
+  ],
+  "ui/stretch/guide-stem-night.png": [
+   249,
+   306
+  ],
+  "ui/stretch/guide-stem.png": [
+   249,
+   306
+  ],
+  "ui/stretch/hint-left-night.png": [
+   150,
+   67
+  ],
+  "ui/stretch/hint-left.png": [
+   150,
+   67
+  ],
+  "ui/stretch/hint-right-night.png": [
+   150,
+   67
+  ],
+  "ui/stretch/hint-right.png": [
+   150,
+   67
+  ],
+  "ui/stretch/ring-day-strip.png": [
+   4800,
+   400
+  ],
+  "ui/stretch/ring-full-night.png": [
+   400,
+   400
+  ],
+  "ui/stretch/ring-full.png": [
+   400,
+   400
+  ],
+  "ui/stretch/ring-night-strip.png": [
+   4800,
+   400
+  ],
+  "ui/stretch/ring-track-night.png": [
+   400,
+   400
+  ],
+  "ui/stretch/ring-track.png": [
+   400,
+   400
+  ]
+ }
+}

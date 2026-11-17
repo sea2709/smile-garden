@@ -150,17 +150,23 @@
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.cc-status {
+.cc-status-in-window {
     position: absolute;
-    left: 360px;
-    top: 482px;
-    width: 560px;
-    z-index: 8;
+    left: 0;
+    right: 0;
+    bottom: 10px;
+    width: auto;
+    z-index: 3;
     display: flex;
     flex-direction: column;
-    gap: 0.25rem;
-    font-size: 0.82rem;
-    text-shadow: 0 1px 2px rgba(255, 252, 245, 0.85);
+    gap: 0.2rem;
+    padding: 0.35rem 0.65rem;
+    font-size: 0.78rem;
+    color: #3e2a1a;
+    background: rgba(255, 248, 232, 0.82);
+    border-radius: 8px;
+    margin: 0 12px;
+    text-shadow: none;
     pointer-events: none;
 }
 
@@ -268,21 +274,31 @@
     font-size: 0.95rem;
     font-weight: 700;
     line-height: 1.15;
-    color: #2e2418;
+    color: #3e2a1a;
+    flex-direction: column;
+    gap: 0.05rem;
     text-shadow: 0 1px 6px rgba(255, 248, 228, 0.9);
     pointer-events: none;
     z-index: 7;
 }
 
-.cc-packet-label.ready small,
-.cc-packet-label small {
+.cc-packet-label .cc-packet-name {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 800;
+    line-height: 1.1;
+    color: #3e2a1a;
+}
+
+.cc-packet-label .cc-packet-status {
     display: block;
     font-size: 0.72rem;
     font-weight: 600;
-    color: #6b5a48;
+    color: #5c4a3a;
+    line-height: 1.1;
 }
 
-.cc-packet-label.ready small {
+.cc-packet-label.ready .cc-packet-status {
     color: #5a7a48;
 }
 

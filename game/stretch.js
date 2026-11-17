@@ -1,6 +1,6 @@
 // game/stretch.js — neck-stretch detector from face landmarks (head roll).
-(function () {
 'use strict';
+(function () {
 
 const TAU = Math.PI * 2;
 const DEG = Math.PI / 180;
@@ -23,6 +23,8 @@ const DEFAULTS = Object.freeze({
     dropoutGraceSec: 0.5,
     noFaceHintSec: 1.8,
     minStableLandmarks: 8,
+    /** Vine ring eases toward 0 when the player relaxes mid-hold (seconds). */
+    displayEaseTau: 0.85,
 });
 
 function meanPoint(points, indices) {
@@ -108,8 +110,8 @@ function createStretchFlow(opts) {
     const cfg = Object.assign({}, DEFAULTS, opts);
     const smoother = createRollSmoother(cfg.smoothWindowSec);
     const sides = {
-        left: { hold: 0, done: false },
-        right: { hold: 0, done: false },
+        left: { hold: 0, done: false, display: 0 },
+        right: { hold: 0, done: false, display: 0 },
     };
     let dropout = 0;
     let noFace = 0;
@@ -121,14 +123,31 @@ function createStretchFlow(opts) {
         sides.left.done = false;
         sides.right.hold = 0;
         sides.right.done = false;
+        sides.left.display = 0;
+        sides.right.display = 0;
         dropout = 0;
         noFace = 0;
         activeSide = null;
         smoother.reset();
     }
 
-    function progress(side) {
+    function rawProgress(side) {
         return Math.min(1, (sides[side].hold || 0) / cfg.holdSeconds);
+    }
+
+    function progress(side) {
+        return sides[side].done ? 1 : Math.max(0, Math.min(1, sides[side].display || 0));
+    }
+
+    function refreshDisplay(dt) {
+        const tau = Math.max(0.12, Number(cfg.displayEaseTau) || DEFAULTS.displayEaseTau);
+        const k = Math.min(1, dt / tau);
+        for (const side of ['left', 'right']) {
+            const raw = rawProgress(side);
+            const target = sides[side].done ? 1 : (activeSide === side ? raw : 0);
+            sides[side].display += (target - sides[side].display) * k;
+            if (sides[side].display < 1e-4) sides[side].display = 0;
+        }
     }
 
     function complete() {
@@ -167,6 +186,7 @@ function createStretchFlow(opts) {
         } else {
             activeSide = null;
         }
+        refreshDisplay(d);
         return snapshot();
     }
 
@@ -227,12 +247,13 @@ const api = {
     syntheticLandmarks,
 };
 
-if (typeof window !== 'undefined') {
-    window.SmileStretch = api;
-} else if (typeof self !== 'undefined') {
-    self.SmileStretch = api;
-}
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
 }
+if (typeof self !== 'undefined') {
+    self.SmileStretch = api;
+} else if (typeof window !== 'undefined') {
+    window.SmileStretch = api;
+}
+
 })();

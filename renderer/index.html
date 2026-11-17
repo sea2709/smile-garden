@@ -66,6 +66,7 @@
         <figure class="meter" id="meter-sun-wrap"><canvas id="meter-sun" class="meter-canvas"></canvas><figcaption><b>Sunlight</b><span id="meter-sun-val">0 h</span></figcaption></figure>
         <figure class="meter" id="meter-water-wrap"><canvas id="meter-water" class="meter-canvas"></canvas><figcaption><b>Water</b><span id="meter-water-val">0%</span></figcaption></figure>
         <figure class="meter" id="meter-fert-wrap"><canvas id="meter-fert" class="meter-canvas"></canvas><figcaption><b>Fertilizer</b><span id="meter-fert-val">optional</span></figcaption></figure>
+        <figure class="meter" id="meter-stake-wrap"><canvas id="meter-stake" class="meter-canvas"></canvas><figcaption><b>Stake</b><span id="meter-stake-val">—</span></figcaption></figure>
     </div>
 
     <!-- Step panel (during a visit) -------------------------------------- -->
@@ -93,17 +94,17 @@
     </section>
 
     <!-- Standalone stretch / stake care (not chained to smile/talk/breath) -->
-    <section id="needs-card" class="needs-card parchment" hidden aria-label="Plant needs">
-        <div class="needs-card-head">
-            <img id="needs-tag-img" class="needs-tag-img" width="40" height="48" alt="" hidden>
-            <div id="needs-tag-fallback" class="needs-tag-fallback" aria-hidden="true"></div>
+    <section id="needs-card" class="needs-card" hidden aria-label="Plant needs">
+        <img id="needs-card-bg" class="needs-card-bg" width="360" height="280" alt="" hidden>
+        <div id="needs-card-fallback" class="needs-card-fallback parchment" aria-hidden="true"></div>
+        <div class="needs-card-body">
             <span id="needs-plant-name" class="needs-plant-name"></span>
-            <img id="needs-bloom-stamp" class="needs-bloom" width="36" height="36" alt="All needs met today" hidden>
-            <img id="needs-resting-stamp" class="needs-resting" width="28" height="28" alt="Resting until today's needs are met" hidden>
+            <img id="needs-bloom-stamp" class="needs-bloom" width="64" height="64" alt="All needs met today" hidden>
+            <img id="needs-resting-stamp" class="needs-resting" width="32" height="32" alt="Resting until today's needs are met" hidden>
             <span id="needs-resting-fallback" class="needs-resting-fallback" aria-hidden="true" hidden>🌿</span>
+            <div id="needs-rows" class="needs-rows"></div>
         </div>
-        <div id="needs-icons" class="needs-icons"></div>
-        <button id="btn-needs-done" class="btn btn-primary btn-small" type="button">Done tending for now</button>
+        <button id="btn-needs-done" class="btn btn-primary btn-small needs-done" type="button">Done tending for now</button>
     </section>
 
     <section id="stretch-care-panel" class="stretch-care-panel parchment" hidden aria-label="Neck stretch care">
@@ -112,21 +113,19 @@
             <h2 id="stretch-care-title">Neck stretch</h2>
             <p id="stretch-care-text" class="stretch-care-text"></p>
         </div>
+        <div id="stretch-guide" class="stretch-guide" hidden>
+            <div class="stretch-guide-box" id="stretch-guide-box">
+                <canvas id="stretch-ring" class="stretch-ring-over-guide" width="200" height="200" aria-hidden="true"></canvas>
+                <img id="stretch-hint-left" class="stretch-hint stretch-hint-left" alt="" hidden>
+                <img id="stretch-hint-right" class="stretch-hint stretch-hint-right" alt="" hidden>
+                <img id="stretch-sunflower-stem" class="stretch-guide-stem" alt="">
+                <img id="stretch-sunflower" class="stretch-guide-head" alt="">
+                <img id="stretch-guide-full" class="stretch-guide-fallback" alt="" hidden>
+            </div>
+        </div>
         <h5 class="stretch-care-sub" id="stretch-care-live"></h5>
         <div class="stretch-care-actions" id="stretch-care-actions"></div>
     </section>
-
-    <!-- Breathing guide (center) ----------------------------------------- -->
-    <div id="stretch-guide" class="stretch-guide" hidden>
-        <div class="stretch-flower-pivot" id="stretch-flower-pivot">
-            <img id="stretch-sunflower-stem" class="stretch-sunflower-stem" width="96" height="96" alt="" hidden>
-            <img id="stretch-sunflower" class="stretch-sunflower" width="96" height="96" alt="">
-        </div>
-        <div class="stretch-rings">
-            <div class="stretch-ring"><canvas id="stretch-ring-left" width="60" height="60"></canvas><label>Left</label></div>
-            <div class="stretch-ring"><canvas id="stretch-ring-right" width="60" height="60"></canvas><label>Right</label></div>
-        </div>
-    </div>
 
     <section id="breath-guide" class="breath-guide" hidden>
         <div class="breath-orb-wrap">
@@ -161,17 +160,17 @@
                 <img id="cc-backdrop" class="cc-backdrop" alt="">
                 <div id="cc-preview-wrap" class="cc-preview-wrap">
                     <div id="cc-mock-slot" class="cc-mock-placeholder" hidden>Demo camera</div>
+                    <div class="cc-status cc-status-in-window" id="cc-status">
+                        <div id="cc-status-face" class="cc-status-row"></div>
+                        <div id="cc-status-light" class="cc-status-row"></div>
+                        <div id="cc-status-camera" class="cc-status-row" hidden></div>
+                    </div>
                 </div>
                 <img id="cc-face-outline" class="cc-face" alt="" hidden>
                 <img id="cc-tilt-left" class="cc-tilt left" alt="" hidden>
                 <img id="cc-tilt-right" class="cc-tilt right" alt="" hidden>
                 <img id="cc-window-frame" class="cc-window-frame" alt="">
                 <img id="cc-sill" class="cc-sill" alt="">
-                <div class="cc-status" id="cc-status">
-                    <div id="cc-status-face" class="cc-status-row"></div>
-                    <div id="cc-status-light" class="cc-status-row"></div>
-                    <div id="cc-status-camera" class="cc-status-row" hidden></div>
-                </div>
                 <div id="cc-packets" class="cc-packets"></div>
                 <p id="cc-note" class="cc-note" hidden></p>
                 <button id="btn-cc-skip-now" class="cc-btn skip" type="button">Skip for now</button>
