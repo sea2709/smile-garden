@@ -1,0 +1,40 @@
+/* ---------- painted breath rate / sub / count (Heily) ----------
+   Replaces the pill rules for .breath-sub, .breath-rate and .breath-count i
+   in renderer/styles.css. Assets: assets/ui/breath/*.png (all 2x).
+   Pills are 9-slice: PNG 160x64 @2x, slice 28 32 (top/bottom 28, left/right 32),
+   drawn at 14px 16px, so the element must be exactly 32px tall. */
+.breath-sub,
+.breath-rate {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 32px; line-height: 20px; white-space: nowrap;
+    padding: 0 18px;
+    background: none; border-radius: 0;
+    border: 0 solid transparent;
+    border-image-source: url('../assets/ui/breath/pill-warming.png');
+    border-image-slice: 28 32 fill;
+    border-image-width: 14px 16px;
+    border-image-repeat: stretch;
+    filter: drop-shadow(0 2px 4px rgba(70, 48, 20, 0.16));
+}
+.breath-sub { font-size: 15px; font-weight: 800; color: var(--ink); }
+.breath-rate { font-size: 13.5px; font-weight: 800; letter-spacing: 0.01em; padding-left: 40px; position: relative; }
+.breath-rate::before {
+    content: ''; position: absolute; left: 12px; top: 50%; width: 24px; height: 24px; margin-top: -12px;
+    background: url('../assets/ui/breath/icon-warming.png') center / 24px 24px no-repeat;
+}
+.breath-rate[data-state="warming"]  { border-image-source: url('../assets/ui/breath/pill-warming.png');  color: var(--ink-soft); font-weight: 700; }
+.breath-rate[data-state="settling"] { border-image-source: url('../assets/ui/breath/pill-settling.png'); color: var(--ink-soft); font-weight: 700; }
+.breath-rate[data-state="stable"]   { border-image-source: url('../assets/ui/breath/pill-stable.png');   color: var(--sage-dark); }
+.breath-rate[data-state="warming"]::before  { background-image: url('../assets/ui/breath/icon-warming.png'); }
+.breath-rate[data-state="settling"]::before { background-image: url('../assets/ui/breath/icon-settling.png'); animation: breath-leaf-sway 3.2s ease-in-out infinite; }
+.breath-rate[data-state="stable"]::before   { background-image: url('../assets/ui/breath/icon-stable.png'); }
+@keyframes breath-leaf-sway { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+@media (prefers-reduced-motion: reduce) { .breath-rate::before { animation: none !important; } }
+
+.breath-count { display: flex; gap: 6px; }
+.breath-count i {
+    width: 18px; height: 18px; border: 0; border-radius: 0;
+    background: url('../assets/ui/breath/dot-off.png') center / 18px 18px no-repeat;
+    filter: drop-shadow(0 0 2px rgba(255, 248, 225, 0.85)) drop-shadow(0 1px 2px rgba(70, 48, 20, 0.25));
+}
+.breath-count i.on { background: url('../assets/ui/breath/dot-on.png') center / 18px 18px no-repeat; }

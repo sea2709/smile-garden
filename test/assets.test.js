@@ -122,6 +122,25 @@ test('critter strips and day backdrops without painted insects', () => {
     assert.equal(ART.critters.strips.bee.scale, 0.28);
 });
 
+test('breath UI art: manifest pills, icons, dots and breath-ui.css', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'breath-manifest.json'), 'utf8'));
+    assert.equal(manifest.scale, 2);
+    for (const key of ['warming', 'settling', 'stable']) {
+        const pill = manifest.pills[key];
+        assert.equal(pill.display.height, 32, `${key} pill height`);
+        assert.ok(fs.existsSync(path.join(root, 'assets', pill.file)), pill.file);
+        const icon = manifest.icons[key];
+        assert.ok(fs.existsSync(path.join(root, 'assets', icon.file)), icon.file);
+    }
+    for (const key of ['on', 'off']) {
+        const dot = manifest.dots[key];
+        assert.deepEqual(dot.display, [18, 18]);
+        assert.ok(fs.existsSync(path.join(root, 'assets', dot.file)), dot.file);
+    }
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'breath-ui.css')));
+    assert.ok(fs.existsSync(path.join(root, 'docs', 'breath-mockup.png')));
+});
+
 test('selection ring art: 8 day/night sprites and backdrop offsets', () => {
     assert.ok(ART.selection);
     for (let b = 1; b <= 8; b++) {

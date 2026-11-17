@@ -14,7 +14,8 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 const outDir = path.join(root, 'docs');
 fs.mkdirSync(outDir, { recursive: true });
-for (const f of fs.readdirSync(outDir)) if (f.endsWith('.png')) fs.unlinkSync(path.join(outDir, f));
+const keepPng = new Set(['breath-mockup.png']);
+for (const f of fs.readdirSync(outDir)) if (f.endsWith('.png') && !keepPng.has(f)) fs.unlinkSync(path.join(outDir, f));
 const electron = require('electron'); // path to the binary when required from Node
 const env = Object.assign({}, process.env, {
     SMILE_GARDEN_MOCK: '1',
