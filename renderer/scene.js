@@ -13,6 +13,7 @@
 (function () {
     'use strict';
     const ART = window.SmileArt;
+    const PA = window.SmilePlantAnchor;
     const TAU = Math.PI * 2;
 
     function loadImage(src) {
@@ -419,12 +420,22 @@
             return { img: null, generic: false };
         }
 
-        function harvestLocalToWorld(plot, lx, ly) {
+        function plotStageMeta(plotIndex, stage) {
+            const pl = plots[plotIndex];
+            if (!pl || !ART.plants[pl.plantId]) return null;
+            if (stage === 'picked') return ART.plants[pl.plantId].stages[4];
+            const st = typeof stage === 'number' ? stage : pl.stage;
+            return ART.plants[pl.plantId].stages[Math.max(0, Math.min(4, st - 1))];
+        }
+
+        function harvestLocalToWorld(plot, lx, ly, plantId) {
             const H = ART.harvest;
             const p = ART.plots[plot];
             const s = p.w / 180;
+            const meta = plantId && ART.plants[plantId] ? ART.plants[plantId].stages[4] : null;
+            const ax = PA && meta ? PA.stripAnchorX(meta, H.frameW) : H.frameW / 2;
             return {
-                x: p.x + (lx - H.frameW / 2) * s,
+                x: p.x + (lx - ax) * s,
                 y: p.y - 4 + (ly - H.soilY) * s,
             };
         }
@@ -448,16 +459,19 @@
             return null;
         }
 
-        function drawHarvestFrame(i, frame, img, alpha) {
+        function drawHarvestFrame(i, frame, img, alpha, plantId) {
             const H = ART.harvest;
             if (!ready(img) || !H || alpha <= 0.01) return;
             const p = ART.plots[i];
             const s = p.w / 180;
+            const id = plantId || (plots[i] && plots[i].plantId);
+            const meta = id && ART.plants[id] ? ART.plants[id].stages[4] : null;
+            const ax = PA && meta ? PA.stripAnchorX(meta, H.frameW) : H.frameW / 2;
             ctx.save();
             ctx.globalAlpha = Math.min(1, alpha);
             ctx.translate(p.x, p.y - 4);
             ctx.scale(s, s);
-            ctx.drawImage(img, frame * H.frameW, 0, H.frameW, H.frameH, -H.frameW / 2, -H.soilY, H.frameW, H.frameH);
+            ctx.drawImage(img, frame * H.frameW, 0, H.frameW, H.frameH, -ax, -H.soilY, H.frameW, H.frameH);
             ctx.restore();
         }
 
@@ -484,7 +498,8 @@
             ctx.translate(p.x, p.y);
             ctx.transform(1, 0, shear, 1, 0, 0);
             ctx.scale(s, s);
-            ctx.drawImage(img, -meta.w / 2, -meta.base, meta.w, meta.h);
+            const ax = PA ? PA.spriteAnchorX(meta) : meta.w / 2;
+            ctx.drawImage(img, -ax, -meta.base, meta.w, meta.h);
             ctx.restore();
         }
 
@@ -503,7 +518,7 @@
             const img = readyStrips[kind];
             if (ready(img) && H) {
                 const frame = Math.floor(t * H.fps + i * 2) % H.readyCount;
-                drawHarvestFrame(i, frame, img, 1);
+                drawHarvestFrame(i, frame, img, 1, pl.plantId);
                 return;
             }
             const p = ART.plots[i];
@@ -586,7 +601,7 @@
             const [bx, by] = H.basketInFrame;
             const lx = 100 + (bx - 100) * t;
             const ly = 140 + (by - 140) * t;
-            const w = harvestLocalToWorld(a.plot, lx, ly);
+            const w = harvestLocalToWorld(a.plot, lx, ly, a.plantId);
             const bed = ART.plots[a.plot];
             const sz = (ART.produce.size || 128) * (bed.w / 180) * 0.38;
             ctx.save();
@@ -607,7 +622,7 @@
                 if (f >= maxF) { harvestAnims.splice(n, 1); continue; }
                 if (f < 0) continue;
                 if (ready(img)) {
-                    drawHarvestFrame(a.plot, f, img, 1);
+                    drawHarvestFrame(a.plot, f, img, 1, a.plantId);
                     if (generic) drawHarvestProduceFly(a, f);
                 }
             }
@@ -835,7 +850,10 @@
             ctx.globalCompositeOperation = kind === 'sun' ? 'lighter' : 'source-over';
             ctx.translate(p.x, p.y - 4);
             ctx.scale(s, s);
-            ctx.drawImage(img, frame * E.frameW, 0, E.frameW, E.frameH, -E.frameW / 2, -E.soilY, E.frameW, E.frameH);
+            const pl = plots[i];
+            const meta = pl && pl.plantId ? plotStageMeta(i, pl.stage) : null;
+            const ax = PA && meta ? PA.stripAnchorX(meta, E.frameW) : E.frameW / 2;
+            ctx.drawImage(img, frame * E.frameW, 0, E.frameW, E.frameH, -ax, -E.soilY, E.frameW, E.frameH);
             ctx.restore();
         }
         function drawEffectSprites(t) {
