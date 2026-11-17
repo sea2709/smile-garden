@@ -222,6 +222,20 @@
             restingDisplay: 28,
             tagOffset: Object.freeze([0, -42]),
         }),
+        cameraCheck: Object.freeze({
+            scale2x: true,
+            frame: '../assets/ui/camera-check/frame.png',
+            checkPass: '../assets/ui/camera-check/check-pass.png',
+            icons: Object.freeze({
+                smile: '../assets/ui/camera-check/icon-smile.png',
+                talk: '../assets/ui/camera-check/icon-talk.png',
+                breath: '../assets/ui/camera-check/icon-breath.png',
+                stretch: '../assets/ui/camera-check/icon-stretch.png',
+            }),
+            iconPixels: Object.freeze([64, 64]),
+            checkPixels: Object.freeze([44, 44]),
+            framePixels: Object.freeze([640, 480]),
+        }),
         stretch: Object.freeze({
             scale2x: true,
             /** Combined guide (fallback); Heily ships head + stem separately. */

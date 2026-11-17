@@ -159,6 +159,18 @@ test('breath UI art: manifest pills, icons, dots and breath-ui.css', () => {
     assert.ok(fs.existsSync(path.join(root, 'docs', 'breath-mockup.png')));
 });
 
+test('camera check art: manifest paths, css, and art spec doc', () => {
+    assert.ok(ART.cameraCheck);
+    assert.ok(ART.cameraCheck.frame.includes('camera-check'));
+    for (const key of ['smile', 'talk', 'breath', 'stretch']) {
+        assert.ok(ART.cameraCheck.icons[key].includes(key), key);
+    }
+    assert.ok(ART.cameraCheck.checkPass.includes('check'));
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'camera-check-ui.css')));
+    assert.ok(fs.existsSync(path.join(root, 'docs', 'ART-CAMERA-CHECK.md')));
+    assert.ok(fs.existsSync(path.join(root, 'game', 'camera-check.js')));
+});
+
 test('stretch UI art: manifest paths, css, and art spec doc', () => {
     assert.ok(ART.needs);
     assert.ok(ART.needs.plantTag.includes('needs/'));

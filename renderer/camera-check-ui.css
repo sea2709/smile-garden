@@ -1,0 +1,219 @@
+/* Pre-game camera check overlay */
+.camera-check .cc-card {
+    max-width: 720px;
+    width: min(96vw, 720px);
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+}
+
+.cc-note {
+    margin: 0;
+    padding: 0.55rem 0.75rem;
+    border-radius: 8px;
+    background: rgba(255, 236, 200, 0.65);
+    font-size: 0.92rem;
+}
+
+.cc-layout {
+    display: grid;
+    grid-template-columns: 1fr 1.05fr;
+    gap: 1rem;
+    align-items: start;
+}
+
+@media (max-width: 720px) {
+    .cc-layout { grid-template-columns: 1fr; }
+}
+
+.cc-preview-wrap {
+    position: relative;
+    border-radius: 14px;
+    overflow: hidden;
+    background: #1a1410;
+    aspect-ratio: 4 / 3;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.08);
+}
+
+.cc-preview-wrap .pip,
+.cc-preview-wrap video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 14px;
+}
+
+.cc-preview-wrap .pip {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 100%;
+}
+
+.cc-face-oval {
+    position: absolute;
+    left: 50%;
+    top: 46%;
+    width: 46%;
+    height: 58%;
+    transform: translate(-50%, -50%);
+    border: 2px solid rgba(255, 248, 230, 0.55);
+    border-radius: 48% 48% 42% 42%;
+    pointer-events: none;
+    box-shadow: 0 0 24px rgba(255, 255, 255, 0.08);
+}
+
+.cc-preview-frame {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    pointer-events: none;
+    opacity: 0.92;
+}
+
+.cc-status {
+    margin-top: 0.65rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    font-size: 0.88rem;
+}
+
+.cc-status-row {
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+}
+
+.cc-status-row .dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: #b8a99a;
+    flex-shrink: 0;
+}
+
+.cc-status-row.ok .dot { background: #5a9e62; }
+.cc-status-row.bad .dot { background: #c45d4a; }
+.cc-status-row.warn .dot { background: #d4a03a; }
+
+.cc-tests {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.55rem;
+}
+
+.cc-test {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.55rem;
+    border-radius: 10px;
+    border: 1px solid rgba(60, 40, 20, 0.12);
+    background: rgba(255, 252, 245, 0.72);
+    text-align: left;
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+}
+
+.cc-test.on { border-color: rgba(90, 158, 98, 0.45); box-shadow: 0 0 0 2px rgba(90, 158, 98, 0.12); }
+.cc-test.done { opacity: 0.82; }
+.cc-test:disabled { opacity: 0.5; cursor: default; }
+
+.cc-test-icon {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.cc-test-icon-fallback {
+    font-size: 1.35rem;
+    line-height: 1;
+    width: 36px;
+    text-align: center;
+}
+
+.cc-test-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.cc-test-title { font-weight: 600; font-size: 0.92rem; }
+.cc-test-sub { font-size: 0.78rem; opacity: 0.85; }
+
+.cc-check {
+    width: 22px;
+    height: 22px;
+    object-fit: contain;
+    flex-shrink: 0;
+    opacity: 0;
+}
+
+.cc-test.done .cc-check,
+.cc-test.passed .cc-check { opacity: 1; }
+
+.cc-detail {
+    padding: 0.65rem 0.75rem;
+    border-radius: 10px;
+    background: rgba(255, 252, 245, 0.9);
+    border: 1px dashed rgba(60, 40, 20, 0.15);
+}
+
+.cc-detail-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.45rem;
+}
+
+.cc-meter {
+    height: 8px;
+    border-radius: 4px;
+    background: rgba(40, 30, 20, 0.12);
+    overflow: hidden;
+    margin: 0.35rem 0;
+}
+
+.cc-meter > i {
+    display: block;
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #f0c040, #5a9e62);
+    transition: width 0.12s linear;
+}
+
+.cc-detail .breath-rate { margin-top: 0.35rem; }
+
+.cc-detail .stretch-guide {
+    position: relative;
+    inset: auto;
+    transform: none;
+    margin: 0.5rem auto 0;
+}
+
+.cc-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.cc-mock-placeholder {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 248, 230, 0.7);
+    font-size: 0.9rem;
+    background: linear-gradient(145deg, #2a221c, #1a1410);
+}

@@ -211,6 +211,8 @@
             version: STATE_VERSION,
             createdDay: dayKey(d),
             wellnessAck: false,
+            setupDone: false,
+            cameraCheckNote: null,
             plots: new Array(PLOTS).fill(null),
             visitDays: [],
             journal: [],
@@ -294,6 +296,10 @@
         const s = fresh;
         s.createdDay = typeof obj.createdDay === 'string' ? obj.createdDay : s.createdDay;
         s.wellnessAck = obj.wellnessAck === true;
+        s.setupDone = obj.setupDone === true;
+        s.cameraCheckNote = typeof obj.cameraCheckNote === 'string' && obj.cameraCheckNote.length
+            ? obj.cameraCheckNote
+            : null;
         const plots = Array.isArray(obj.plots) ? obj.plots : [];
         for (let i = 0; i < PLOTS; i++) s.plots[i] = sanitizePlot(plots[i]);
         s.visitDays = Array.isArray(obj.visitDays)

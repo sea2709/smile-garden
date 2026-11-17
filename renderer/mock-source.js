@@ -81,7 +81,21 @@
             let talking = false;
 
             if (auto) {
-                if (phase === 'smile' || phase === 'care-sun') {
+                if (phase === 'camera-check-smile') {
+                    target = smileLevel(phaseT);
+                    setValidation('Ok');
+                } else if (phase === 'camera-check-talk') {
+                    talking = talkingAt(phaseT);
+                    target = 0.34 + (talking ? 0.12 : 0);
+                    setValidation('Ok');
+                } else if (phase === 'camera-check-breath') {
+                    target = 0.16;
+                    setValidation('Ok');
+                    visitT = Math.max(visitT, 32);
+                } else if (phase === 'camera-check-stretch') {
+                    target = 0.22;
+                    setValidation('Ok');
+                } else if (phase === 'smile' || phase === 'care-sun') {
                     target = smileLevel(phaseT);
                     if (night && !darkDone && phaseT > 4 && phaseT < 7.5) {
                         face = false;
@@ -116,9 +130,9 @@
                 // Percentages like the SDK (ExpressionScore.confidence is 0..100).
                 em.emit('expression', { happiness: L.normalizeConfidence(value * 100), stable: true });
                 em.emit('talking', { detected: talking, stable: true });
-                if (Stretch && (phase === 'stretch' || keys.tiltLeft || keys.tiltRight)) {
+                if (Stretch && (phase === 'stretch' || phase === 'camera-check-stretch' || keys.tiltLeft || keys.tiltRight)) {
                     let rollDeg = 0;
-                    if (auto && phase === 'stretch') rollDeg = 20 * Math.sin(phaseT * 0.55);
+                    if (auto && (phase === 'stretch' || phase === 'camera-check-stretch')) rollDeg = 20 * Math.sin(phaseT * 0.55);
                     else if (keys.tiltLeft) rollDeg = -20;
                     else if (keys.tiltRight) rollDeg = 20;
                     em.emit('landmarks', { points: Stretch.syntheticLandmarks(rollDeg), stable: true, space: 'normalized' });
@@ -131,8 +145,9 @@
             // Synthetic breathing rate: appears after ~25 s of visit time, settles
             // near ~6 breaths/min (matches the guided standard pace).
             visitT += dt;
-            if (visitT > 25) {
-                const settling = visitT < 35 && phase !== 'breathe' && phase !== 'care-breathe';
+            const breathPhase = phase === 'breathe' || phase === 'care-breathe' || phase === 'camera-check-breath';
+            if (visitT > 25 || breathPhase) {
+                const settling = visitT < 35 && !breathPhase;
                 const rate = 5.6 + Math.sin(visitT * 0.35) * 0.35 + (noise() - 0.5) * 0.15;
                 const confidence = settling ? 30 + (visitT - 25) : 55 + Math.min(20, visitT - 35);
                 em.emit('breathing', {
@@ -164,7 +179,11 @@
             },
             async reset() { await this.stop(); },
             destroy() { clearInterval(timer); timer = null; },
-            setPhase(p) { phase = p; phaseT = 0; },
+            setPhase(p) {
+                phase = p;
+                phaseT = 0;
+                if (p === 'camera-check-breath') visitT = Math.max(visitT, 32);
+            },
             setNight(v) { night = !!v; if (!night) darkDone = false; },
             setKeys(k) { Object.assign(keys, k); auto = false; },
             setAuto(v) { auto = !!v; },

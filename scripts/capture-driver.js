@@ -218,7 +218,30 @@ async function run(win, outDir) {
 
     await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
     await sleep(1200);
-    await shot('02-greeting-dawn.png');
+    await waitFor('camera check', (d) => d.screen === 'camera-check', 20000);
+    await shot('camera-check-initial.png');
+    await G(`g.selectCameraCheck('smile')`);
+    await sleep(4200);
+    await G(`g.selectCameraCheck('talk')`);
+    await sleep(4200);
+    await G(`g.selectCameraCheck('breath')`);
+    await sleep(400);
+    await G('g.setBreathHudDemo("warming")');
+    await shot('camera-check-midway.png');
+    await G('g.selectCameraCheck("breath")');
+    await sleep(6000);
+    await G(`g.selectCameraCheck('stretch')`);
+    await sleep(5000);
+    await G('g.markAllCameraChecksPassed()');
+    await sleep(500);
+    await shot('camera-check-all-passed.png');
+    await G('g.setCameraDeniedDemo(true)');
+    await sleep(450);
+    await shot('camera-check-denied.png');
+    await G('g.setCameraDeniedDemo(false)');
+    await G('g.finishCameraCheck()');
+    await sleep(800);
+    await shot('02-garden-idle-dawn.png');
 
     await G('g.openPicker(4)');
     await sleep(1000);

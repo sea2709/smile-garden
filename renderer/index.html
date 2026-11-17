@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="./breath-ui.css">
     <link rel="stylesheet" href="./stretch-ui.css">
     <link rel="stylesheet" href="./needs-ui.css">
+    <link rel="stylesheet" href="./camera-check-ui.css">
 </head>
 <body data-screen="loading" data-ready="0">
 <div id="app" class="app">
@@ -153,6 +154,36 @@
     <div id="float-layer" class="float-layer"></div>
     <div id="toast" class="toast" hidden></div>
 
+    <!-- Camera check (first launch / settings) --------------------------- -->
+    <section id="screen-camera-check" class="overlay camera-check" hidden>
+        <div class="card parchment cc-card">
+            <h1>Camera check</h1>
+            <p class="note">Optional mini-tests help Smile Garden read your smile, voice, breath, and gentle neck stretches. You can skip any test — <b>Start my garden</b> is always available.</p>
+            <p id="cc-note" class="cc-note" hidden></p>
+            <div class="cc-layout">
+                <div>
+                    <div id="cc-preview-wrap" class="cc-preview-wrap">
+                        <div id="cc-mock-slot" class="cc-mock-placeholder" hidden>Demo camera preview</div>
+                        <div class="cc-face-oval" aria-hidden="true"></div>
+                        <img id="cc-preview-frame" class="cc-preview-frame" alt="" hidden>
+                    </div>
+                    <div class="cc-status" id="cc-status">
+                        <div id="cc-status-face" class="cc-status-row"></div>
+                        <div id="cc-status-light" class="cc-status-row"></div>
+                        <div id="cc-status-camera" class="cc-status-row" hidden></div>
+                    </div>
+                </div>
+                <div>
+                    <div id="cc-tests" class="cc-tests"></div>
+                    <div id="cc-detail" class="cc-detail" hidden></div>
+                </div>
+            </div>
+            <div class="cc-actions">
+                <button id="btn-cc-start" class="btn btn-primary" type="button">Start my garden</button>
+            </div>
+        </div>
+    </section>
+
     <!-- Wellness notice (once) ------------------------------------------- -->
     <section id="screen-wellness" class="overlay" hidden>
         <div class="card parchment wellness">
@@ -233,6 +264,7 @@
                     <button class="tab" data-tab="pantry" type="button">Pantry</button>
                     <button class="tab" data-tab="decorate" type="button">Decorate</button>
                     <button class="tab" data-tab="library" type="button">Seed library</button>
+                    <button class="tab" data-tab="settings" type="button">Settings</button>
                 </div>
                 <button id="btn-journal-close" class="btn btn-ghost btn-small" type="button">Close</button>
             </div>
@@ -290,7 +322,9 @@
 <script src="../game/critters.js"></script>
 <script src="../game/season-particles.js"></script>
 <script src="../game/stretch.js"></script>
+<script src="../game/camera-check.js"></script>
 <script src="./art.js"></script>
+<script src="./camera-check-ui.js"></script>
 <script src="./mock-source.js"></script>
 <script src="./scene.js"></script>
 <script src="./smile-chart.js"></script>
