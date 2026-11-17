@@ -1,0 +1,344 @@
+{
+ "note": "All PNGs are transparent. 'scale2x' assets are painted at 2x: draw at half their pixel size. Backdrop-aligned layers are 1:1 with the 1280x720 backdrops.",
+ "clock": {
+  "display": {
+   "w": 160,
+   "h": 64,
+   "centerX": 640,
+   "centerY": 40,
+   "scale2x": true
+  },
+  "frame": {
+   "day": "ui/clock/clock-frame-day.png",
+   "night": "ui/clock/clock-frame-night.png",
+   "size": [
+    320,
+    128
+   ]
+  },
+  "front": {
+   "day": "ui/clock/clock-front-day.png",
+   "night": "ui/clock/clock-front-night.png",
+   "size": [
+    320,
+    128
+   ],
+   "use": "Draw AFTER the token so the sun/moon rises from and sets behind the little hills (optional)."
+  },
+  "tokens": {
+   "sun": "ui/clock/sun-token.png",
+   "moon": "ui/clock/moon-token.png",
+   "size": [
+    64,
+    64
+   ],
+   "anchor": "center"
+  },
+  "drawOrder": [
+   "frame",
+   "token",
+   "front"
+  ],
+  "arc": {
+   "units": "px in the 320x128 frame (halve for on-screen)",
+   "centerX": 160.6,
+   "centerY": 183.1,
+   "radius": 150.6,
+   "startDeg": 147.0,
+   "endDeg": 33.0,
+   "angleConvention": "math degrees: 0=right, 90=up; x=cx+r*cos(a), y=cy-r*sin(a) (canvas y grows down)",
+   "centerIsBelowFrame": true
+  },
+  "hourMapping": {
+   "sun": "6:00-18:00: t=(hour-6)/12, angle=startDeg+(endDeg-startDeg)*t",
+   "moon": "18:00 onward: t=min((hour-18)/12,1); at t=1 (6:00) the moon simply rests at the right end - no warning, no countdown",
+   "crossfade": "Fade sun->moon over ~17:30-18:30 (both at the right/left ends, alpha blend). Use night frame/front when the scene is mostly night (alpha of night layer > 0.5).",
+   "examples": {
+    "6:00": 147.0,
+    "9:00": 118.5,
+    "12:00": 90.0,
+    "15:00": 61.5,
+    "18:00": 33.0
+   }
+  },
+  "label": {
+   "ribbon": {
+    "day": "ui/clock/season-ribbon.png",
+    "night": "ui/clock/season-ribbon-night.png",
+    "size": [
+     280,
+     61
+    ],
+    "display": {
+     "w": 140,
+     "h": 30,
+     "centerX": 640,
+     "centerY": 88
+    },
+    "textSafe2x": [
+     80,
+     14,
+     200,
+     44
+    ],
+    "text": "e.g. 'Spring · Day 3' in Lora, brown ink #6b4a2f day / #4a3a2a on night ribbon too (ribbon stays cream)"
+   },
+   "plaqueAlt": {
+    "file": "ui/clock/season-plaque.png",
+    "size": [
+     240,
+     64
+    ],
+    "textSafe2x": [
+     22,
+     12,
+     218,
+     52
+    ]
+   }
+  }
+ },
+ "bedtime": {
+  "bedButtonIcon": {
+   "file": "ui/bed-button-icon.png",
+   "size": [
+    120,
+    120
+   ],
+   "scale2x": true,
+   "display": {
+    "w": 60,
+    "h": 60
+   },
+   "note": "candle + crescent, no text; place where your 'Go to bed' button lives"
+  },
+  "windowDark": {
+   "file": "bedtime/window-dark.png",
+   "size": [
+    1280,
+    720
+   ],
+   "align": "night backdrop, 1:1",
+   "use": "optional: lights-off start state over night.jpg"
+  },
+  "windowGlow": {
+   "file": "bedtime/window-glow.png",
+   "size": [
+    1280,
+    720
+   ],
+   "align": "night backdrop, 1:1",
+   "windows": {
+    "upper": [
+     201,
+     108,
+     232,
+     146
+    ],
+    "lower": [
+     228,
+     200,
+     270,
+     266
+    ]
+   },
+   "use": "fade 0->1 over ~1.2s after 'Go to bed' (crossfade from windowDark if used), hold ~0.8s, then fade the screen to the morning backdrop"
+  },
+  "morningCard": {
+   "file": "bedtime/morning-card.png",
+   "size": [
+    700,
+    600
+   ],
+   "scale2x": false,
+   "display": {
+    "w": 700,
+    "h": 600,
+    "center": [
+     640,
+     360
+    ]
+   },
+   "illustrationBox": [
+    120,
+    20,
+    580,
+    270
+   ],
+   "textSafe": [
+    60,
+    290,
+    640,
+    560
+   ],
+   "text": "title e.g. 'Your garden grew overnight' + list of grown plants; no text is painted"
+  }
+ },
+ "seasons": {
+  "overlays": {
+   "spring": {
+    "day": "seasons/spring-day.png",
+    "night": "seasons/spring-night.png"
+   },
+   "summer": {
+    "day": "seasons/summer-day.png",
+    "night": "seasons/summer-night.png"
+   },
+   "autumn": {
+    "day": "seasons/autumn-day.png",
+    "night": "seasons/autumn-night.png"
+   },
+   "winter": {
+    "day": "seasons/winter-day.png",
+    "night": "seasons/winter-night.png"
+   }
+  },
+  "size": [
+   1280,
+   720
+  ],
+  "drawOrder": "backdrop -> season overlay -> decor/plants/critters/effects",
+  "dayNight": "Blend like the backdrops: day overlay over dawn/midday/golden-hour, night overlay over night; crossfade with the same night alpha.",
+  "plots": "Bed soil is kept clear in every overlay (winter dusts the stone rims only).",
+  "particles": {
+   "files": {
+    "blossom-1": "seasons/particles/blossom-1.png",
+    "blossom-2": "seasons/particles/blossom-2.png",
+    "blossom-3": "seasons/particles/blossom-3.png",
+    "firefly": "seasons/particles/firefly.png",
+    "leaf-1": "seasons/particles/leaf-1.png",
+    "leaf-2": "seasons/particles/leaf-2.png",
+    "leaf-3": "seasons/particles/leaf-3.png",
+    "leaf-4": "seasons/particles/leaf-4.png",
+    "leaf-5": "seasons/particles/leaf-5.png",
+    "leaf-6": "seasons/particles/leaf-6.png",
+    "petal-1": "seasons/particles/petal-1.png",
+    "petal-2": "seasons/particles/petal-2.png",
+    "petal-3": "seasons/particles/petal-3.png",
+    "petal-4": "seasons/particles/petal-4.png",
+    "petal-5": "seasons/particles/petal-5.png",
+    "pollen": "seasons/particles/pollen.png",
+    "seed-fluff": "seasons/particles/seed-fluff.png",
+    "snowflake-1": "seasons/particles/snowflake-1.png",
+    "snowflake-2": "seasons/particles/snowflake-2.png",
+    "snowflake-3": "seasons/particles/snowflake-3.png",
+    "snowflake-4": "seasons/particles/snowflake-4.png",
+    "snowflake-5": "seasons/particles/snowflake-5.png",
+    "snowflake-6": "seasons/particles/snowflake-6.png"
+   },
+   "sizes": {
+    "blossom-1": [
+     43,
+     44
+    ],
+    "blossom-2": [
+     44,
+     44
+    ],
+    "blossom-3": [
+     44,
+     43
+    ],
+    "firefly": [
+     32,
+     32
+    ],
+    "leaf-1": [
+     49,
+     56
+    ],
+    "leaf-2": [
+     46,
+     56
+    ],
+    "leaf-3": [
+     36,
+     56
+    ],
+    "leaf-4": [
+     56,
+     56
+    ],
+    "leaf-5": [
+     56,
+     49
+    ],
+    "leaf-6": [
+     44,
+     56
+    ],
+    "petal-1": [
+     33,
+     40
+    ],
+    "petal-2": [
+     32,
+     40
+    ],
+    "petal-3": [
+     31,
+     40
+    ],
+    "petal-4": [
+     32,
+     40
+    ],
+    "petal-5": [
+     40,
+     40
+    ],
+    "pollen": [
+     20,
+     20
+    ],
+    "seed-fluff": [
+     40,
+     28
+    ],
+    "snowflake-1": [
+     37,
+     40
+    ],
+    "snowflake-2": [
+     34,
+     40
+    ],
+    "snowflake-3": [
+     34,
+     40
+    ],
+    "snowflake-4": [
+     33,
+     40
+    ],
+    "snowflake-5": [
+     34,
+     40
+    ],
+    "snowflake-6": [
+     34,
+     40
+    ]
+   },
+   "scale2x": true,
+   "bySeason": {
+    "spring": [
+     "petal-1..5",
+     "blossom-1..3"
+    ],
+    "summer": [
+     "seed-fluff",
+     "pollen (day)",
+     "firefly (night, additive or normal blend)"
+    ],
+    "autumn": [
+     "leaf-1..6"
+    ],
+    "winter": [
+     "snowflake-1..6"
+    ]
+   },
+   "suggested": "8-14 on screen, drift down/sideways 10-30 px/s, gentle sway and rotation; draw at 0.5x; at night multiply by ~0.6 or use globalAlpha 0.7 (except firefly)."
+  }
+ }
+}

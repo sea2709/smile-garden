@@ -25,8 +25,45 @@
 
     function createScene(canvas) {
         const ctx = canvas.getContext('2d');
+        const resolveArt = (rel) => {
+            try { return new URL(rel, window.location.href).href; } catch { return rel; }
+        };
         const bgImgs = {};
         for (const [k, src] of Object.entries(ART.backgrounds)) bgImgs[k] = loadImage(src);
+        const seasonOverlayImgs = {};
+        const seasonNames = ['spring', 'summer', 'autumn', 'winter'];
+        if (ART.seasons) {
+            for (const s of seasonNames) {
+                seasonOverlayImgs[s] = {
+                    day: loadImage(ART.seasons.overlaySrc(s, 'day')),
+                    night: loadImage(ART.seasons.overlaySrc(s, 'night')),
+                };
+            }
+        }
+        const particleImgs = {};
+        if (ART.seasons && ART.seasons.particlePools) {
+            const keys = new Set();
+            for (const list of Object.values(ART.seasons.particlePools)) {
+                for (const k of list) keys.add(k);
+            }
+            for (const k of keys) particleImgs[k] = loadImage(ART.seasons.particleSrc(k));
+        }
+        const clockFrameImgs = ART.clock ? {
+            day: loadImage(resolveArt(ART.clock.frameSrc('day'))),
+            night: loadImage(resolveArt(ART.clock.frameSrc('night'))),
+        } : { day: null, night: null };
+        const clockFrontImgs = ART.clock ? {
+            day: loadImage(resolveArt(ART.clock.frontSrc('day'))),
+            night: loadImage(resolveArt(ART.clock.frontSrc('night'))),
+        } : { day: null, night: null };
+        const clockSunImg = ART.clock ? loadImage(resolveArt(ART.clock.sunSrc)) : null;
+        const clockMoonImg = ART.clock ? loadImage(resolveArt(ART.clock.moonSrc)) : null;
+        const clockRibbonImgs = ART.clock ? {
+            day: loadImage(resolveArt(ART.clock.ribbonSrc('day'))),
+            night: loadImage(resolveArt(ART.clock.ribbonSrc('night'))),
+        } : { day: null, night: null };
+        const bedtimeGlowImg = ART.bedtime ? loadImage(resolveArt(ART.bedtime.windowGlow)) : null;
+        const bedtimeDarkImg = ART.bedtime ? loadImage(resolveArt(ART.bedtime.windowDark)) : null;
         const plantImgs = {};
         const pickedImgs = {};
         for (const id of Object.keys(ART.plants)) {
@@ -45,9 +82,14 @@
         const genericHarvest = { day: null, night: null };
         const produceImgs = {};
         const basketImg = (ART.produce && ART.produce.basket) ? loadImage(ART.produce.basket) : null;
-        const logoDayImg = (ART.ui && ART.ui.logoDay) ? loadImage(ART.ui.logoDay) : null;
-        const logoNightImg = (ART.ui && ART.ui.logoNight) ? loadImage(ART.ui.logoNight) : null;
+        const logoDayImg = (ART.ui && ART.ui.logoDay) ? loadImage(resolveArt(ART.ui.logoDay)) : null;
+        const logoNightImg = (ART.ui && ART.ui.logoNight) ? loadImage(resolveArt(ART.ui.logoNight)) : null;
         let logoOnCanvas = false;
+        function refreshLogoOnCanvas() {
+            logoOnCanvas = ready(logoDayImg) || ready(logoNightImg);
+        }
+        if (logoDayImg) logoDayImg.addEventListener('load', refreshLogoOnCanvas);
+        if (logoNightImg) logoNightImg.addEventListener('load', refreshLogoOnCanvas);
         if (ART.harvest) {
             readyStrips.day = loadImage(ART.readyStripSrc('day'));
             readyStrips.night = loadImage(ART.readyStripSrc('night'));
@@ -92,6 +134,16 @@
         let lighting = 'midday';
         let prevLighting = null;
         let lightFade = 1;
+        /** @type {null | Record<string, number>} */
+        let lightWeights = null;
+        let season = 'spring';
+        let daylight = true;
+        let gardenClockMinutes = 360;
+        let gardenClockLabel = '';
+        let bedtimeGlow = 0;
+        let bedtimeDark = 0;
+        const seasonParticles = [];
+        for (let i = 0; i < 12; i++) seasonParticles.push(newSeasonParticle(true));
         let plots = new Array(8).fill(null);   // { plantId, stage, ready?, pickedSprite? }
         let decorPlacements = {}; // spotId -> decorId
         const harvestAnims = []; // { plot, plantId, t0, pull }
@@ -161,10 +213,110 @@
         }
 
         function setLighting(l) {
+            lightWeights = null;
             if (l === lighting) return;
             prevLighting = lighting;
             lighting = l;
             lightFade = 0;
+            daylight = l !== 'night';
+        }
+
+        function setLightingBlend(weights) {
+            const w = Object.assign({ dawn: 0, midday: 0, 'golden-hour': 0, night: 0 }, weights || {});
+            let primary = 'midday';
+            let best = -1;
+            for (const k of ['dawn', 'midday', 'golden-hour', 'night']) {
+                if ((w[k] || 0) > best) { best = w[k]; primary = k; }
+            }
+            if (primary !== lighting) {
+                prevLighting = lighting;
+                lighting = primary;
+                lightFade = 0;
+            }
+            lightWeights = w;
+            daylight = (w.night || 0) < 0.55;
+        }
+
+        function setSeason(s) {
+            season = s || 'spring';
+            for (let i = 0; i < seasonParticles.length; i++) seasonParticles[i] = newSeasonParticle(true);
+        }
+
+        function logoLayerAlphas() {
+            if (C && C.logoLayerAlphas) return C.logoLayerAlphas(lighting, prevLighting, lightFade);
+            if (lightWeights) {
+                const night = lightWeights.night || 0;
+                return { day: 1 - night, night };
+            }
+            const day = lighting === 'night' ? 0 : 1;
+            return { day, night: 1 - day };
+        }
+
+        function hudArtReady() {
+            const logos = ready(logoDayImg) || ready(logoNightImg);
+            const clock = ready(clockFrameImgs.day) || ready(clockFrameImgs.night);
+            const tok = ready(clockSunImg) && ready(clockMoonImg);
+            return logos && clock && tok;
+        }
+
+        function waitForHudArt(timeoutMs) {
+            const limit = Math.max(500, Number(timeoutMs) || 25000);
+            return new Promise((resolve) => {
+                const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+                const tick = () => {
+                    refreshLogoOnCanvas();
+                    if (hudArtReady()) { resolve(true); return; }
+                    const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
+                    if (now - t0 >= limit) { resolve(hudArtReady()); return; }
+                    if (typeof requestAnimationFrame !== 'undefined') requestAnimationFrame(tick);
+                    else setTimeout(tick, 32);
+                };
+                tick();
+            });
+        }
+
+        function setGardenClock(minutes, label) {
+            gardenClockMinutes = Number(minutes) || 0;
+            if (label !== undefined) gardenClockLabel = String(label || '');
+        }
+
+        function setBedtimeGlow(alpha) {
+            bedtimeGlow = Math.max(0, Math.min(1, Number(alpha) || 0));
+        }
+
+        function setBedtimeDark(alpha) {
+            bedtimeDark = Math.max(0, Math.min(1, Number(alpha) || 0));
+        }
+
+        function overlayNightWeight() {
+            if (lightWeights) return lightWeights.night || 0;
+            return lighting === 'night' ? 1 : 0;
+        }
+
+        function particlePool() {
+            const pools = ART.seasons && ART.seasons.particlePools;
+            if (!pools) return [];
+            const nightW = overlayNightWeight();
+            if (season === 'spring') return pools.spring;
+            if (season === 'autumn') return pools.autumn;
+            if (season === 'winter') return pools.winter;
+            if (season === 'summer') return nightW > 0.55 ? pools.summerNight : pools.summerDay;
+            return [];
+        }
+
+        function newSeasonParticle(anywhere) {
+            const pool = particlePool();
+            const sprite = pool.length ? pool[Math.floor(rnd() * pool.length)] : null;
+            return {
+                sprite,
+                x: rnd() * ART.width,
+                y: anywhere ? rnd() * ART.height * 0.72 : -20 - rnd() * 40,
+                vx: (rnd() - 0.5) * 22,
+                vy: 12 + rnd() * 22,
+                rot: rnd() * TAU,
+                vr: (rnd() - 0.5) * 2.5,
+                ph: rnd() * TAU,
+            };
         }
 
         function setDecor(decorState) {
@@ -182,6 +334,7 @@
                     stage: raw.stage,
                     ready: !!raw.ready,
                     pickedSprite: !!raw.pickedSprite,
+                    tendedToday: !!raw.tendedToday,
                 } : null;
                 const o = plots[i];
                 if (animate && n && (!o || o.plantId !== n.plantId)) {
@@ -338,10 +491,328 @@
                 s.vy = s.vy * (1 - dt * 1.5) + (s.glow ? -6 : 60) * dt;
                 if (s.life > s.max) sparkles.splice(i, 1);
             }
+            updateSeasonParticles(dt, t);
         }
 
         // ------------------------------------------------------------------
+        function drawSeasonOverlay() {
+            const pair = seasonOverlayImgs[season];
+            const nightW = overlayNightWeight();
+            const dayW = 1 - nightW;
+            let drew = false;
+            if (pair) {
+                if (ready(pair.day) && dayW > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = dayW;
+                    ctx.drawImage(pair.day, 0, 0, ART.width, ART.height);
+                    ctx.restore();
+                    drew = true;
+                }
+                if (ready(pair.night) && nightW > 0.01) {
+                    ctx.save();
+                    ctx.globalAlpha = nightW;
+                    ctx.drawImage(pair.night, 0, 0, ART.width, ART.height);
+                    ctx.restore();
+                    drew = true;
+                }
+            }
+            if (drew) return;
+            const t = performance.now() / 1000;
+            ctx.save();
+            const a = 0.18 * (dayW + nightW * 0.65);
+            if (season === 'spring') {
+                for (let i = 0; i < 14; i++) {
+                    const x = (i * 137.5 + t * 8) % ART.width;
+                    const y = 80 + (i * 41) % 220;
+                    ctx.fillStyle = `rgba(255, 182, 193, ${a})`;
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, 5, 3, 0.3, 0, TAU);
+                    ctx.fill();
+                }
+            } else if (season === 'summer') {
+                for (let i = 0; i < 10; i++) {
+                    const x = (i * 163 + t * 5) % ART.width;
+                    const y = 100 + (i * 37) % 180;
+                    ctx.fillStyle = `rgba(255, 236, 160, ${a * 0.6})`;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 2.5, 0, TAU);
+                    ctx.fill();
+                }
+            } else if (season === 'autumn') {
+                for (let i = 0; i < 12; i++) {
+                    const x = (i * 151 + t * 14) % ART.width;
+                    const y = 60 + ((i * 53 + t * 18) % 280);
+                    ctx.fillStyle = `rgba(210, 120, 50, ${a})`;
+                    ctx.fillRect(x, y, 6, 3);
+                }
+            } else if (season === 'winter') {
+                for (let i = 0; i < 30; i++) {
+                    const x = (i * 97 + t * 4) % ART.width;
+                    const y = (i * 31 + t * 8) % (ART.height * 0.55);
+                    ctx.fillStyle = `rgba(240, 248, 255, ${a * 0.85})`;
+                    ctx.fillRect(x, y, 2, 2);
+                }
+            }
+            ctx.restore();
+        }
+
+        function updateSeasonParticles(dt, t) {
+            if (!particlePool().length) return;
+            const wind = Math.sin(t * 0.35) * 10;
+            for (let i = 0; i < seasonParticles.length; i++) {
+                const p = seasonParticles[i];
+                p.x += (p.vx + wind) * dt;
+                p.y += p.vy * dt;
+                p.rot += p.vr * dt;
+                if (p.y > ART.height * 0.78 || p.x < -40 || p.x > ART.width + 40) {
+                    seasonParticles[i] = newSeasonParticle(false);
+                }
+            }
+        }
+
+        function drawSeasonParticleFallback(p) {
+            const name = p.sprite || '';
+            if (name.includes('petal') || name.includes('blossom') || name.includes('pollen')) {
+                ctx.fillStyle = 'rgba(255, 182, 193, 0.75)';
+                ctx.beginPath();
+                ctx.ellipse(p.x, p.y, 5, 3, p.rot, 0, TAU);
+                ctx.fill();
+            } else if (name.includes('leaf') || name.includes('seed')) {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rot);
+                ctx.fillStyle = 'rgba(200, 110, 45, 0.8)';
+                ctx.fillRect(-4, -2, 8, 4);
+                ctx.restore();
+            } else if (name.includes('firefly')) {
+                ctx.fillStyle = 'rgba(230, 255, 120, 0.85)';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, TAU);
+                ctx.fill();
+            } else {
+                ctx.fillStyle = 'rgba(245, 250, 255, 0.9)';
+                ctx.fillRect(p.x, p.y, 2.5, 2.5);
+            }
+        }
+
+        function drawSeasonParticles(t) {
+            if (!ART.seasons || !particlePool().length) return;
+            const scale = ART.seasons.particleScale || 0.5;
+            const disp = 64 * scale;
+            const nightW = overlayNightWeight();
+            ctx.save();
+            ctx.globalAlpha = 0.55 + 0.35 * (1 - nightW);
+            for (const p of seasonParticles) {
+                const img = p.sprite ? particleImgs[p.sprite] : null;
+                if (ready(img)) {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(p.rot);
+                    ctx.drawImage(img, -disp / 2, -disp / 2, disp, disp);
+                    ctx.restore();
+                } else drawSeasonParticleFallback(p);
+            }
+            ctx.restore();
+        }
+
+        function clockPointFromFrame(fx, fy) {
+            const L = typeof window !== 'undefined' ? window.SmileClockLayout : null;
+            if (L && L.framePointToBackdrop) {
+                return L.framePointToBackdrop(fx, fy, {
+                    display: ART.clock.display,
+                    framePixels: ART.clock.framePixels,
+                });
+            }
+            const d = ART.clock.display;
+            const scale = d.w / ART.clock.framePixels[0];
+            return { x: d.cx - d.w / 2 + fx * scale, y: d.cy - d.h / 2 + fy * scale };
+        }
+
+        function blitClockToken(img, p, disp, alpha) {
+            if (alpha < 0.02) return false;
+            ctx.save();
+            ctx.filter = 'none';
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = alpha;
+            ctx.shadowBlur = 0;
+            const [tw, th] = ART.clock.tokenPixels || [64, 64];
+            if (ready(img)) {
+                ctx.drawImage(img, 0, 0, tw, th, p.x - disp / 2, p.y - disp / 2, disp, disp);
+                ctx.restore();
+                return true;
+            }
+            ctx.fillStyle = '#f0b84a';
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, disp * 0.32, 0, TAU);
+            ctx.fill();
+            ctx.restore();
+            return true;
+        }
+
+        function sampleBackdrop(x, y) {
+            resize();
+            const px = Math.round((x * view.s + view.ox) * view.dpr);
+            const py = Math.round((y * view.s + view.oy) * view.dpr);
+            if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) {
+                return { r: 0, g: 0, b: 0, a: 0, oob: true, px, py };
+            }
+            const d = ctx.getImageData(px, py, 1, 1).data;
+            return { r: d[0], g: d[1], b: d[2], a: d[3], oob: false, px, py };
+        }
+
+        function drawClockBitmap(img, alpha, ox, oy, w, h) {
+            if (!ready(img) || alpha < 0.02) return false;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            ctx.drawImage(img, ox, oy, w, h);
+            ctx.restore();
+            return true;
+        }
+
+        function drawGardenClockHud() {
+            if (!ART.clock) return;
+            const cfg = ART.clock;
+            const { w, h } = cfg.display;
+            const ox = cfg.display.cx - w / 2;
+            const oy = cfg.display.cy - h / 2;
+            const nightW = overlayNightWeight();
+            const CARC = typeof window !== 'undefined' ? window.SmileClockArc : null;
+            const tok = CARC ? CARC.clockTokenState(gardenClockMinutes) : null;
+
+            let painted = false;
+            if (tok) {
+                const nf = tok.useNightFrame ? 1 : 0;
+                painted = drawClockBitmap(clockFrameImgs.day, 1 - Math.max(nightW, nf), ox, oy, w, h)
+                    || drawClockBitmap(clockFrameImgs.night, Math.max(nightW, nf), ox, oy, w, h);
+            } else {
+                painted = drawClockBitmap(clockFrameImgs.day, 1 - nightW, ox, oy, w, h)
+                    || drawClockBitmap(clockFrameImgs.night, nightW, ox, oy, w, h);
+            }
+
+            const disp = cfg.tokenDisplay || 32;
+            const tokenBehindHill = (deg) => {
+                if (!CARC) return true;
+                const fr = CARC.tokenFrameXY(deg);
+                return fr.y >= cfg.arc.centerY - 1;
+            };
+            const drawToken = (img, deg, alpha, sun, behindHill) => {
+                if (alpha < 0.03) return;
+                const isBehind = tokenBehindHill(deg);
+                if (behindHill !== undefined && isBehind !== behindHill) return;
+                const fr = CARC ? CARC.tokenFrameXY(deg) : cfg.arc;
+                const p = clockPointFromFrame(fr.x != null ? fr.x : cfg.arc.centerX, fr.y != null ? fr.y : cfg.arc.centerY);
+                ctx.save();
+                ctx.globalAlpha = alpha;
+                if (ready(img)) ctx.drawImage(img, p.x - disp / 2, p.y - disp / 2, disp, disp);
+                else {
+                    ctx.fillStyle = sun ? '#f0b84a' : '#d8dce8';
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, disp * 0.22, 0, TAU);
+                    ctx.fill();
+                }
+                ctx.restore();
+            };
+
+            if (!painted && CARC) {
+                ctx.save();
+                ctx.strokeStyle = 'rgba(120, 95, 60, 0.45)';
+                ctx.lineWidth = 2;
+                const a0 = CARC.degToRad ? CARC.degToRad(cfg.arc.startDeg) : (cfg.arc.startDeg * Math.PI / 180);
+                const a1 = CARC.degToRad ? CARC.degToRad(cfg.arc.endDeg) : (cfg.arc.endDeg * Math.PI / 180);
+                const c = clockPointFromFrame(cfg.arc.centerX, cfg.arc.centerY);
+                const r = cfg.arc.radius * (w / cfg.framePixels[0]);
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, r, -a0, -a1, true);
+                ctx.stroke();
+                ctx.restore();
+            }
+
+            if (tok) {
+                drawToken(clockSunImg, tok.sunDeg, tok.sunAlpha, true, true);
+                drawToken(clockMoonImg, tok.moonDeg, tok.moonAlpha, false, true);
+                const nf = tok.useNightFrame ? 1 : 0;
+                drawClockBitmap(clockFrontImgs.day, 1 - Math.max(nightW, nf), ox, oy, w, h);
+                drawClockBitmap(clockFrontImgs.night, Math.max(nightW, nf), ox, oy, w, h);
+                drawToken(clockSunImg, tok.sunDeg, tok.sunAlpha, true, false);
+                drawToken(clockMoonImg, tok.moonDeg, tok.moonAlpha, false, false);
+            }
+
+            const rb = cfg.ribbonDisplay;
+            const ribNight = (tok && tok.useNightFrame) || nightW > 0.5;
+            const rw = rb.w;
+            const rh = rb.h;
+            const rx = rb.cx - rw / 2;
+            const ry = rb.cy - rh / 2;
+            drawClockBitmap(clockRibbonImgs.day, ribNight ? 0 : 1, rx, ry, rw, rh);
+            drawClockBitmap(clockRibbonImgs.night, ribNight ? 1 : 0, rx, ry, rw, rh);
+            if (gardenClockLabel) {
+                ctx.save();
+                ctx.fillStyle = ribNight ? 'rgba(235, 228, 215, 0.96)' : 'rgba(62, 48, 36, 0.92)';
+                ctx.font = '600 12px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(gardenClockLabel, rb.cx, rb.cy + 1);
+                ctx.restore();
+            }
+            if (tok) {
+                const paintTok = (img, deg, alpha) => {
+                    if (alpha < 0.03 || !CARC) return;
+                    const fr = CARC.tokenFrameXY(deg);
+                    blitClockToken(img, clockPointFromFrame(fr.x, fr.y), disp, alpha);
+                };
+                paintTok(clockSunImg, tok.sunDeg, tok.sunAlpha);
+                paintTok(clockMoonImg, tok.moonDeg, tok.moonAlpha);
+            }
+            if (typeof document !== 'undefined' && document.body) {
+                document.body.dataset.paintedClock = painted ? '1' : '0';
+            }
+        }
+
+        function drawBedtimeGlowLayer() {
+            if (bedtimeGlow <= 0.01 && bedtimeDark <= 0.01) return;
+            if (bedtimeGlow > 0.01 && ready(bedtimeGlowImg)) {
+                ctx.save();
+                ctx.globalAlpha = bedtimeGlow;
+                ctx.drawImage(bedtimeGlowImg, 0, 0, ART.width, ART.height);
+                ctx.restore();
+            } else if (bedtimeGlow > 0.01) {
+                ctx.save();
+                const g = ctx.createRadialGradient(420, 260, 20, 420, 260, 220);
+                g.addColorStop(0, `rgba(255, 220, 140, ${0.55 * bedtimeGlow})`);
+                g.addColorStop(1, 'rgba(255, 180, 80, 0)');
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, ART.width, ART.height);
+                ctx.globalAlpha = 0.35 * bedtimeGlow;
+                ctx.fillStyle = 'rgba(5, 12, 40, 0.5)';
+                ctx.fillRect(0, 0, ART.width, ART.height);
+                ctx.restore();
+            }
+            if (bedtimeDark > 0.01 && ready(bedtimeDarkImg)) {
+                ctx.save();
+                ctx.globalAlpha = bedtimeDark;
+                ctx.drawImage(bedtimeDarkImg, 0, 0, ART.width, ART.height);
+                ctx.restore();
+            }
+        }
+
         function drawBackdrop() {
+            if (lightWeights) {
+                ctx.fillStyle = '#e9e0c9';
+                ctx.fillRect(0, 0, ART.width, ART.height);
+                for (const k of ['dawn', 'midday', 'golden-hour', 'night']) {
+                    const alpha = lightWeights[k] || 0;
+                    if (alpha < 0.008) continue;
+                    const img = bgImgs[k];
+                    if (!ready(img)) continue;
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    ctx.drawImage(img, 0, 0, ART.width, ART.height);
+                    ctx.restore();
+                }
+                drawSeasonOverlay();
+                ctx.globalAlpha = 1;
+                return;
+            }
             const cur = bgImgs[lighting];
             const prev = prevLighting ? bgImgs[prevLighting] : null;
             if (prev && ready(prev) && lightFade < 1) {
@@ -355,6 +826,7 @@
                 ctx.fillStyle = '#e9e0c9';
                 ctx.fillRect(0, 0, ART.width, ART.height);
             }
+            drawSeasonOverlay();
             ctx.globalAlpha = 1;
         }
 
@@ -689,6 +1161,16 @@
                 }
                 drawReadyLoop(i, t);
                 if (tendPlot === i) drawSelectionRing(i, t);
+                if (pl.tendedToday && tendPlot !== i) {
+                    const p = ART.plots[i];
+                    ctx.save();
+                    ctx.globalAlpha = 0.42 + 0.08 * Math.sin(t * 2 + i);
+                    ctx.fillStyle = 'rgba(168, 210, 148, 0.95)';
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y + 6, 5.5, 0, TAU);
+                    ctx.fill();
+                    ctx.restore();
+                }
                 const an = anims[i];
                 if (an) {
                     const k = (now - an.t0) / an.dur;
@@ -890,6 +1372,7 @@
 
         function drawCritters(t) {
             if (!ART.critters || !C) return;
+            if (!daylight) return;
             const alpha = C.critterDayAlpha(lighting, prevLighting, lightFade);
             if (alpha < 0.02) return;
             const motionScale = C.motionScaleFromReduced(reducedMotion);
@@ -934,27 +1417,29 @@
 
         function drawLogoHud() {
             const hud = ART.logoHud;
-            if (!hud || !C) return;
+            if (!hud) return;
             if (typeof document !== 'undefined' && document.body && document.body.dataset.canvasLogo === '1' &&
                 document.getElementById('brand-logo-day') && document.getElementById('brand-logo-day').naturalWidth > 0) {
+                refreshLogoOnCanvas();
                 return;
             }
-            const layers = C.logoLayerAlphas(lighting, prevLighting, lightFade);
+            const layers = logoLayerAlphas();
             const dayReady = ready(logoDayImg);
             const nightReady = ready(logoNightImg);
-            logoOnCanvas = dayReady || nightReady;
+            refreshLogoOnCanvas();
             if (!logoOnCanvas) return;
             const { x, y, w, h } = hud;
+            const [sw, sh] = hud.srcPixels || [w * 2, h * 2];
             if (dayReady && layers.day > 0.02) {
                 ctx.save();
                 ctx.globalAlpha = layers.day;
-                ctx.drawImage(logoDayImg, x, y, w, h);
+                ctx.drawImage(logoDayImg, 0, 0, sw, sh, x, y, w, h);
                 ctx.restore();
             }
             if (nightReady && layers.night > 0.02) {
                 ctx.save();
                 ctx.globalAlpha = layers.night;
-                ctx.drawImage(logoNightImg, x, y, w, h);
+                ctx.drawImage(logoNightImg, 0, 0, sw, sh, x, y, w, h);
                 ctx.restore();
             }
         }
@@ -976,16 +1461,74 @@
             drawDecorations(t);
             drawSunShafts(t);
             drawPlants(t);
+            drawSeasonParticles(t);
             drawCritters(t);
             drawEffectSprites(t);
             drawParticles(t);
             drawHarvestAnims();
             drawBasketIcon(t);
-            drawLogoHud();
+            drawGardenClockHud();
+            drawBedtimeGlowLayer();
             drawVignette();
+            drawLogoHud();
+            drawClockTokensOnTop();
         }
 
-        return { resize, update, draw, setLighting, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
+        /** Final pass: tokens above vignette / HTML (frame → hills → token → front → ribbon → token). */
+        function drawClockTokensOnTop() {
+            if (!ART.clock || typeof window === 'undefined' || !window.SmileClockArc) return;
+            const CARC = window.SmileClockArc;
+            const tok = CARC.clockTokenState(gardenClockMinutes);
+            const disp = ART.clock.tokenDisplay || 32;
+            const paint = (img, deg, alpha) => {
+                if (alpha < 0.03) return;
+                const fr = CARC.tokenFrameXY(deg);
+                blitClockToken(img, clockPointFromFrame(fr.x, fr.y), disp, alpha);
+            };
+            paint(clockSunImg, tok.sunDeg, tok.sunAlpha);
+            paint(clockMoonImg, tok.moonDeg, tok.moonAlpha);
+        }
+
+        function probeClockSunToken() {
+            const CARC = typeof window !== 'undefined' ? window.SmileClockArc : null;
+            if (!ART.clock || !CARC) return { ok: false, reason: 'missing-clock' };
+            const tok = CARC.clockTokenState(gardenClockMinutes);
+            const fr = CARC.tokenFrameXY(tok.sunDeg);
+            const center = clockPointFromFrame(fr.x, fr.y);
+            const pixel = sampleBackdrop(center.x, center.y);
+            return {
+                ok: true,
+                gardenClockMinutes,
+                center,
+                deg: tok.sunDeg,
+                sunAlpha: tok.sunAlpha,
+                sunReady: ready(clockSunImg),
+                sunNatural: clockSunImg ? clockSunImg.naturalWidth : 0,
+                pixel,
+            };
+        }
+
+        function probeClockMoonToken() {
+            const CARC = typeof window !== 'undefined' ? window.SmileClockArc : null;
+            if (!ART.clock || !CARC) return { ok: false, reason: 'missing-clock' };
+            const tok = CARC.clockTokenState(gardenClockMinutes);
+            const fr = CARC.tokenFrameXY(tok.moonDeg);
+            const center = clockPointFromFrame(fr.x, fr.y);
+            const pixel = sampleBackdrop(center.x, center.y);
+            return {
+                ok: true,
+                gardenClockMinutes,
+                center,
+                deg: tok.moonDeg,
+                moonAlpha: tok.moonAlpha,
+                moonReady: ready(clockMoonImg),
+                moonNatural: clockMoonImg ? clockMoonImg.naturalWidth : 0,
+                pixel,
+            };
+        }
+
+        return { resize, update, draw, setLighting, setLightingBlend, setSeason, setGardenClock, setBedtimeGlow, setBedtimeDark, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
+            waitForHudArt, hudArtReady, sampleBackdrop, probeClockSunToken, probeClockMoonToken,
             get lighting() { return lighting; },
             get reducedMotion() { return reducedMotion; },
             setReducedMotion(v) { reducedMotion = !!v; },

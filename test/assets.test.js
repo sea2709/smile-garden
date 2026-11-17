@@ -122,6 +122,24 @@ test('critter strips and day backdrops without painted insects', () => {
     assert.equal(ART.critters.strips.bee.scale, 0.28);
 });
 
+test('time-of-day art matches assets/time-manifest.json', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'time-manifest.json'), 'utf8'));
+    assert.ok(fs.existsSync(fromRenderer(ART.clock.frameSrc('day'))));
+    assert.ok(fs.existsSync(fromRenderer(ART.clock.frameSrc('night'))));
+    assert.ok(fs.existsSync(fromRenderer(ART.clock.frontSrc('day'))));
+    assert.ok(fs.existsSync(fromRenderer(ART.clock.sunSrc)));
+    assert.ok(fs.existsSync(fromRenderer(ART.bedtime.windowGlow)));
+    assert.ok(fs.existsSync(fromRenderer(ART.bedtime.morningCard)));
+    assert.ok(fs.existsSync(fromRenderer(ART.bedtime.bedButtonIcon)));
+    for (const list of Object.values(ART.seasons.particlePools)) {
+        for (const name of list) {
+            assert.ok(fs.existsSync(fromRenderer(ART.seasons.particleSrc(name))), name);
+        }
+    }
+    assert.equal(ART.clock.arc.centerX, manifest.clock.arc.centerX);
+    assert.equal(ART.clock.arc.startDeg, manifest.clock.arc.startDeg);
+});
+
 test('breath UI art: manifest pills, icons, dots and breath-ui.css', () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'breath-manifest.json'), 'utf8'));
     assert.equal(manifest.scale, 2);

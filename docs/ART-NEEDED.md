@@ -54,3 +54,42 @@ lantern, birdbath, bench, scarecrow, fairy-lights — natural sizes ~161–249px
 | `mid-left` | 218 | 460 | 0.62 |
 
 Defined in `renderer/art.js` → `decorSpots`. Scale chosen so ~160–250px source art reads beside the beds (~100–120px on backdrop).
+
+## Day clock, seasons, bedtime (v5 — Heily art)
+
+**Authoritative manifest:** `assets/time-manifest.json` (paths in `renderer/art.js`). Missing PNGs keep procedural fallbacks in `scene.js`.
+
+### HUD garden clock (canvas draw order: frame → token → front)
+
+| Path | Size (@2x) | Display | Anchor |
+|------|------------|---------|--------|
+| `ui/clock/clock-frame-day.png` | **320×128** | 160×64 | backdrop centre **(640, 40)** |
+| `ui/clock/clock-frame-night.png` | **320×128** | 160×64 | same |
+| `ui/clock/sun-token.png` | **64×64** | 32×32 | arc 147° → 33° (6:00–18:00) |
+| `ui/clock/moon-token.png` | **64×64** | 32×32 | rests at right end after 18:00 |
+| `ui/clock/clock-front-day.png` | **320×128** | 160×64 | after token (hill mask) |
+| `ui/clock/clock-front-night.png` | **320×128** | 160×64 | same |
+| `ui/clock/season-ribbon.png` | **280×61** | 140×30 | centre **(640, 88)** |
+| `ui/clock/season-ribbon-night.png` | **280×61** | 140×30 | same |
+
+Arc centre **(160.6, 183.1)**, radius **150.6** in frame pixels (@2x).
+
+### Season overlays (above backdrop, below plants/decor)
+
+| Path | Size | Notes |
+|------|------|--------|
+| `seasons/{spring\|summer\|autumn\|winter}-day.png` | **1280×720** | transparent; aligned to backdrop |
+| `seasons/{spring\|summer\|autumn\|winter}-night.png` | **1280×720** | blended with day using lighting night weight |
+
+### Season particles (`assets/seasons/particles/*.png`, 25 sprites)
+
+Pools in `ART.seasons.particlePools` (spring petals/blossoms, summer pollen/seed-fluff, summer night fireflies, autumn leaves, winter snowflakes).
+
+### Bedtime & morning reveal
+
+| Path | Size | Use |
+|------|------|-----|
+| `bedtime/window-glow.png` | **1280×720** | aligned to `night.jpg`; fade in on Go to bed |
+| `bedtime/window-dark.png` | **1280×720** | optional lights-off overlay |
+| `bedtime/morning-card.png` | **700×600** | morning summary; text in manifest `morningTextSafe` |
+| `ui/bed-button-icon.png` | **56×56** (@2x) | Go to bed button |

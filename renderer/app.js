@@ -1,14 +1,13 @@
-// renderer/app.js — Smile Garden v3: a calm daily visit to a painted garden.
+// renderer/app.js — Smile Garden: calm in-garden tending on a Stardew-style day clock.
 //
-// Flow: (one-time wellness notice) -> greeting -> [plant seeds] -> smile ~45 s
-// (sunlight) -> talk ~30 s (water) -> optional guided breathing (fertilizer)
-// -> summary -> garden. State persists in localStorage. Plants grow at most
-// one stage per local day; see game/visit.js.
+// Flow: wellness -> garden idle -> tend beds (smile / talk / breathe per plant)
+// -> optional Go to bed -> overnight growth reveal. Clock runs only while open.
 
 (function () {
     'use strict';
     const L = window.SmileLogic;
     const V = window.SmileVisit;
+    const D = window.SmileDay;
     const ART = window.SmileArt;
     const STORE_KEY = 'smile-garden.v3';
     const $ = (id) => document.getElementById(id);
@@ -17,10 +16,10 @@
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub', 'meter-sun', 'meter-water', 'meter-fert',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-rate', 'breath-count', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
-        'screen-summary', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
+        'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
         'btn-sum-done', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
         'dev-ready', 'dev-fill', 'dev-reset', 'basket-chip', 'basket-count', 'screen-unlock', 'unlock-title', 'unlock-body', 'unlock-art', 'btn-unlock-ok',
         'brand-logo-day', 'brand-logo-night', 'brand-fallback',
@@ -38,13 +37,33 @@
     let config = { mock: true, fast: false };
     let state = V.loadState(safeGet(), new Date());
     const clock = new V.GameClock({ offsetDays: state.settings.offsetDays });
+    const gardenClock = new D.GardenDayClock(state, {
+        realMsPerGardenMinute: state.settings.realMsPerGardenMinute || D.DEFAULT_DAY_CONFIG.realMsPerGardenMinute,
+    });
+    let saveAcc = 0;
     function safeGet() { try { return localStorage.getItem(STORE_KEY); } catch { return null; } }
     function save() {
         state.settings.offsetDays = clock.offsetDays;
         try { localStorage.setItem(STORE_KEY, V.serializeState(state)); } catch (e) { console.warn('[smile-garden] save failed', e); }
     }
 
+    function artUrl(rel) {
+        try { return new URL(rel, window.location.href).href; } catch { return rel; }
+    }
     const scene = window.SmileScene.createScene(els.garden);
+    if (ART.ui && els.brandLogoDay) {
+        els.brandLogoDay.src = artUrl(ART.ui.logoDay);
+        els.brandLogoNight.src = artUrl(ART.ui.logoNight);
+        const markBrand = () => {
+            if ((els.brandLogoDay.complete && els.brandLogoDay.naturalWidth) ||
+                (els.brandLogoNight.complete && els.brandLogoNight.naturalWidth)) {
+                document.body.dataset.canvasLogo = '1';
+            }
+        };
+        els.brandLogoDay.addEventListener('load', markBrand);
+        els.brandLogoNight.addEventListener('load', markBrand);
+        if (els.brandLogoDay.complete) markBrand();
+    }
     const trace = new L.SmileTrace({ windowSec: 10, capacity: 480 });
     let screen = 'loading';
     let session = null;
@@ -55,6 +74,8 @@
     let currentDay = clock.today();
     let lighting = 'midday';
     let devOpen = false;
+    /** When true, HUD season stays on `state.season` (demo capture); otherwise it tracks `dayNumber`. */
+    let hudSeasonOverride = false;
 
     const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', faceGoneAt: 0, breathing: null };
     let breathHudDemoLock = false;
@@ -83,9 +104,13 @@
         if (name !== 'visit') els.basketChip.hidden = true;
     }
 
-  function plotsForScene(instant) {
-        const today = clock.today();
-        const view = state.plots.map((p) => {
+  function gardenTodayKey() {
+        return V.calendarKey(state, clock.now());
+    }
+
+    function plotsForScene(instant) {
+        const today = gardenTodayKey();
+        const view = state.plots.map((p, i) => {
             if (!p) return null;
             const regrow = V.isPlotRegrowing(p, today);
             return {
@@ -93,10 +118,12 @@
                 stage: p.stage,
                 pickedSprite: regrow,
                 ready: V.isPlotReady(p, today),
+                tendedToday: D.plotTendedToday(state, i),
             };
         });
         scene.setPlots(view, instant ? { instant: true } : undefined);
         scene.setDecor(state.decor);
+        scene.setSeason(state.season);
     }
 
     function syncTendRing() {
@@ -141,31 +168,103 @@
         return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
     }
     function refreshLighting() {
-        const l = V.lightingFor(clock.now(), state.settings.lighting === 'auto' ? null : state.settings.lighting);
-        if (l !== lighting) {
-            lighting = l;
-            scene.setLighting(l);
-            document.body.dataset.lighting = l;
-            if (source && source.setNight) source.setNight(l === 'night');
+        const auto = state.settings.lighting === 'auto';
+        if (state.version >= 5 && auto) {
+            const blend = D.lightingBlend(state.gardenMinutes);
+            scene.setLightingBlend(blend.weights);
+            lighting = blend.primary;
+            document.body.dataset.lighting = lighting;
+            if (source && source.setNight) source.setNight((blend.weights.night || 0) > 0.6);
+        } else {
+            const l = state.version >= 5 && !auto
+                ? V.lightingForGardenMinutes(state.gardenMinutes, state.settings.lighting)
+                : V.lightingFor(clock.now(), auto ? null : state.settings.lighting);
+            if (l !== lighting) {
+                lighting = l;
+                scene.setLighting(l);
+                document.body.dataset.lighting = l;
+                if (source && source.setNight) source.setNight(l === 'night');
+            }
+        }
+        scene.setSeason(state.season);
+    }
+
+    function syncGardenSeasonFromDay() {
+        if (state.version < 5 || hudSeasonOverride) return;
+        const canonical = D.seasonForDayNumber(state.dayNumber);
+        if (state.season !== canonical) {
+            state.season = canonical;
+            state.seasonDay = D.seasonDayNumber(state.dayNumber);
+            scene.setSeason(state.season);
         }
     }
+
+    function syncGardenClockHud() {
+        if (state.version < 5) return;
+        syncGardenSeasonFromDay();
+        const seasonLabel = D.SEASON_LABELS[state.season] || state.season;
+        const label = `Day ${state.dayNumber} · ${seasonLabel} · ${D.formatGardenTime(state.gardenMinutes)}`;
+        scene.setGardenClock(state.gardenMinutes, label);
+        if (els.gardenClock) els.gardenClock.hidden = true;
+        document.body.dataset.gardenV = '5';
+    }
+
+    function syncHudChipClamp() {
+        if (document.body.dataset.paintedClock !== '1') {
+            document.documentElement.style.removeProperty('--hud-chips-max');
+            return;
+        }
+        const H = typeof window !== 'undefined' ? window.SmileHudLayout : null;
+        if (!H) return;
+        const keep = H.clockKeepOutClientRect(window.innerWidth, window.innerHeight);
+        const chips = document.querySelector('.topbar .chips');
+        if (!chips) return;
+        const chipLeft = chips.getBoundingClientRect().left;
+        const pad = 6;
+        const maxW = Math.floor(Math.max(96, keep.left - chipLeft - pad));
+        document.documentElement.style.setProperty('--hud-chips-max', `${maxW}px`);
+    }
+
     function renderHud() {
         const now = clock.now();
-        const time = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
-        els.clockChip.textContent = `${fmtDate(now)} · ${time} · ${V.LIGHTING_LABELS[lighting]}${state.settings.lighting !== 'auto' ? ' (demo light)' : ''}`;
-        const weekly = V.weeklyVisits(state, now);
-        const start = V.weekStartKey(now);
-        const today = V.dayKey(now);
-        els.weekDots.textContent = '';
-        for (let i = 0; i < 7; i++) {
-            const k = V.addDaysKey(start, i);
-            const dot = document.createElement('i');
-            if (state.visitDays.includes(k)) dot.className = 'on';
-            if (k === today) dot.classList.add('today');
-            dot.title = V.dayStart(k).toLocaleDateString(undefined, { weekday: 'short' });
-            els.weekDots.appendChild(dot);
+        if (state.version >= 5) {
+            const seasonLabel = D.SEASON_LABELS[state.season] || state.season;
+            els.dayChipText.textContent = `Day ${state.dayNumber} · ${seasonLabel} · ${D.formatGardenTime(state.gardenMinutes)}`;
+            syncGardenClockHud();
+        } else {
+            const time = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+            els.dayChipText.textContent = `${fmtDate(now)} · ${time} · ${V.LIGHTING_LABELS[lighting]}${state.settings.lighting !== 'auto' ? ' (demo light)' : ''}`;
         }
-        els.weekText.textContent = `${weekly} ${weekly === 1 ? 'visit' : 'visits'} this week`;
+        const weekly = V.weeklyVisits(state, now);
+        els.weekDots.textContent = '';
+        if (state.version >= 5) {
+            const block = Math.floor((state.dayNumber - 1) / D.DAYS_PER_SEASON);
+            const base = block * D.DAYS_PER_SEASON + 1;
+            for (let i = 0; i < D.DAYS_PER_SEASON; i++) {
+                const n = base + i;
+                const k = D.gardenDayKey(n);
+                const dot = document.createElement('i');
+                if (state.visitDays.includes(k)) dot.className = 'on';
+                if (n === state.dayNumber) dot.classList.add('today');
+                dot.title = `Day ${n}`;
+                els.weekDots.appendChild(dot);
+            }
+            els.weekText.textContent = `${weekly} ${weekly === 1 ? 'day' : 'days'} this season`;
+        } else {
+            const start = V.weekStartKey(now);
+            const today = V.dayKey(now);
+            for (let i = 0; i < 7; i++) {
+                const k = V.addDaysKey(start, i);
+                const dot = document.createElement('i');
+                if (state.visitDays.includes(k)) dot.className = 'on';
+                if (k === today) dot.classList.add('today');
+                dot.title = V.dayStart(k).toLocaleDateString(undefined, { weekday: 'short' });
+                els.weekDots.appendChild(dot);
+            }
+            els.weekText.textContent = `${weekly} ${weekly === 1 ? 'visit' : 'visits'} this week`;
+        }
+        const suggestBed = state.version >= 5 && gardenClock.suggestBed();
+        if (els.btnBed) els.btnBed.classList.toggle('suggest', suggestBed && screen === 'idle');
         const sc = V.score(state);
         els.scoreChip.textContent = `🌱 ${sc.planted}/${sc.plots} planted · ❀ ${sc.mature} grown`;
         const pantryN = (state.pantry && state.pantry.totalHarvests) || 0;
@@ -174,6 +273,7 @@
         document.body.dataset.planted = String(sc.planted);
         document.body.dataset.mature = String(sc.mature);
         els.devDay.textContent = clock.offsetDays ? `+${clock.offsetDays} day${clock.offsetDays > 1 ? 's' : ''}` : 'today';
+        syncHudChipClamp();
     }
 
     const meterImgs = {};
@@ -219,7 +319,8 @@
     }
     function meterValues() {
         if (session) return { sun: session.sunHours, water: session.water, fert: session.fertilizer, fertUsed: session.breathTaken };
-        if (lastResult && lastResult.day === clock.today()) return { sun: lastResult.sunHours, water: lastResult.water, fert: lastResult.fertilizer, fertUsed: lastResult.fertilizer > 0 };
+        const dayKey = state.version >= 5 ? D.gardenDayKey(state.dayNumber) : clock.today();
+        if (lastResult && lastResult.day === dayKey) return { sun: lastResult.sunHours, water: lastResult.water, fert: lastResult.fertilizer, fertUsed: lastResult.fertilizer > 0 };
         return { sun: 0, water: 0, fert: 0, fertUsed: false };
     }
     function renderMeters() {
@@ -273,13 +374,18 @@
             : (config.enableTelemetry ? 'SmartSpectra SDK telemetry is on (SMARTSPECTRA_TELEMETRY=0 to opt out). ' : '') + 'For fun and general wellness only.';
     }
     function renderIdle() {
-        const now = clock.now();
-        const visited = V.visitedToday(state, now);
-        els.idleText.textContent = visited
-            ? (V.matureCount(state) === 8 ? 'Every bed is in full growth. What a garden!' : 'Visit done for today. Come back tomorrow to see what grows.')
-            : 'Your garden is waiting for today\'s visit.';
-        els.btnVisit.textContent = visited ? 'Visit again' : 'Start today\'s visit';
+        const tendable = V.tendableForState(state, clock.now());
+        const ready = V.readyPlotIndices(state.plots, gardenTodayKey()).length;
+        let msg = 'Wander the beds, tend your plants, and harvest when ready.';
+        if (state.version >= 5) {
+            if (gardenClock.atLateNight()) msg = 'A peaceful night. Go to bed when you are ready — the day never ends by force.';
+            else if (gardenClock.suggestBed()) msg = 'Golden hour. You can keep tending, or head to bed whenever you like.';
+            else if (!tendable.length && !ready) msg = 'Every plant is tended for today. Rest, harvest, or go to bed when ready.';
+        }
+        els.idleText.textContent = msg;
+        els.btnVisit.textContent = tendable.length ? 'Tend your plants' : (ready ? 'Tend (harvest)' : 'Tend your plants');
         els.btnPlantIdle.hidden = !V.emptyPlots(state).length;
+        els.btnBed.hidden = state.version < 5;
     }
 
     // ------------------------------------------------------------------
@@ -403,14 +509,14 @@
 
     async function beginVisit() {
         if (!(await ensureSource())) return;
-        const today = clock.today();
+        const today = gardenTodayKey();
         session = new V.VisitSession({
             fast: config.fast,
             pace: state.settings.pace,
             breaths: state.settings.breaths,
             plots: state.plots,
             today,
-            tendBeds: V.tendablePlotIndices(state.plots, today),
+            tendBeds: V.tendableForState(state, clock.now()),
         });
         refreshBasketChip(0);
         els.basketChip.hidden = session.harvestQueue.length === 0;
@@ -674,7 +780,34 @@
         if (title) { els.hintTitle.textContent = title; els.hintSub.textContent = sub; }
     }
 
+    async function endTendSession() {
+        const result = session.result();
+        const beforeSeeds = V.unlockedPlants(state);
+        const beforeDecor = V.decorUnlocked(state);
+        const out = V.applyVisit(state, result, clock.now());
+        const harvested = V.applySessionHarvests(state, result.harvestPlots, clock.now());
+        const unlocks = V.newUnlocksAfterHarvest(state, beforeSeeds, beforeDecor);
+        out.harvested = harvested;
+        out.seedUnlocks = unlocks.seeds;
+        out.decorUnlocks = unlocks.decor;
+        lastResult = Object.assign({}, out);
+        save();
+        if (source) { try { await source.stop(); } catch { /* ignore */ } }
+        sourceReady = false;
+        session = null;
+        scene.setEffects({ sun: 0, water: 0, fert: 0 });
+        plotsForScene();
+        renderHud();
+        show('idle');
+        if (out.seedUnlocks.length || out.decorUnlocks.length) showUnlockReveal(out.seedUnlocks, out.decorUnlocks);
+        else if (out.tended && out.tended.length) toast('Tending saved for tonight.');
+    }
+
     async function finishVisit() {
+        if (state.version >= 5) {
+            await endTendSession();
+            return;
+        }
         const result = session.result();
         const before = state.plots.map((p) => (p ? { plantId: p.plantId, stage: p.stage } : null));
         const beforeSeeds = V.unlockedPlants(state);
@@ -695,7 +828,6 @@
         renderSummary(out);
         show('summary');
         renderHud();
-        // reveal growth one bed at a time
         const shown = before.slice();
         scene.setPlots(shown, { instant: true });
         out.grew.forEach((g, k) => {
@@ -709,6 +841,111 @@
         document.body.dataset.revealed = '0';
         document.body.dataset.grew = String(out.grew.length);
         if (out.seedUnlocks.length || out.decorUnlocks.length) showUnlockReveal(out.seedUnlocks, out.decorUnlocks);
+    }
+
+    function mountMorningCard(title, body) {
+        const host = els.sumCardArt;
+        if (!host) return;
+        host.hidden = false;
+        host.textContent = '';
+        const cardSrc = (ART.bedtime && ART.bedtime.morningCard) || (ART.ui && ART.ui.morningCard);
+        const img = new Image();
+        img.alt = '';
+        img.className = 'morning-card-img';
+        img.src = cardSrc || ART.card;
+        const copy = document.createElement('div');
+        copy.className = 'morning-card-copy';
+        const h = document.createElement('h1');
+        h.textContent = title;
+        const p = document.createElement('p');
+        p.className = 'lead';
+        p.textContent = body;
+        copy.append(h, p);
+        img.onerror = () => { els.sumTitle.hidden = false; els.sumDate.hidden = false; };
+        img.onload = () => { els.sumTitle.hidden = true; els.sumDate.hidden = true; };
+        host.append(img, copy);
+        if (cardSrc) {
+            els.sumCard.classList.add('summary-painted');
+        }
+    }
+
+    function renderMorningSummary(night) {
+        const out = night || { grew: [], waiting: [], tended: [] };
+        const title = out.grew.length ? 'Your garden grew overnight' : 'A quiet night in the garden';
+        const body = `Day ${state.dayNumber} · ${D.SEASON_LABELS[state.season]} · ${D.formatGardenTime(state.gardenMinutes)}`;
+        els.sumDate.textContent = body;
+        els.sumTitle.textContent = title;
+        els.sumTitle.hidden = false;
+        els.sumDate.hidden = false;
+        if (els.sumCardArt) {
+            els.sumCardArt.hidden = true;
+            els.sumCardArt.textContent = '';
+            els.sumCard.classList.remove('summary-painted');
+        }
+        if (state.version >= 5) mountMorningCard(title, body);
+        els.sumSun.textContent = '—';
+        els.sumWater.textContent = '—';
+        els.sumFert.textContent = '—';
+        els.sumGrew.textContent = '';
+        for (const g of out.grew) {
+            const li = document.createElement('li');
+            li.textContent = g.mature ? `${g.name} in bed ${g.plot + 1} is fully grown.` : `${g.name} in bed ${g.plot + 1} grew to ${V.STAGES[g.to].label}.`;
+            els.sumGrew.appendChild(li);
+        }
+        const readyN = V.readyPlotIndices(state.plots, gardenTodayKey()).length;
+        if (readyN) {
+            const li = document.createElement('li');
+            li.textContent = `${readyN} crop${readyN === 1 ? '' : 's'} ready to harvest today.`;
+            els.sumGrew.appendChild(li);
+        }
+        if (!out.grew.length && !readyN) {
+            const li = document.createElement('li');
+            li.textContent = 'Plants are resting — tend them today and they will grow after bed.';
+            els.sumGrew.appendChild(li);
+        }
+        els.sumWait.textContent = '';
+        for (const w of (out.waiting || []).slice(0, 4)) {
+            const li = document.createElement('li');
+            li.textContent = V.waitingText(w);
+            els.sumWait.appendChild(li);
+        }
+        els.sumWeek.textContent = `Season day ${state.seasonDay} of ${D.DAYS_PER_SEASON}. Growth happens when you go to bed, not on a timer.`;
+    }
+
+    async function showMorningReveal(night) {
+        renderMorningSummary(night);
+        show('summary');
+        const out = night || { grew: [] };
+        out.grew.forEach((g, k) => {
+            setTimeout(() => {
+                floatLabel(g.plot, g.mature ? `${g.name}: ready!` : `${g.name} grew overnight`);
+                scene.playGrowth(g.plot, g.from, g.to);
+            }, 400 + k * 500);
+        });
+        setTimeout(() => plotsForScene({ instant: true }), 400 + out.grew.length * 500 + 800);
+    }
+
+    async function goToBed() {
+        if (screen === 'visit' && session) await endTendSession();
+        document.body.dataset.lighting = 'night';
+        scene.setLighting('night');
+        state.gardenMinutes = D.DEFAULT_DAY_CONFIG.lateNightStop;
+        save();
+        const steps = 14;
+        for (let i = 1; i <= steps; i++) {
+            scene.setBedtimeGlow(i / steps);
+            if (i > steps - 4) scene.setBedtimeDark((i - (steps - 4)) / 4);
+            await new Promise((r) => setTimeout(r, 65));
+        }
+        scene.setBedtimeGlow(0);
+        scene.setBedtimeDark(0);
+        hudSeasonOverride = false;
+        const night = V.goToBed(state, clock.now());
+        state.morningPending = null;
+        save();
+        refreshLighting();
+        renderHud();
+        await showMorningReveal(night);
     }
 
     function showUnlockReveal(seeds, decor) {
@@ -1121,7 +1358,7 @@
     // ------------------------------------------------------------------
     els.chkAdult.addEventListener('change', () => { els.btnWellnessOk.disabled = !els.chkAdult.checked; });
     els.btnWellnessOk.addEventListener('click', ackWellness);
-    function ackWellness() { state.wellnessAck = true; save(); show('greeting'); }
+    function ackWellness() { state.wellnessAck = true; save(); show(state.version >= 5 ? 'idle' : 'greeting'); }
     els.btnGreetPlant.addEventListener('click', () => openPicker());
     els.btnBegin.addEventListener('click', beginVisit);
     els.btnPickerClose.addEventListener('click', closePicker);
@@ -1130,7 +1367,8 @@
     els.btnJournal.addEventListener('click', () => (screen === 'journal' ? closeJournal() : openJournal('diary')));
     els.btnJournalClose.addEventListener('click', closeJournal);
     els.screenJournal.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => renderJournal(b.dataset.tab)));
-    els.btnVisit.addEventListener('click', () => show('greeting'));
+    els.btnVisit.addEventListener('click', () => (state.version >= 5 ? beginVisit() : show('greeting')));
+    els.btnBed.addEventListener('click', () => goToBed());
     els.btnPlantIdle.addEventListener('click', () => openPicker());
     els.btnDev.addEventListener('click', () => toggleDev());
     els.btnErrorDismiss.addEventListener('click', () => { els.errorBanner.hidden = true; });
@@ -1181,6 +1419,10 @@
 
     function nextDay() {
         if (screen === 'visit') return;
+        if (state.version >= 5) {
+            goToBed();
+            return;
+        }
         clock.nextDay();
         currentDay = clock.today();
         save();
@@ -1263,24 +1505,39 @@
         const dt = Math.min(0.1, t - lastT);
         lastT = t;
         if (session && screen === 'visit') updateVisit(dt, t);
+        if (state.version >= 5) syncGardenClockHud();
+        if (state.version >= 5 && document.visibilityState === 'visible' && screen !== 'wellness') {
+            gardenClock.tick(dt * 1000);
+            saveAcc += dt;
+            if (saveAcc > 8) { saveAcc = 0; save(); }
+        } else if (document.visibilityState !== 'visible') {
+            gardenClock.pause();
+        } else {
+            gardenClock.resume();
+        }
         scene.update(dt, t);
         scene.draw(t);
         const brandPainted = els.brandLogoDay && els.brandLogoDay.complete && els.brandLogoDay.naturalWidth > 0;
-        document.body.dataset.canvasLogo = (scene.logoOnCanvas || brandPainted) ? '1' : '0';
+        const logoVisible = scene.logoOnCanvas || brandPainted;
+        document.body.dataset.canvasLogo = logoVisible ? '1' : '0';
+        if (state.version >= 5 && els.brandLogoDay) {
+            if (els.brandFallback) els.brandFallback.hidden = logoVisible;
+        }
         renderMeters();
         const chartOn = state.settings.chart && screen === 'visit';
         if (els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;
         if (chartOn) window.SmileChart.drawSmileChart(els.smileChart, trace, t, els.chartLive);
         hudAcc += dt;
-        if (hudAcc > 1) {
+        if (hudAcc > 0.35) {
             hudAcc = 0;
             refreshLighting();
             renderHud();
-            // Local midnight: a new day begins (outside of a visit).
-            const today = clock.today();
-            if (today !== currentDay) {
-                currentDay = today;
-                if (screen === 'idle') show('greeting');
+            if (state.version < 5) {
+                const today = clock.today();
+                if (today !== currentDay) {
+                    currentDay = today;
+                    if (screen === 'idle') show('greeting');
+                }
             }
         }
         requestAnimationFrame(loop);
@@ -1321,21 +1578,21 @@
                 showError('Renderer bundle missing', 'Run `npm run build` (or `npm start`) first. You can still play with the keyboard.', true);
             }
         }
-        if (ART.ui && els.brandLogoDay) {
-            els.brandLogoDay.src = artUrl(ART.ui.logoDay);
-            els.brandLogoNight.src = artUrl(ART.ui.logoNight);
-            const markBrand = () => {
-                if ((els.brandLogoDay.complete && els.brandLogoDay.naturalWidth) ||
-                    (els.brandLogoNight.complete && els.brandLogoNight.naturalWidth)) {
-                    document.body.dataset.canvasLogo = '1';
-                }
-            };
-            els.brandLogoDay.addEventListener('load', markBrand);
-            els.brandLogoNight.addEventListener('load', markBrand);
-            if (els.brandLogoDay.complete) markBrand();
+        if (state.morningPending && state.version >= 5) {
+            const pending = state.morningPending;
+            state.morningPending = null;
+            save();
+            await showMorningReveal(pending);
+        } else {
+            show(state.wellnessAck ? 'idle' : 'wellness');
         }
-        show(state.wellnessAck ? 'greeting' : 'wellness');
+        if (state.version >= 5) {
+            document.body.dataset.gardenV = '5';
+            scene.setSeason(state.season);
+            refreshLighting();
+        }
         document.body.dataset.ready = '1';
+        window.addEventListener('resize', syncHudChipClamp);
     }
 
     // Dev/test hooks (used by scripts/capture-driver.js; harmless otherwise).
@@ -1343,7 +1600,8 @@
         get state() { return state; },
         get session() { return session; },
         get screen() { return screen; },
-        clock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness,
+        get scene() { return scene; },
+        clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness,
         plant: (id, plot) => plant(id, plot),
         begin: () => (screen === 'greeting' || screen === 'idle' ? beginVisit() : null),
         skip: () => {
@@ -1362,7 +1620,51 @@
         show,
         toggleDev,
         makeAllReady: () => { V.makeAllReady(state); save(); plotsForScene({ instant: true }); renderHud(); },
-        reset() { localStorage.removeItem(STORE_KEY); state = V.createState(new Date()); clock.offsetDays = 0; plotsForScene({ instant: true }); renderHud(); },
+        reset() {
+            localStorage.removeItem(STORE_KEY);
+            hudSeasonOverride = false;
+            state = V.createState(new Date());
+            gardenClock.state = state;
+            clock.offsetDays = 0;
+            plotsForScene({ instant: true });
+            scene.setSeason(state.season);
+            refreshLighting();
+            renderHud();
+            document.body.dataset.gardenV = state.version >= 5 ? '5' : '4';
+        },
+        setGardenTime(m) {
+            state.version = 5;
+            state.gardenMinutes = D.clampMinutes(m);
+            gardenClock.pause();
+            refreshLighting();
+            renderHud();
+        },
+        setSeason(season) {
+            if (!D.SEASONS.includes(season)) return;
+            hudSeasonOverride = true;
+            state.season = season;
+            state.seasonDay = Math.min(D.DAYS_PER_SEASON, Math.max(1, state.seasonDay || 1));
+            scene.setSeason(season);
+            refreshLighting();
+            renderHud();
+        },
+        clearSeasonOverride() { hudSeasonOverride = false; syncGardenSeasonFromDay(); renderHud(); },
+        waitForHudArt: (ms) => scene.waitForHudArt(ms),
+        probeClockSunToken() {
+            scene.draw(performance.now() / 1000);
+            return scene.probeClockSunToken();
+        },
+        probeClockMoonToken() {
+            scene.draw(performance.now() / 1000);
+            return scene.probeClockMoonToken();
+        },
+        syncHudChipClamp,
+        auditHudLayout() {
+            syncHudChipClamp();
+            const H = typeof window !== 'undefined' ? window.SmileHudLayout : null;
+            if (!H) return { ok: false, reason: 'missing-hud-layout' };
+            return H.auditHudLayoutInDocument();
+        },
         setBreathHudDemo(mode, countDone) {
             breathHudDemoLock = true;
             els.breathGuide.hidden = false;
@@ -1395,8 +1697,27 @@
             breathHudDemoLock = false;
             if (session && session.step === 'breathe') renderBreathRate();
         },
+        async previewBedtimeGlow() {
+            scene.setLighting('night');
+            document.body.dataset.lighting = 'night';
+            for (let i = 1; i <= 10; i++) {
+                scene.setBedtimeGlow(i / 10);
+                if (i > 6) scene.setBedtimeDark((i - 6) / 4);
+                await new Promise((r) => setTimeout(r, 40));
+            }
+        },
+        clearBedtimeLayers() { scene.setBedtimeGlow(0); scene.setBedtimeDark(0); refreshLighting(); },
+        async previewMorningCard() {
+            renderMorningSummary({ grew: [{ plot: 0, name: 'Lettuce', from: 1, to: 2, mature: false }] });
+            show('summary');
+        },
     };
 
-    window.addEventListener('beforeunload', () => { if (source) { try { source.destroy(); } catch { /* ignore */ } } });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') gardenClock.resume();
+        else { gardenClock.pause(); save(); }
+    });
+
+    window.addEventListener('beforeunload', () => { if (source) { try { source.destroy(); } catch { /* ignore */ } } save(); });
     init();
 })();
