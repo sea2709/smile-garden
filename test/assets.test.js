@@ -60,7 +60,8 @@ test('harvest art: ready loops, per-plant harvest strips, generic fallback, pant
     for (const id of ['tomato', 'mint', 'cucumber', 'apple']) {
         const src = ART.plantPickedSrc(id);
         assert.ok(src && fs.existsSync(fromRenderer(src)), `picked ${id}`);
-        assert.ok(ART.plants[id].picked, `picked meta ${id}`);
+        assert.ok(!ART.plants[id].picked, `picked uses stage-5 geometry for ${id}`);
+        assert.ok(ART.plants[id].stages[4], `stage-5 meta ${id}`);
     }
 });
 

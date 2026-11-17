@@ -35,16 +35,9 @@ Basket is drawn in-frame at **(150, 286)** in strip space. Sprite swap at **fram
 
 ### Picked sprites — `assets/plants/<dir>/picked.png`
 
-| Plant | File | Canvas | Anchor (`picked` in `art.js`) |
-|-------|------|--------|-------------------------------|
-| tomato | `plants/tomato/picked.png` | 312×484 | base 475, top 16 |
-| mint | `plants/mint/picked.png` | 312×484 | base 475, top 35 |
-| cucumber | `plants/cucumber/picked.png` | 312×484 | base 475, top 16 |
-| apple | `plants/apple-tree/picked.png` | 312×484 | base 475, top 16 |
+Regrow crops (tomato, mint, cucumber, apple): **same canvas and soil line as stage 5**. The renderer uses **stage-5 geometry** from `art.js` (`stages[4]`) for `picked.png` — no separate `picked` anchor block.
 
 Lettuce / sunflower are **pull** crops (no picked sprite; bed clears at harvest frame 5).
-
-**Alignment note:** Mature **apple-tree** stage-5 art is **356×538** (base ~511) while `picked.png` is **312×484** (base 475). The stub may read slightly smaller on the bed until a size-matched picked asset ships.
 
 ### Decorations — `assets/decor/<id>-{day|night}.png`
 

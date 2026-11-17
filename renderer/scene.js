@@ -381,9 +381,9 @@
         function resolveSprite(id, stage) {
             if (stage === 'picked') {
                 const pi = pickedImgs[id];
-                const meta = (ART.plants[id] && ART.plants[id].picked)
-                    || (ART.plants[id] && ART.plants[id].stages[3]);
-                if (ready(pi)) return { img: pi, meta };
+                const stages = ART.plants[id] && ART.plants[id].stages;
+                const meta = stages && stages[4];
+                if (ready(pi) && meta) return { img: pi, meta };
                 return { img: plantImgs[id] && plantImgs[id][4], meta };
             }
             return { img: plantImgs[id] && plantImgs[id][stage], meta: ART.plants[id] && ART.plants[id].stages[stage - 1] };
