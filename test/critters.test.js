@@ -5,9 +5,9 @@ const assert = require('node:assert/strict');
 const C = require('../game/critters.js');
 
 test('stripFrameCount divides strip width by frame width', () => {
-    assert.equal(C.stripFrameCount(1024, 128), 8);
-    assert.equal(C.stripFrameCount(448, 112), 4);
-    assert.equal(C.stripFrameCount(1000, 128), 7);
+    assert.equal(C.stripFrameCount(1600, 200), 8);
+    assert.equal(C.stripFrameCount(800, 200), 4);
+    assert.equal(C.stripFrameCount(1000, 200), 5);
 });
 
 test('animFrameIndex advances with time and wraps', () => {
@@ -29,6 +29,14 @@ test('beeFlipX mirrors when moving right', () => {
     assert.equal(C.beeFlipX(-1), false);
     assert.equal(C.beeFlipX(0.2), true);
     assert.equal(C.beeFlipX(0), false);
+});
+
+test('logoLayerAlphas crossfades day and night logos with lighting', () => {
+    assert.deepEqual(C.logoLayerAlphas('midday', 'midday', 1), { day: 1, night: 0 });
+    assert.deepEqual(C.logoLayerAlphas('night', 'night', 1), { day: 0, night: 1 });
+    const mid = C.logoLayerAlphas('night', 'midday', 0.5);
+    assert.ok(mid.day > 0.4 && mid.night > 0.4);
+    assert.ok(Math.abs(mid.day + mid.night - 1) < 0.001);
 });
 
 test('critterDayAlpha fades during day/night transition', () => {

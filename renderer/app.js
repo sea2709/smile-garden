@@ -1218,6 +1218,7 @@
         if (session && screen === 'visit') updateVisit(dt, t);
         scene.update(dt, t);
         scene.draw(t);
+        document.body.dataset.canvasLogo = scene.logoOnCanvas ? '1' : '0';
         renderMeters();
         const chartOn = state.settings.chart && screen === 'visit';
         if (els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;
@@ -1274,15 +1275,6 @@
         }
         show(state.wellnessAck ? 'greeting' : 'wellness');
         document.body.dataset.ready = '1';
-        const brandLogo = document.getElementById('brand-logo');
-        if (brandLogo) {
-            brandLogo.addEventListener('load', () => {
-                brandLogo.hidden = false;
-                const mark = document.querySelector('.brand-mark');
-                if (mark) mark.hidden = true;
-            }, { once: true });
-            brandLogo.addEventListener('error', () => brandLogo.remove(), { once: true });
-        }
     }
 
     // Dev/test hooks (used by scripts/capture-driver.js; harmless otherwise).

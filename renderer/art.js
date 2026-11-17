@@ -83,11 +83,13 @@
         ui: {
             pantryShelf: '../assets/ui/pantry-shelf.png',
             unlockSeedCard: '../assets/ui/unlock-seed-card.png',
-            logo: '../assets/ui/logo.png',
+            logoDay: '../assets/ui/logo-day.png',
+            logoNight: '../assets/ui/logo-night.png',
+            logoFallback: 'Smile Garden',
         },
+        logoHud: Object.freeze({ x: 20, y: 20, w: 184, h: 49 }),
         critters: Object.freeze({
             dir: '../assets/critters/',
-            drawScale: 0.5,
             bounds: Object.freeze({ width: 1280, height: 720, hudTop: 92, margin: 48 }),
             placeholder: Object.freeze({
                 butterfly: '#e8a050',
@@ -95,9 +97,9 @@
                 bee: '#f0c840',
             }),
             strips: Object.freeze({
-                'butterfly-monarch': Object.freeze({ file: 'butterfly-monarch-strip.png', frameW: 128, frameH: 112, fps: 12, kind: 'butterfly' }),
-                'butterfly-white': Object.freeze({ file: 'butterfly-white-strip.png', frameW: 128, frameH: 112, fps: 12, kind: 'butterfly' }),
-                bee: Object.freeze({ file: 'bee-strip.png', frameW: 112, frameH: 96, fps: 16, kind: 'bee' }),
+                'butterfly-monarch': Object.freeze({ file: 'butterfly-monarch-strip.png', frameW: 200, frameH: 200, fps: 12, scale: 0.32, kind: 'butterfly' }),
+                'butterfly-white': Object.freeze({ file: 'butterfly-white-strip.png', frameW: 200, frameH: 200, fps: 12, scale: 0.32, kind: 'butterfly' }),
+                bee: Object.freeze({ file: 'bee-strip.png', frameW: 200, frameH: 200, fps: 16, scale: 0.28, kind: 'bee' }),
             }),
             roster: Object.freeze([
                 Object.freeze({ id: 'monarch', strip: 'butterfly-monarch', anchor: [420, 280], phase: 0.2, ampX: 75, ampY: 20, pathSpeed: 0.24, timeScale: 1.0 }),

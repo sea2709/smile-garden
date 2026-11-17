@@ -1,34 +1,36 @@
-# Daytime garden critters
+# Daytime garden critters & canvas logo
 
-Animated **monarch butterfly**, **white butterfly**, and **bee** fly over the garden during **dawn**, **midday**, and **golden hour**. They are hidden at **night**, fading out with the same backdrop crossfade as plants.
+Animated **monarch butterfly**, **white butterfly**, and **bee** on **dawn / midday / golden hour**, fading at **night** with the backdrop crossfade.
 
-## Assets (`assets/critters/`)
+## Critter strips (`assets/critters/`)
 
-| Strip | Frames | Size/frame | FPS |
-|-------|--------|------------|-----|
-| `butterfly-monarch-strip.png` | 8 | 128×112 | 12 |
-| `butterfly-white-strip.png` | 8 | 128×112 | 12 |
-| `bee-strip.png` | 4 | 112×96 | 16 |
+| Strip | Frames | Frame size | On-screen scale | FPS |
+|-------|--------|------------|-----------------|-----|
+| `butterfly-monarch-strip.png` | 8 (1600×200) | 200×200 | **0.32** (~64px) | 12 |
+| `butterfly-white-strip.png` | 8 | 200×200 | **0.32** | 12 |
+| `bee-strip.png` | 4 (800×200) | 200×200 | **0.28** (~56px) | 16 |
 
-`manifest.json` is the source of truth; `renderer/art.js` mirrors it for the canvas. Frame count = strip width ÷ frame width.
+Frame count = strip width ÷ 200. Creatures are centered in each frame; butterflies face **up** (rotate to velocity); bee faces **left** (flip when moving right).
 
-Day backdrops (`assets/backgrounds/dawn.png`, `midday.png`, `golden-hour.png`) are insect-free PNGs; `night.jpg` is unchanged.
+`manifest.json` lists `frames`, `size`, `fps`, `anchor`. Config scales live in `renderer/art.js` → `critters.strips[*].scale`.
 
-Apply Heily’s handoff zip with:
+Handoff zip: `./scripts/apply-critters-handoff.sh /path/to/critters-logo-handoff.zip`
 
-```bash
-./scripts/apply-critters-handoff.sh /path/to/critters-handoff.zip
-```
+## Logo option A (`assets/ui/`)
 
-## Rendering
+| File | Use |
+|------|-----|
+| `logo-day.png` | Brown ink (368×98 @2x → **184×49** backdrop px) |
+| `logo-night.png` | Cream ink + soft halo |
 
-- Drawn after plants, before tend-effect strips (under the HTML UI).
-- Butterflies rotate toward travel direction (art faces up).
-- Bee flips horizontally when moving right (art faces left).
-- `prefers-reduced-motion: reduce`: frame 0, slower wander.
+Drawn on the **canvas** at `ART.logoHud` (top-left). Day/night layers crossfade with scene lighting; HTML **Smile Garden** text is the fallback until images load (`data-canvas-logo` on `<body>`).
 
-![Midday critters on the garden](critters-midday-garden.png)
+## Day backdrops
 
-## Logo (follow-up)
+`assets/backgrounds/dawn.png`, `midday.png`, `golden-hour.png` — insect-free; `night.jpg` unchanged.
 
-`renderer/index.html` reserves `#brand-logo` → `assets/ui/logo.png` (Heily option A). The ❀ mark stays until the logo loads.
+`prefers-reduced-motion: reduce` — critters hold frame 0 with slower wander.
+
+![Critters at midday](critters-midday-garden.png)
+
+![Logo and garden at night](logo-night-garden.png)

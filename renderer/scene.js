@@ -45,6 +45,9 @@
         const genericHarvest = { day: null, night: null };
         const produceImgs = {};
         const basketImg = (ART.produce && ART.produce.basket) ? loadImage(ART.produce.basket) : null;
+        const logoDayImg = (ART.ui && ART.ui.logoDay) ? loadImage(ART.ui.logoDay) : null;
+        const logoNightImg = (ART.ui && ART.ui.logoNight) ? loadImage(ART.ui.logoNight) : null;
+        let logoOnCanvas = false;
         if (ART.harvest) {
             readyStrips.day = loadImage(ART.readyStripSrc('day'));
             readyStrips.night = loadImage(ART.readyStripSrc('night'));
@@ -874,7 +877,6 @@
             const alpha = C.critterDayAlpha(lighting, prevLighting, lightFade);
             if (alpha < 0.02) return;
             const motionScale = C.motionScaleFromReduced(reducedMotion);
-            const drawScale = ART.critters.drawScale || 0.5;
             ctx.save();
             ctx.globalAlpha = alpha;
             for (const entry of ART.critters.roster) {
@@ -887,6 +889,7 @@
                     ? C.stripFrameCount(img.naturalWidth, spec.frameW)
                     : defaultFrames;
                 const frame = C.animFrameIndex(t + (entry.phase || 0), spec.fps, frameCount, { reducedMotion, motionScale });
+                const drawScale = spec.scale != null ? spec.scale : 0.32;
                 const { frameW: fw, frameH: fh } = spec;
                 if (!ready(img)) {
                     const ph = ART.critters.placeholder || {};
@@ -913,6 +916,29 @@
             ctx.restore();
         }
 
+        function drawLogoHud() {
+            const hud = ART.logoHud;
+            if (!hud || !C) return;
+            const layers = C.logoLayerAlphas(lighting, prevLighting, lightFade);
+            const dayReady = ready(logoDayImg);
+            const nightReady = ready(logoNightImg);
+            logoOnCanvas = dayReady || nightReady;
+            if (!logoOnCanvas) return;
+            const { x, y, w, h } = hud;
+            if (dayReady && layers.day > 0.02) {
+                ctx.save();
+                ctx.globalAlpha = layers.day;
+                ctx.drawImage(logoDayImg, x, y, w, h);
+                ctx.restore();
+            }
+            if (nightReady && layers.night > 0.02) {
+                ctx.save();
+                ctx.globalAlpha = layers.night;
+                ctx.drawImage(logoNightImg, x, y, w, h);
+                ctx.restore();
+            }
+        }
+
         function drawVignette() {
             const g = ctx.createRadialGradient(640, 380, 300, 640, 380, 820);
             g.addColorStop(0, 'rgba(60, 40, 20, 0)');
@@ -935,6 +961,7 @@
             drawParticles(t);
             drawHarvestAnims();
             drawBasketIcon(t);
+            drawLogoHud();
             drawVignette();
         }
 
@@ -942,7 +969,8 @@
             get lighting() { return lighting; },
             get reducedMotion() { return reducedMotion; },
             setReducedMotion(v) { reducedMotion = !!v; },
-            images: { bgImgs, plantImgs, critterImgs } };
+            get logoOnCanvas() { return logoOnCanvas; },
+            images: { bgImgs, plantImgs, critterImgs, logoDayImg, logoNightImg } };
     }
 
     window.SmileScene = { createScene };

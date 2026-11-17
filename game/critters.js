@@ -50,6 +50,12 @@ function critterDayAlpha(lighting, prevLighting, lightFade) {
     return 0;
 }
 
+/** Day logo vs night logo crossfade (tracks scene backdrop transition). */
+function logoLayerAlphas(lighting, prevLighting, lightFade) {
+    const day = critterDayAlpha(lighting, prevLighting, lightFade);
+    return { day, night: 1 - day };
+}
+
 function prefersReducedMotion() {
     if (typeof window === 'undefined' || !window.matchMedia) return false;
     try {
@@ -99,6 +105,7 @@ const api = {
     beeFlipX,
     isDayLighting,
     critterDayAlpha,
+    logoLayerAlphas,
     prefersReducedMotion,
     motionScaleFromReduced,
     wanderPosition,

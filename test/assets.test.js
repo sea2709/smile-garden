@@ -114,6 +114,12 @@ test('critter strips and day backdrops without painted insects', () => {
     for (const day of ['dawn', 'midday', 'golden-hour']) {
         assert.ok(ART.backgrounds[day].endsWith('.png'), day);
     }
+    assert.ok(fs.existsSync(fromRenderer(ART.ui.logoDay)));
+    assert.ok(fs.existsSync(fromRenderer(ART.ui.logoNight)));
+    assert.equal(ART.logoHud.w, 184);
+    assert.equal(ART.logoHud.h, 49);
+    assert.equal(ART.critters.strips['butterfly-monarch'].scale, 0.32);
+    assert.equal(ART.critters.strips.bee.scale, 0.28);
 });
 
 test('selection ring art: 8 day/night sprites and backdrop offsets', () => {
