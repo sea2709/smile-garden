@@ -186,7 +186,6 @@
                 if (source && source.setNight) source.setNight(l === 'night');
             }
         }
-        scene.setSeason(state.season);
     }
 
     function syncGardenSeasonFromDay() {
