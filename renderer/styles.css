@@ -39,14 +39,34 @@ button { font-family: inherit; }
 }
 
 /* ---------- top bar ---------- */
+:root {
+    --hud-logo-width: 184px;
+    --hud-logo-gap: 12px;
+}
 .topbar {
     position: absolute; top: 0; left: 0; right: 0; height: 56px; z-index: 20;
     display: flex; align-items: center; gap: 16px; padding: 0 18px;
     background: linear-gradient(to bottom, rgba(251, 245, 230, 0.82), rgba(251, 245, 230, 0));
 }
 .brand { display: inline-flex; align-items: center; min-width: 120px; font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: 0.2px; white-space: nowrap; }
+.brand-logo { display: none; height: 49px; width: var(--hud-logo-width); max-width: none; object-fit: contain; object-position: left center; flex: none; }
+body[data-canvas-logo="1"] .brand-logo-day { display: block; }
+body[data-canvas-logo="1"][data-lighting="night"] .brand-logo-day { display: none; }
+body[data-canvas-logo="1"][data-lighting="night"] .brand-logo-night { display: block; }
 .brand-fallback { color: var(--ink); transition: opacity 0.4s ease; }
 body[data-canvas-logo="1"] .brand-fallback { opacity: 0; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+body[data-canvas-logo="1"] .brand:has(.brand-logo) {
+    min-width: var(--hud-logo-width); width: var(--hud-logo-width); flex: 0 0 var(--hud-logo-width);
+    overflow: visible; pointer-events: none; position: relative; z-index: 22;
+}
+body[data-canvas-logo="1"] .brand:has(.brand-logo) + .chips { margin-left: var(--hud-logo-gap); min-width: 0; }
+body[data-canvas-logo="1"] .brand:not(:has(.brand-logo)) {
+    min-width: 0; width: 0; flex: 0 0 0; overflow: visible; pointer-events: none;
+}
+body[data-canvas-logo="1"] .brand:not(:has(.brand-logo)) + .chips {
+    margin-left: calc(var(--hud-logo-width) + var(--hud-logo-gap));
+    min-width: 0;
+}
 .chips { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
 .chip {
     display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px;

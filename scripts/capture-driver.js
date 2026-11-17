@@ -33,24 +33,37 @@ async function run(win, outDir) {
         fs.writeFileSync(path.join(outDir, name), img.toPNG());
         console.log('[capture] wrote', name, img.getSize());
     }
-    async function breathUiShot(name, state, rateText, countDone, total) {
-        const n = total || 4;
-        await js(`(() => {
-            document.getElementById('breath-guide').hidden = false;
-            const el = document.getElementById('breath-rate');
-            el.hidden = false;
-            el.dataset.state = ${JSON.stringify(state)};
-            el.textContent = ${JSON.stringify(rateText)};
-            const bc = document.getElementById('breath-count');
-            bc.textContent = '';
-            for (let i = 0; i < ${n}; i++) {
-                const d = document.createElement('i');
-                if (i < ${countDone}) d.className = 'on';
-                bc.appendChild(d);
-            }
-        })()`);
-        await sleep(400);
+    async function breathUiShot(name, mode, countDone) {
+        await G(`g.setBreathHudDemo(${JSON.stringify(mode)}, ${countDone})`);
+        await sleep(450);
         await shot(name);
+    }
+    async function shotBreathHudCrop(name) {
+        const rect = await js(`(() => {
+            const rate = document.getElementById('breath-rate');
+            const count = document.getElementById('breath-count');
+            if (!rate || !count) return null;
+            const r = rate.getBoundingClientRect();
+            const c = count.getBoundingClientRect();
+            const pad = 14;
+            const x = Math.max(0, Math.min(r.left, c.left) - pad);
+            const y = Math.max(0, Math.min(r.top, c.top) - pad);
+            const w = Math.max(r.right, c.right) - x + pad;
+            const h = Math.max(r.bottom, c.bottom) - y + pad;
+            return { x, y, width: w, height: h };
+        })()`);
+        if (!rect) return;
+        const bounds = await G(`({ w: window.innerWidth, dpr: window.devicePixelRatio || 1 })`);
+        let img = await wc.capturePage(rect);
+        if (bounds.dpr < 2) {
+            const { nativeImage } = require('electron');
+            img = nativeImage.createFromBuffer(img.toPNG()).resize({
+                width: Math.round(rect.width * 2),
+                height: Math.round(rect.height * 2),
+            });
+        }
+        fs.writeFileSync(path.join(outDir, name), img.toPNG());
+        console.log('[capture] wrote', name, '(breath hud crop)');
     }
     const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(2000); };
 
@@ -92,9 +105,11 @@ async function run(win, outDir) {
     await shot('06-breathing-choice.png');
     await js(`document.getElementById('btn-breathe-start').click()`);
     await waitFor('breathing', (d) => d.step === 'breathe', 5000);
-    await breathUiShot('07a-breath-rate-warming.png', 'warming', 'Listening for your breath…', 0);
-    await breathUiShot('07b-breath-rate-settling.png', 'settling', 'Settling… ~5.8 breaths/min', 2);
-    await breathUiShot('07c-breath-rate-stable.png', 'stable', '6.1 breaths/min', 3);
+    await breathUiShot('07a-breath-rate-warming.png', 'warming', 0);
+    await breathUiShot('07b-breath-rate-settling.png', 'settling', 2);
+    await breathUiShot('07c-breath-rate-stable.png', 'stable', 3);
+    await shotBreathHudCrop('07-breath-pill-count-2x.png');
+    await G('g.clearBreathHudDemo()');
     await sleep(6200);
     await shot('07-breathing-step.png');
     await waitFor('2 breaths', (d) => Number(d.breath) >= 2, 30000);

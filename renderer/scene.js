@@ -935,6 +935,10 @@
         function drawLogoHud() {
             const hud = ART.logoHud;
             if (!hud || !C) return;
+            if (typeof document !== 'undefined' && document.body && document.body.dataset.canvasLogo === '1' &&
+                document.getElementById('brand-logo-day') && document.getElementById('brand-logo-day').naturalWidth > 0) {
+                return;
+            }
             const layers = C.logoLayerAlphas(lighting, prevLighting, lightFade);
             const dayReady = ready(logoDayImg);
             const nightReady = ready(logoNightImg);
