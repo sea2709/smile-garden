@@ -32,11 +32,14 @@ Authoritative layout: **`assets/tags-manifest.json`** (tags, needs card, care ic
 
 | Asset | Path |
 |-------|------|
-| Card (day only; no night sheet) | `assets/ui/tag/needs-card.png` |
+| Card (day) | `assets/ui/tag/needs-card.png` |
+| Card (night) | `assets/ui/tag/needs-card-night.png` |
 
-- **Source:** 720×560 px (2×).
+- **Source:** 720×560 px (2×) each; identical layout boxes (`card.nightNote` in manifest).
 - **Display:** 360×280 CSS px (`#needs-card`).
-- **Rows (PNG px, halve for CSS):** sun y=190–276, water 276–362, fertilizer 362–448, stake 448–534 (86 px tall each). **Omit stake row** for lettuce/mint. Night visit: same day card, slightly dimmed (`brightness(0.94)`).
+- **Lighting:** dawn, midday, and golden hour use the **day** card; **night** uses `needs-card-night.png` (same rule as in-garden tags). Title and row ink **`#3E2A1A`**.
+- **On the card (day and night):** always draw **day** care icons, dots, check, bloom stamp, and resting leaf. `-night` care sprites are for **plant tags in the garden only** (they are too low-contrast on the dimmed night card art).
+- **Rows (PNG px, halve for CSS):** sun y=190–276, water 276–362, fertilizer 362–448, stake 448–534 (86 px tall each). **Omit stake row** for lettuce/mint.
 - **Bloom stamp region:** `[584, 72, 712, 200]` on the card art.
 
 ---

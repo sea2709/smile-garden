@@ -84,6 +84,8 @@
  },
  "card": {
   "file": "ui/tag/needs-card.png",
+  "night": "ui/tag/needs-card-night.png",
+  "nightNote": "same 720x560 and identical layout boxes; 42% blend toward #34405F. On it draw ink #3E2A1A and use the DAY icon/dot/check/stamp files (the -night ones are too low-contrast on the dimmed card; keep -night for the in-scene tag).",
   "px": [
    720,
    560

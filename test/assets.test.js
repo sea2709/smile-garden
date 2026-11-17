@@ -198,6 +198,12 @@ test('tags art matches assets/tags-manifest.json', () => {
     assert.ok(fs.existsSync(path.join(root, 'assets', manifest.tag.day)));
     assert.ok(fs.existsSync(path.join(root, 'assets', manifest.tag.night)));
     assert.ok(fs.existsSync(path.join(root, 'assets', manifest.card.file)));
+    assert.ok(manifest.card.night);
+    assert.equal(ART.needs.needsCardNight.includes('needs-card-night'), true);
+    assert.ok(fs.existsSync(path.join(root, 'assets', manifest.card.night)));
+    const nightCard = fs.readFileSync(path.join(root, 'assets', manifest.card.night));
+    assert.equal(nightCard.readUInt32BE(16), manifest.card.px[0], 'needs-card-night width');
+    assert.equal(nightCard.readUInt32BE(20), manifest.card.px[1], 'needs-card-night height');
     for (let b = 1; b <= 8; b++) {
         const key = 'bed' + b;
         assert.equal(JSON.stringify(ART.needs.tagSpots[key].anchor), JSON.stringify(manifest.tag.beds[key].anchor));

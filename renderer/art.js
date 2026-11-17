@@ -207,6 +207,8 @@
             plantTagDay: '../assets/ui/tag/plant-tag-day.png',
             plantTagNight: '../assets/ui/tag/plant-tag-night.png',
             needsCard: '../assets/ui/tag/needs-card.png',
+            needsCardNight: '../assets/ui/tag/needs-card-night.png',
+            cardInk: '#3E2A1A',
             tagPixels: Object.freeze([224, 227]),
             tagAnchor: Object.freeze([112, 227]),
             faceBox: Object.freeze([14, 13, 209, 116]),
@@ -265,11 +267,15 @@
             tagFaceIconPx: 48,
             tagFaceDotPx: 16,
             nightTagBlend: 0.42,
-            nightCardDim: 0.94,
         }),
         plantTagSrc(lighting) {
             const day = lighting !== 'night';
             return day ? this.needs.plantTagDay : this.needs.plantTagNight;
+        },
+        /** Dawn/midday/golden hour → day card; night → painted night sheet (same layout boxes). */
+        needsCardSrc(lighting) {
+            const day = lighting !== 'night';
+            return day ? this.needs.needsCard : this.needs.needsCardNight;
         },
         needsIconSrc(key, lighting) {
             const n = this.needs;

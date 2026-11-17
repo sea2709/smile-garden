@@ -181,11 +181,6 @@ async function runTagsArt(win, outDir) {
     };
     await safe('plant', () => G(`g.plant('tomato', 2)`));
     try {
-        await G(`g.plant('lettuce', 6)`);
-        await G('g.begin()');
-        await waitFor('visit', (d) => d.screen === 'visit', 8000);
-        await G('g.confirmPick()');
-        await waitFor('care hub', (d) => d.step === 'care-hub', 12000);
         await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
         await sleep(500);
         await shot('needs-card-tomato-partial-day.png');
@@ -203,6 +198,13 @@ async function runTagsArt(win, outDir) {
     await safe('night', () => js(`window.__smileGarden.prepTagGardenDemo('complete')`));
     await sleep(900);
     await shot('needs-tag-night.png');
+    try {
+        await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
+        await sleep(500);
+        await shot('needs-card-tomato-partial-night.png');
+    } catch (e) {
+        console.warn('[capture] partial needs card (night) skipped:', e.message);
+    }
 }
 
 async function runStakeArt(win, outDir) {

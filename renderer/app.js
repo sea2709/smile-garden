@@ -578,25 +578,22 @@
         const prog = session.careProgressFor(plot);
         const kind = L.plantById(pl.plantId);
         els.needsPlantName.textContent = `${kind.name} · bed ${plot + 1}`;
-        bindNeedsArt(els.needsCardBg, ART.needs.needsCard, els.needsCardFallback);
-        if (els.needsCard) {
-            els.needsCard.classList.toggle('needs-card--night', lighting === 'night');
-        }
+        bindNeedsArt(els.needsCardBg, ART.needsCardSrc(lighting), els.needsCardFallback);
+        const cardCareLight = 'midday';
         const allMet = C.allNeedsMet(prog, needs, pl.staked);
         const showResting = !!pl.tagResting && !allMet;
         if (els.needsBloomStamp) {
-            bindNeedsArt(els.needsBloomStamp, ART.needsBloomSrc(lighting), null);
+            bindNeedsArt(els.needsBloomStamp, ART.needs.bloomStamp, null);
             els.needsBloomStamp.hidden = !allMet;
         }
         if (els.needsRestingStamp) {
-            bindNeedsArt(els.needsRestingStamp, ART.needsRestingSrc(lighting), els.needsRestingFallback);
+            bindNeedsArt(els.needsRestingStamp, ART.needs.restingLeaf, els.needsRestingFallback);
             els.needsRestingStamp.hidden = !showResting;
             if (els.needsRestingFallback) els.needsRestingFallback.hidden = !showResting || !els.needsRestingStamp.hidden;
         }
         const rowsEl = els.needsRows;
         if (rowsEl) {
             rowsEl.textContent = '';
-            const night = lighting === 'night';
             const half = (n) => n / 2;
             for (const rowSpec of ART.needs.cardRows) {
                 const key = rowSpec.key;
@@ -614,7 +611,7 @@
                 const icon = document.createElement('img');
                 icon.className = 'need-row-icon';
                 icon.alt = '';
-                icon.src = artUrl(ART.needsIconSrc(key, lighting));
+                icon.src = artUrl(ART.needsIconSrc(key, cardCareLight));
                 icon.style.left = `${half(ix0)}px`;
                 icon.style.top = `${half(iy0) - rowTop}px`;
                 icon.style.width = `${half(ix1 - ix0)}px`;
@@ -630,7 +627,7 @@
                     const dot = document.createElement('img');
                     dot.className = 'need-row-dot';
                     dot.alt = '';
-                    dot.src = artUrl(ART.needsDotSrc(d < got, lighting));
+                    dot.src = artUrl(ART.needsDotSrc(d < got, cardCareLight));
                     dot.style.width = `${dotSz}px`;
                     dot.style.height = `${dotSz}px`;
                     dot.style.left = `${half(cent[0]) - dotSz / 2}px`;
@@ -649,7 +646,7 @@
                     const check = document.createElement('img');
                     check.className = 'need-row-check';
                     check.alt = '';
-                    check.src = artUrl(ART.needsDoneSrc(lighting));
+                    check.src = artUrl(ART.needsDoneSrc(cardCareLight));
                     check.style.left = `${half(sx0)}px`;
                     check.style.top = `${half(sy0) - rowTop}px`;
                     check.style.width = `${half(sx1 - sx0)}px`;
@@ -2088,14 +2085,29 @@
         },
         /** Mock capture: fill one care meter then return to the hub without waiting on face input. */
         setNeedsCardDemo(plot, progress) {
-            if (!session) return null;
-            session.setSelectedPlot(plot);
-            if (progress) session.setCareProgress(plot, progress);
+            const i = Number(plot);
+            if (!(i >= 0 && i < state.plots.length && state.plots[i] && state.plots[i].plantId)) return null;
+            if (!session) {
+                session = new V.VisitSession({
+                    fast: config.fast,
+                    pace: state.settings.pace,
+                    breaths: state.settings.breaths,
+                    plots: state.plots,
+                    today: gardenTodayKey(),
+                    gardenDay: state.dayNumber,
+                    dailyTends: state.dailyTends,
+                    tendBeds: V.tendableForState(state, clock.now()),
+                });
+                session.begin();
+            }
+            onStep(session.go('care-hub'));
+            session.setSelectedPlot(i);
+            if (progress) session.setCareProgress(i, progress);
             show('visit');
-            document.body.dataset.step = 'care-hub';
             renderNeedsCard();
+            renderHud();
             plotsForScene({ instant: true });
-            return plot;
+            return i;
         },
         /** Mock capture: garden tag/soil states without a live visit session. */
         prepTagGardenDemo(mode) {
