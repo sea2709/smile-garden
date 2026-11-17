@@ -13,7 +13,6 @@
 (function () {
     'use strict';
     const ART = window.SmileArt;
-    const PA = window.SmilePlantAnchor;
     const TAU = Math.PI * 2;
 
     function loadImage(src) {
@@ -433,7 +432,7 @@
             const p = ART.plots[plot];
             const s = p.w / 180;
             const meta = plantId && ART.plants[plantId] ? ART.plants[plantId].stages[4] : null;
-            const ax = PA && meta ? PA.stripAnchorX(meta, H.frameW) : H.frameW / 2;
+            const ax = H.frameW / 2;
             return {
                 x: p.x + (lx - ax) * s,
                 y: p.y - 4 + (ly - H.soilY) * s,
@@ -466,7 +465,7 @@
             const s = p.w / 180;
             const id = plantId || (plots[i] && plots[i].plantId);
             const meta = id && ART.plants[id] ? ART.plants[id].stages[4] : null;
-            const ax = PA && meta ? PA.stripAnchorX(meta, H.frameW) : H.frameW / 2;
+            const ax = H.frameW / 2;
             ctx.save();
             ctx.globalAlpha = Math.min(1, alpha);
             ctx.translate(p.x, p.y - 4);
@@ -498,8 +497,7 @@
             ctx.translate(p.x, p.y);
             ctx.transform(1, 0, shear, 1, 0, 0);
             ctx.scale(s, s);
-            const ax = PA ? PA.spriteAnchorX(meta) : meta.w / 2;
-            ctx.drawImage(img, -ax, -meta.base, meta.w, meta.h);
+            ctx.drawImage(img, -meta.w / 2, -meta.base, meta.w, meta.h);
             ctx.restore();
         }
 
@@ -852,7 +850,7 @@
             ctx.scale(s, s);
             const pl = plots[i];
             const meta = pl && pl.plantId ? plotStageMeta(i, pl.stage) : null;
-            const ax = PA && meta ? PA.stripAnchorX(meta, E.frameW) : E.frameW / 2;
+            const ax = E.frameW / 2;
             ctx.drawImage(img, frame * E.frameW, 0, E.frameW, E.frameH, -ax, -E.soilY, E.frameW, E.frameH);
             ctx.restore();
         }
