@@ -248,19 +248,26 @@ body[data-lighting="night"] .hint { background: rgba(240, 236, 214, 0.95); borde
 .bank i { display: block; height: 100%; background: linear-gradient(90deg, #f6d77c, var(--honey)); }
 .chip-basket { color: #8b5a28; display: inline-flex; align-items: center; gap: 6px; }
 .chip-basket .basket-icon { width: 22px; height: 22px; object-fit: contain; vertical-align: middle; }
-.pantry-shelf { min-height: 200px; padding: 20px; border-radius: 16px; background: rgba(250, 240, 215, 0.5); border: 1px dashed rgba(150, 120, 80, 0.35); }
-.pantry-row { display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; }
-.pantry-slot { text-align: center; width: 110px; }
+.pantry-shelf-frame { display: flex; justify-content: center; padding: 8px 0 4px; }
+.pantry-shelf-canvas { position: relative; width: min(520px, 100%); }
+.pantry-shelf-img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; }
+.pantry-cubby { position: absolute; display: flex; align-items: center; justify-content: center; pointer-events: none; }
+.pantry-cubby-icon { object-fit: contain; max-width: 100%; max-height: 100%; }
+.pantry-cubby-label { position: absolute; transform: translate(-50%, -50%); font-size: 0.85rem; font-weight: 700; color: #5c3d22; text-shadow: 0 1px 0 rgba(255, 248, 230, 0.8); pointer-events: none; }
 .produce-icon { width: 80px; height: 80px; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; position: relative; }
 .produce-icon .produce-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
 .decor-picks { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
 .decor-pick.on { outline: 2px solid var(--sage); }
 .decor-spots { display: flex; flex-direction: column; gap: 10px; }
 .decor-spot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px dashed rgba(150, 120, 80, 0.2); }
-.unlock-card { width: min(420px, 90vw); text-align: center; padding: 36px 40px; }
-.unlock-art { position: relative; margin: 16px auto; min-height: 120px; }
-.unlock-seed-img { width: 100%; max-width: 320px; height: auto; }
-.unlock-plant { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -55%); width: 90px; height: 110px; object-fit: contain; object-position: bottom; pointer-events: none; }
+.unlock-card { width: min(380px, 92vw); text-align: center; padding: 0; overflow: hidden; background: transparent; box-shadow: none; border: none; }
+.unlock-art { position: relative; margin: 0 auto; width: min(320px, 88vw); aspect-ratio: 700 / 991; }
+.unlock-seed-img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.unlock-copy { position: absolute; left: 0; right: 0; bottom: 0; height: 48%; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 12px 28px 20px; box-sizing: border-box; pointer-events: none; }
+.unlock-copy h1 { font-size: 1.05rem; margin: 0 0 8px; }
+.unlock-copy .lead { font-size: 0.88rem; margin: 0; line-height: 1.35; }
+.unlock-plant { position: absolute; left: 50%; top: 28%; transform: translate(-50%, -50%); width: 100px; height: 120px; object-fit: contain; object-position: bottom; pointer-events: none; }
+#screen-unlock .actions { margin-top: 12px; }
 .step-track span[data-step="harvest"].on { color: #8b5a28; }
 
 /* ---------- dev drawer, errors ---------- */

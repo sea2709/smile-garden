@@ -42,15 +42,20 @@
         }
         const readyStrips = { day: null, night: null };
         const harvestStrips = {};
+        const genericHarvest = { day: null, night: null };
+        const produceImgs = {};
         const basketImg = (ART.produce && ART.produce.basket) ? loadImage(ART.produce.basket) : null;
         if (ART.harvest) {
             readyStrips.day = loadImage(ART.readyStripSrc('day'));
             readyStrips.night = loadImage(ART.readyStripSrc('night'));
+            genericHarvest.day = loadImage(ART.genericHarvestStripSrc('day'));
+            genericHarvest.night = loadImage(ART.genericHarvestStripSrc('night'));
             for (const id of ART.harvest.plantIds) {
                 harvestStrips[id] = {
                     day: loadImage(ART.harvestStripSrc(id, 'day')),
                     night: loadImage(ART.harvestStripSrc(id, 'night')),
                 };
+                if (ART.produce) produceImgs[id] = loadImage(ART.produce.src(id));
             }
         }
 
@@ -384,6 +389,33 @@
             return { img: plantImgs[id] && plantImgs[id][stage], meta: ART.plants[id] && ART.plants[id].stages[stage - 1] };
         }
 
+        function harvestStripFrameCount(img) {
+            const H = ART.harvest;
+            if (!H) return 12;
+            return (ready(img) && img.naturalWidth > 0)
+                ? Math.floor(img.naturalWidth / H.frameW)
+                : H.defaultHarvestCount;
+        }
+
+        function resolveHarvestStrip(plantId, kind) {
+            const pack = harvestStrips[plantId];
+            const perPlant = pack && pack[kind];
+            if (ready(perPlant)) return { img: perPlant, generic: false };
+            const gen = genericHarvest[kind];
+            if (ready(gen)) return { img: gen, generic: true };
+            return { img: null, generic: false };
+        }
+
+        function harvestLocalToWorld(plot, lx, ly) {
+            const H = ART.harvest;
+            const p = ART.plots[plot];
+            const s = p.w / 180;
+            return {
+                x: p.x + (lx - H.frameW / 2) * s,
+                y: p.y - 4 + (ly - H.soilY) * s,
+            };
+        }
+
         function harvestAnimFrame(anim, now) {
             const H = ART.harvest;
             if (!H || !anim) return -1;
@@ -392,10 +424,13 @@
 
         function activeHarvestAnim(plot) {
             const now = performance.now() / 1000;
+            const kind = lighting === 'night' ? 'night' : 'day';
             for (const a of harvestAnims) {
                 if (a.plot !== plot) continue;
                 const f = harvestAnimFrame(a, now);
-                if (f >= 0 && f < ART.harvest.harvestCount) return a;
+                const { img } = resolveHarvestStrip(a.plantId, kind);
+                const maxF = harvestStripFrameCount(img);
+                if (f >= 0 && f < maxF) return a;
             }
             return null;
         }
@@ -481,7 +516,8 @@
                 if (!id) continue;
                 const pack = decorImgs[id];
                 const img = pack && (night ? pack.night : pack.day);
-                const w = 88, h = ART.decor.placeholderH;
+                const w = 88;
+                let h = ART.decor.placeholderH;
                 const drawPlaceholder = !ready(img);
                 ctx.save();
                 ctx.translate(spot.x, spot.y);
@@ -498,14 +534,18 @@
                     ctx.fillStyle = night ? '#fff8e8' : '#f7eed8';
                     ctx.fillText(id.replace(/-/g, ' '), 0, -h * 0.45);
                 } else {
-                    ctx.drawImage(img, -w / 2, -h, w, h);
+                    const sc = spot.scale || 0.55;
+                    const iw = img.naturalWidth * sc;
+                    const ih = img.naturalHeight * sc;
+                    ctx.drawImage(img, -iw / 2, -ih, iw, ih);
+                    h = ih;
                 }
                 const def = (window.SmileVisit && window.SmileVisit.DECOR_UNLOCKS || []).find((d) => d.id === id);
                 if (night && def && def.nightGlow) {
                     ctx.globalCompositeOperation = 'lighter';
                     const pulse = 0.6 + 0.4 * Math.sin(t * 2.1 + spot.x * 0.01);
-                    glowDot(0, -h * 0.55, 18, [255, 220, 140], 0.22 * pulse);
-                    glowDot(0, -h * 0.55, 8, [255, 250, 220], 0.35 * pulse);
+                    glowDot(0, -h * 0.72, 18, [255, 220, 140], 0.22 * pulse);
+                    glowDot(0, -h * 0.72, 8, [255, 250, 220], 0.35 * pulse);
                 }
                 ctx.restore();
             }
@@ -522,6 +562,25 @@
             basketFlash = 1;
         }
 
+        function drawHarvestProduceFly(a, f) {
+            const H = ART.harvest;
+            const pi = produceImgs[a.plantId];
+            if (!ready(pi) || !H) return;
+            const startF = 4;
+            const endF = Math.min(harvestStripFrameCount(genericHarvest[lighting === 'night' ? 'night' : 'day']) - 1, 10);
+            if (f < startF || f > endF) return;
+            const t = (f - startF) / Math.max(1, endF - startF);
+            const [bx, by] = H.basketInFrame;
+            const lx = 100 + (bx - 100) * t;
+            const ly = 140 + (by - 140) * t;
+            const w = harvestLocalToWorld(a.plot, lx, ly);
+            const bed = ART.plots[a.plot];
+            const sz = (ART.produce.size || 128) * (bed.w / 180) * 0.38;
+            ctx.save();
+            ctx.drawImage(pi, w.x - sz / 2, w.y - sz / 2, sz, sz);
+            ctx.restore();
+        }
+
         function drawHarvestAnims() {
             const H = ART.harvest;
             if (!H) return;
@@ -530,11 +589,14 @@
             for (let n = harvestAnims.length - 1; n >= 0; n--) {
                 const a = harvestAnims[n];
                 const f = harvestAnimFrame(a, now);
-                if (f >= H.harvestCount) { harvestAnims.splice(n, 1); continue; }
+                const { img, generic } = resolveHarvestStrip(a.plantId, kind);
+                const maxF = harvestStripFrameCount(img);
+                if (f >= maxF) { harvestAnims.splice(n, 1); continue; }
                 if (f < 0) continue;
-                const pack = harvestStrips[a.plantId];
-                const img = pack && pack[kind];
-                if (ready(img)) drawHarvestFrame(a.plot, f, img, 1);
+                if (ready(img)) {
+                    drawHarvestFrame(a.plot, f, img, 1);
+                    if (generic) drawHarvestProduceFly(a, f);
+                }
             }
             if (basketFlash > 0) basketFlash = Math.max(0, basketFlash - 0.04);
         }

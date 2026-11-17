@@ -671,16 +671,29 @@
             const labels = decor.map((id) => (V.DECOR_UNLOCKS.find((d) => d.id === id) || { label: id }).label);
             parts.push('New decorations: ' + labels.join(', '));
         }
-        els.unlockTitle.textContent = seeds.length ? 'Fresh seeds for your journal' : 'Garden decorations';
-        els.unlockBody.textContent = parts.join(' · ');
+        const title = seeds.length ? 'Fresh seeds for your journal' : 'Garden decorations';
+        const body = parts.join(' · ');
+        els.unlockTitle.textContent = title;
+        els.unlockBody.textContent = body;
+        els.unlockTitle.hidden = true;
+        els.unlockBody.hidden = true;
         els.unlockArt.textContent = '';
         const cardSrc = ART.ui && ART.ui.unlockSeedCard;
         const img = new Image();
         img.alt = '';
         img.className = 'unlock-seed-img';
         img.src = cardSrc || ART.card;
-        img.onerror = () => { img.remove(); };
+        img.onerror = () => { els.unlockTitle.hidden = false; els.unlockBody.hidden = false; };
         els.unlockArt.appendChild(img);
+        const copy = document.createElement('div');
+        copy.className = 'unlock-copy';
+        const h = document.createElement('h1');
+        h.textContent = title;
+        const p = document.createElement('p');
+        p.className = 'lead';
+        p.textContent = body;
+        copy.append(h, p);
+        els.unlockArt.appendChild(copy);
         if (seeds[0]) {
             const thumb = document.createElement('img');
             thumb.src = ART.plantSrc(seeds[0], 5);
@@ -823,52 +836,62 @@
                 body.appendChild(row);
             });
         } else if (tab === 'pantry') {
-            const shelf = document.createElement('div');
-            shelf.className = 'pantry-shelf';
-            const bg = document.createElement('div');
-            bg.className = 'pantry-bg';
+            const P = ART.pantry;
             const items = (state.pantry && state.pantry.items) || {};
             const keys = Object.keys(items).filter((k) => items[k].count > 0);
             if (!keys.length) {
                 const p = document.createElement('p');
                 p.className = 'j-empty';
                 p.textContent = 'Your pantry is empty. Harvest mature crops during a visit to fill the shelf.';
-                shelf.appendChild(p);
-            } else {
-                const row = document.createElement('div');
-                row.className = 'pantry-row';
-                for (const id of keys) {
+                body.appendChild(p);
+            } else if (P && P.cubbies) {
+                const shelf = document.createElement('div');
+                shelf.className = 'pantry-shelf-frame';
+                const canvas = document.createElement('div');
+                canvas.className = 'pantry-shelf-canvas';
+                canvas.style.aspectRatio = `${P.w} / ${P.h}`;
+                const bg = document.createElement('img');
+                bg.className = 'pantry-shelf-img';
+                bg.src = P.src || ART.ui.pantryShelf;
+                bg.alt = 'Pantry shelf';
+                canvas.appendChild(bg);
+                const order = L.PLANTS.map((p) => p.id);
+                const sorted = keys.slice().sort((a, b) => order.indexOf(a) - order.indexOf(b));
+                sorted.slice(0, P.cubbies.length).forEach((id, idx) => {
                     const it = items[id];
+                    const cub = P.cubbies[idx];
+                    const [x0, y0, x1, y1] = cub.box;
                     const slot = document.createElement('div');
-                    slot.className = 'pantry-slot';
-                    const icon = document.createElement('div');
-                    icon.className = 'produce-icon';
+                    slot.className = 'pantry-cubby';
+                    slot.style.left = `${(100 * x0) / P.w}%`;
+                    slot.style.top = `${(100 * y0) / P.h}%`;
+                    slot.style.width = `${(100 * (x1 - x0)) / P.w}%`;
+                    slot.style.height = `${(100 * (y1 - y0)) / P.h}%`;
                     const img = document.createElement('img');
                     img.src = ART.produce.src(id);
                     img.alt = L.plantById(id).name;
-                    img.width = ART.produce.size || 160;
-                    img.className = 'produce-img';
-                    img.onerror = () => {
-                        icon.style.background = (ART.produce.placeholder && ART.produce.placeholder[id]) || '#c4a574';
-                        icon.style.borderRadius = '50%';
-                        icon.textContent = (id[0] || '?').toUpperCase();
-                    };
-                    icon.appendChild(img);
-                    const cap = document.createElement('h3');
-                    cap.textContent = `${L.plantById(id).name} × ${it.count}`;
-                    const sub = document.createElement('div');
-                    sub.className = 'note';
-                    sub.textContent = it.firstDay ? `First picked ${V.dayStart(it.firstDay).toLocaleDateString()}` : '';
-                    slot.append(icon, cap, sub);
-                    row.appendChild(slot);
-                }
-                shelf.appendChild(row);
+                    img.className = 'pantry-cubby-icon';
+                    const frac = P.iconFrac || 0.52;
+                    img.style.width = `${frac * 100}%`;
+                    img.style.height = `${frac * 100}%`;
+                    img.onerror = () => { img.style.display = 'none'; };
+                    slot.appendChild(img);
+                    const [lx, ly] = cub.label;
+                    const lab = document.createElement('div');
+                    lab.className = 'pantry-cubby-label';
+                    lab.style.left = `${(100 * lx) / P.w}%`;
+                    lab.style.top = `${(100 * ly) / P.h}%`;
+                    lab.textContent = `×${it.count}`;
+                    canvas.append(slot, lab);
+                });
+                shelf.appendChild(canvas);
+                body.appendChild(shelf);
             }
             const total = (state.pantry && state.pantry.totalHarvests) || 0;
             const foot = document.createElement('p');
             foot.className = 'note';
             foot.textContent = `${total} harvest${total === 1 ? '' : 's'} so far · collection only (no cooking yet).`;
-            body.append(shelf, foot);
+            body.appendChild(foot);
         } else if (tab === 'decorate') {
             V.syncDecorUnlocks(state);
             const unlocked = state.decor.unlocked || [];
