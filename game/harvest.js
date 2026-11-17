@@ -97,7 +97,9 @@
         return Object.assign({}, p, {
             picked: p.picked === true,
             pickDay: typeof p.pickDay === 'string' ? p.pickDay : null,
-            matureWater: p.matureWater == null ? null : Math.max(0, Math.min(1, Number(p.matureWater) || 0)),
+            staked: p.staked === true,
+            tagResting: p.tagResting === true,
+        matureWater: p.matureWater == null ? null : Math.max(0, Math.min(1, Number(p.matureWater) || 0)),
             matureFert: p.matureFert == null ? null : Math.max(0, Math.min(1, Number(p.matureFert) || 0)),
             tendedDay: Number.isFinite(Number(p.tendedDay)) ? Math.round(Number(p.tendedDay)) : p.tendedDay,
         });
@@ -137,6 +139,20 @@
     function dayStart(key) {
         const [y, m, d] = String(key).split('-').map(Number);
         return new Date(y, m - 1, d, 0, 0, 0, 0);
+    }
+
+    function logicNeedsStake(plantId) {
+        try {
+            if (typeof require === 'function') {
+                const L = require('./logic.js');
+                return L.plantNeedsStake(plantId);
+            }
+        } catch (_) { /* browser bundle */ }
+        const root = typeof self !== 'undefined' ? self : typeof global !== 'undefined' ? global : null;
+        if (root && root.SmileLogic && root.SmileLogic.plantNeedsStake) {
+            return root.SmileLogic.plantNeedsStake(plantId);
+        }
+        return false;
     }
 
     function computeYield(p) {
@@ -244,6 +260,7 @@
                 pickDay: dk,
                 matureWater: null,
                 matureFert: null,
+                staked: false,
             });
         }
         return {

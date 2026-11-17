@@ -8,8 +8,9 @@
 // Breathing rate warms up across the visit (like the real SDK) and becomes
 // stable during the breathe step.
 //
-// Keyboard fallback: setKeys({ smile, talk, hide }) switches to manual input
-// (hold S / Space to smile, T to talk, F to leave the frame). setAuto(true)
+// Keyboard fallback: setKeys({ smile, talk, hide, tiltLeft, tiltRight })
+// (hold S / Space to smile, T to talk, F to hide, [ / ] to tilt for stretch).
+// setAuto(true)
 // hands control back to the simulated player.
 
 (function () {
@@ -40,7 +41,8 @@
         let night = false;
         let darkDone = false;
         let auto = opts.auto !== false;
-        const keys = { smile: false, talk: false, hide: false };
+        const keys = { smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false };
+        const Stretch = typeof window !== 'undefined' ? window.SmileStretch : null;
         let h = 0.1;
         let visitT = 0;
         const nowS = () => performance.now() / 1000;
@@ -79,7 +81,21 @@
             let talking = false;
 
             if (auto) {
-                if (phase === 'smile') {
+                if (phase === 'camera-check-smile') {
+                    target = smileLevel(phaseT);
+                    setValidation('Ok');
+                } else if (phase === 'camera-check-talk') {
+                    talking = talkingAt(phaseT);
+                    target = 0.34 + (talking ? 0.12 : 0);
+                    setValidation('Ok');
+                } else if (phase === 'camera-check-breath') {
+                    target = 0.16;
+                    setValidation('Ok');
+                    visitT = Math.max(visitT, 32);
+                } else if (phase === 'camera-check-stretch') {
+                    target = 0.22;
+                    setValidation('Ok');
+                } else if (phase === 'smile' || phase === 'care-sun') {
                     target = smileLevel(phaseT);
                     if (night && !darkDone && phaseT > 4 && phaseT < 7.5) {
                         face = false;
@@ -88,7 +104,7 @@
                         if (night && phaseT >= 7.5) darkDone = true;
                         setValidation('Ok');
                     }
-                } else if (phase === 'talk') {
+                } else if (phase === 'talk' || phase === 'care-water') {
                     talking = talkingAt(phaseT);
                     target = 0.32 + (talking ? 0.1 : 0) + Math.sin(phaseT * 0.9) * 0.05;
                     setValidation('Ok');
@@ -96,6 +112,11 @@
                     target = 0.14;
                     setValidation('Ok');
                 }
+            } else if (phase === 'stretch') {
+                target = 0.22;
+                talking = false;
+                setValidation('Ok');
+                face = true;
             } else {
                 face = !keys.hide;
                 target = keys.smile ? 0.86 : 0.12;
@@ -109,6 +130,13 @@
                 // Percentages like the SDK (ExpressionScore.confidence is 0..100).
                 em.emit('expression', { happiness: L.normalizeConfidence(value * 100), stable: true });
                 em.emit('talking', { detected: talking, stable: true });
+                if (Stretch && (phase === 'stretch' || phase === 'camera-check-stretch' || keys.tiltLeft || keys.tiltRight)) {
+                    let rollDeg = 0;
+                    if (auto && (phase === 'stretch' || phase === 'camera-check-stretch')) rollDeg = 20 * Math.sin(phaseT * 0.55);
+                    else if (keys.tiltLeft) rollDeg = -20;
+                    else if (keys.tiltRight) rollDeg = 20;
+                    em.emit('landmarks', { points: Stretch.syntheticLandmarks(rollDeg), stable: true, space: 'normalized' });
+                }
             } else {
                 em.emit('noface', {});
             }
@@ -117,8 +145,9 @@
             // Synthetic breathing rate: appears after ~25 s of visit time, settles
             // near ~6 breaths/min (matches the guided standard pace).
             visitT += dt;
-            if (visitT > 25) {
-                const settling = visitT < 35 && phase !== 'breathe';
+            const breathPhase = phase === 'breathe' || phase === 'care-breathe' || phase === 'camera-check-breath';
+            if (visitT > 25 || breathPhase) {
+                const settling = visitT < 35 && !breathPhase;
                 const rate = 5.6 + Math.sin(visitT * 0.35) * 0.35 + (noise() - 0.5) * 0.15;
                 const confidence = settling ? 30 + (visitT - 25) : 55 + Math.min(20, visitT - 35);
                 em.emit('breathing', {
@@ -150,7 +179,11 @@
             },
             async reset() { await this.stop(); },
             destroy() { clearInterval(timer); timer = null; },
-            setPhase(p) { phase = p; phaseT = 0; },
+            setPhase(p) {
+                phase = p;
+                phaseT = 0;
+                if (p === 'camera-check-breath') visitT = Math.max(visitT, 32);
+            },
             setNight(v) { night = !!v; if (!night) darkDone = false; },
             setKeys(k) { Object.assign(keys, k); auto = false; },
             setAuto(v) { auto = !!v; },

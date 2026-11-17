@@ -206,6 +206,17 @@ body[data-painted-clock="1"] .chip-day #day-chip-text { position: absolute; widt
 
 /* ---------- meters ---------- */
 .meters { position: absolute; left: 18px; bottom: 16px; z-index: 15; display: flex; gap: 10px; }
+body[data-screen="idle"] #meters,
+body[data-screen="greeting"] #meters,
+body[data-screen="picker"] #meters,
+body[data-screen="journal"] #meters,
+body[data-stretch-care="1"] #meters,
+body[data-screen="visit"][data-step="stretch"] #meters,
+body[data-screen="visit"][data-step="care-hub"] #meters,
+body[data-screen="visit"][data-step^="care-"] #meters {
+    display: none !important;
+}
+body[data-garden-v="6"] #btn-visit { display: none !important; }
 .meter { margin: 0; text-align: center; transition: transform 0.4s ease, opacity 0.4s ease; opacity: 0.92; }
 .meter.active { transform: translateY(-6px) scale(1.06); opacity: 1; }
 .meter-canvas { width: 132px; height: 86px; margin: 0 auto; display: block; filter: drop-shadow(0 6px 10px rgba(70, 48, 20, 0.22)); }
