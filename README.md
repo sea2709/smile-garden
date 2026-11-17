@@ -30,6 +30,7 @@ talking metrics), with a keyboard/demo fallback so it runs without a camera or A
    * default **4 s in / 6 s out** (6 breaths a minute), or the **gentler 3 s in / 5 s out**;
    * **3–6 breaths** per bout (default 4, **40 s**); fertilizer = finished breaths ÷ planned;
    * SmartSpectra **breathing rate** is shown as feedback when available (display only; not used for scoring);
+   painted pills / seed dots: `assets/breath-manifest.json`, `renderer/breath-ui.css`, reference mockup `docs/breath-mockup.png`, capture frames `docs/07a-breath-rate-*.png`;
    * **Skip** is always visible, and the note says to stop and breathe normally if you feel dizzy.
    Fertilizer only speeds growth (+50 % banked sunlight at 100 %). It is never required.
 6. **Summary.** Sun-hours, water and fertilizer; each bed that grew blooms in turn with a floating label;

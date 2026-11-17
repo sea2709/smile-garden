@@ -1,0 +1,130 @@
+{
+ "scale": 2,
+ "pills": {
+  "warming": {
+   "file": "ui/breath/pill-warming.png",
+   "size": [
+    160,
+    64
+   ],
+   "display": {
+    "height": 32
+   },
+   "sliceInsets2x": {
+    "top": 28,
+    "right": 32,
+    "bottom": 28,
+    "left": 32
+   },
+   "borderImageWidthCss": "14px 16px",
+   "fill": true,
+   "repeat": "stretch",
+   "textColor": "var(--ink-soft)"
+  },
+  "settling": {
+   "file": "ui/breath/pill-settling.png",
+   "size": [
+    160,
+    64
+   ],
+   "display": {
+    "height": 32
+   },
+   "sliceInsets2x": {
+    "top": 28,
+    "right": 32,
+    "bottom": 28,
+    "left": 32
+   },
+   "borderImageWidthCss": "14px 16px",
+   "fill": true,
+   "repeat": "stretch",
+   "textColor": "var(--ink-soft)"
+  },
+  "stable": {
+   "file": "ui/breath/pill-stable.png",
+   "size": [
+    160,
+    64
+   ],
+   "display": {
+    "height": 32
+   },
+   "sliceInsets2x": {
+    "top": 28,
+    "right": 32,
+    "bottom": 28,
+    "left": 32
+   },
+   "borderImageWidthCss": "14px 16px",
+   "fill": true,
+   "repeat": "stretch",
+   "textColor": "var(--sage-dark)"
+  }
+ },
+ "pillNotes": "Element must be exactly 32px tall (top+bottom slices = full height). .breath-sub reuses pill-warming.",
+ "icons": {
+  "warming": {
+   "file": "ui/breath/icon-warming.png",
+   "size": [
+    48,
+    48
+   ],
+   "display": [
+    24,
+    24
+   ],
+   "cssLeft": 12
+  },
+  "settling": {
+   "file": "ui/breath/icon-settling.png",
+   "size": [
+    48,
+    48
+   ],
+   "display": [
+    24,
+    24
+   ],
+   "cssLeft": 12
+  },
+  "stable": {
+   "file": "ui/breath/icon-stable.png",
+   "size": [
+    48,
+    48
+   ],
+   "display": [
+    24,
+    24
+   ],
+   "cssLeft": 12
+  }
+ },
+ "iconNotes": "warming = wind curl + seedling, settling = swaying leaf (optional CSS sway), stable = open leaves + tiny bloom",
+ "dots": {
+  "off": {
+   "file": "ui/breath/dot-off.png",
+   "size": [
+    36,
+    36
+   ],
+   "display": [
+    18,
+    18
+   ]
+  },
+  "on": {
+   "file": "ui/breath/dot-on.png",
+   "size": [
+    36,
+    36
+   ],
+   "display": [
+    18,
+    18
+   ]
+  }
+ },
+ "css": "breath-ui.css"
+}

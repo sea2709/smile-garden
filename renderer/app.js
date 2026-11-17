@@ -22,8 +22,13 @@
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
         'btn-sum-done', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
         'dev-ready', 'dev-fill', 'dev-reset', 'basket-chip', 'basket-count', 'screen-unlock', 'unlock-title', 'unlock-body', 'unlock-art', 'btn-unlock-ok',
+        'brand-logo-day', 'brand-logo-night', 'brand-fallback',
         'error-banner', 'error-title', 'error-message', 'btn-error-keyboard', 'btn-error-dismiss']) {
         els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = $(id);
+    }
+
+    function artUrl(rel) {
+        try { return new URL(rel, window.location.href).href; } catch { return rel; }
     }
 
     // ------------------------------------------------------------------
@@ -73,6 +78,7 @@
     let hudSeasonOverride = false;
 
     const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', faceGoneAt: 0, breathing: null };
+    let breathHudDemoLock = false;
 
     // ------------------------------------------------------------------
     // Screens
@@ -632,6 +638,7 @@
         return b;
     }
     function renderBreathCount(done) {
+        if (breathHudDemoLock) return;
         const total = session && session.pacer ? session.pacer.breaths : state.settings.breaths;
         els.breathCount.textContent = '';
         for (let i = 0; i < total; i++) {
@@ -643,7 +650,7 @@
 
     function renderBreathRate() {
         const el = els.breathRate;
-        if (!el) return;
+        if (!el || breathHudDemoLock) return;
         const fresh = signal.breathing && performance.now() - signal.breathing.at < 2500;
         if (!fresh) {
             el.hidden = false;
@@ -1657,6 +1664,38 @@
             const H = typeof window !== 'undefined' ? window.SmileHudLayout : null;
             if (!H) return { ok: false, reason: 'missing-hud-layout' };
             return H.auditHudLayoutInDocument();
+        },
+        setBreathHudDemo(mode, countDone) {
+            breathHudDemoLock = true;
+            els.breathGuide.hidden = false;
+            els.breathRate.hidden = false;
+            const done = Number(countDone) || 0;
+            if (mode === 'warming') {
+                signal.breathing = null;
+                els.breathRate.dataset.state = 'warming';
+                els.breathRate.textContent = 'Listening for your breath…';
+            } else if (mode === 'settling') {
+                signal.breathing = { rate: 5.8, stable: false, confidence: 42, at: performance.now() };
+                breathHudDemoLock = false;
+                renderBreathRate();
+                breathHudDemoLock = true;
+            } else if (mode === 'stable') {
+                signal.breathing = { rate: 6.1, stable: true, confidence: 88, at: performance.now() };
+                breathHudDemoLock = false;
+                renderBreathRate();
+                breathHudDemoLock = true;
+            }
+            const total = session && session.pacer ? session.pacer.breaths : state.settings.breaths;
+            els.breathCount.textContent = '';
+            for (let i = 0; i < total; i++) {
+                const d = document.createElement('i');
+                if (i < done) d.className = 'on';
+                els.breathCount.appendChild(d);
+            }
+        },
+        clearBreathHudDemo() {
+            breathHudDemoLock = false;
+            if (session && session.step === 'breathe') renderBreathRate();
         },
         async previewBedtimeGlow() {
             scene.setLighting('night');
