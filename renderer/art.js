@@ -34,5 +34,76 @@
                 return '../assets/selection/ring-' + kind + '-bed' + i + '.png';
             },
         },
+        // Fixed decoration anchors (backdrop px, bottom-centre). Chosen clear of the 8 bed boxes in plots[].
+        decorSpots: [
+            Object.freeze({ id: 'nw-path', label: 'Northwest path', x: 168, y: 298, scale: 0.58 }),
+            Object.freeze({ id: 'ne-hedge', label: 'Northeast hedge', x: 1110, y: 310, scale: 0.55 }),
+            Object.freeze({ id: 'sw-corner', label: 'Southwest corner', x: 145, y: 580, scale: 0.48 }),
+            Object.freeze({ id: 'se-path', label: 'Southeast path', x: 1155, y: 575, scale: 0.62 }),
+            Object.freeze({ id: 'mid-left', label: 'Mid-left lawn', x: 218, y: 460, scale: 0.62 }),
+        ],
+        produce: {
+            size: 128,
+            placeholder: Object.freeze({
+                lettuce: '#8ecf7a', mint: '#6bb88a', cucumber: '#5a9e62', tomato: '#e07055',
+                sunflower: '#f0c040', apple: '#c86b4a',
+            }),
+            src(id) { return '../assets/produce/' + id + '.png'; },
+            basket: '../assets/ui/basket.png',
+        },
+        plantPickedSrc(id) {
+            const dir = this.plants[id] && this.plants[id].dir;
+            return dir ? '../assets/plants/' + dir + '/picked.png' : null;
+        },
+        decor: {
+            ids: ['lantern', 'birdbath', 'bench', 'scarecrow', 'fairy-lights'],
+            src(id, kind) { return '../assets/decor/' + id + '-' + kind + '.png'; },
+            placeholderH: 96,
+        },
+        pantry: Object.freeze({
+            w: 1047,
+            h: 807,
+            src: '../assets/ui/pantry-shelf.png',
+            iconFrac: 0.52,
+            // Cubby interiors (shelf image pixels); labels are blank plaques below each opening.
+            cubbies: [
+                Object.freeze({ box: [48, 48, 510, 258], label: [279, 278] }),
+                Object.freeze({ box: [536, 48, 998, 258], label: [767, 278] }),
+                Object.freeze({ box: [48, 305, 510, 515], label: [279, 535] }),
+                Object.freeze({ box: [536, 305, 998, 515], label: [767, 535] }),
+                Object.freeze({ box: [48, 562, 510, 772], label: [279, 792] }),
+                Object.freeze({ box: [536, 562, 998, 772], label: [767, 792] }),
+            ],
+        }),
+        ui: {
+            pantryShelf: '../assets/ui/pantry-shelf.png',
+            unlockSeedCard: '../assets/ui/unlock-seed-card.png',
+        },
+        // Ready + harvest effect strips in assets/effects/ (see docs/ART-NEEDED.md).
+        harvest: Object.freeze({
+            frameW: 200,
+            frameH: 320,
+            soilY: 282,
+            fps: 12,
+            basketInFrame: [150, 286],
+            readyCount: 12,
+            defaultHarvestCount: 12,
+            genericHarvestCount: 12,
+            swapFrame: 5,
+            plantIds: ['lettuce', 'mint', 'cucumber', 'tomato', 'sunflower', 'apple'],
+        }),
+        readyStripSrc(lighting) {
+            const kind = lighting === 'night' ? 'night' : 'day';
+            return '../assets/effects/ready-' + kind + '-strip.png';
+        },
+        harvestStripSrc(plantId, lighting) {
+            const kind = lighting === 'night' ? 'night' : 'day';
+            return '../assets/effects/harvest-' + plantId + '-' + kind + '-strip.png';
+        },
+        genericHarvestStripSrc(lighting) {
+            const kind = lighting === 'night' ? 'night' : 'day';
+            return '../assets/effects/harvest-' + kind + '-strip.png';
+        },
+        basketHud: Object.freeze({ x: 1195, y: 68, w: 36, h: 36 }),
     });
 })();

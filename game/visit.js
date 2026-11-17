@@ -20,13 +20,16 @@
     const logic = (typeof module === 'object' && module.exports)
         ? require('./logic.js')
         : root.SmileLogic;
-    const api = factory(logic);
+    const harvest = (typeof module === 'object' && module.exports)
+        ? require('./harvest.js')
+        : root.SmileHarvest;
+    const api = factory(logic, harvest);
     if (typeof module === 'object' && module.exports) module.exports = api;
     else root.SmileVisit = api;
-})(typeof self !== 'undefined' ? self : this, function (L) {
+})(typeof self !== 'undefined' ? self : this, function (L, H) {
     'use strict';
 
-    const STATE_VERSION = 3;
+    const STATE_VERSION = 4;
     const PLOTS = 8;
     const MAX_STAGE = 5;
     const DAY_MS = 86400000;
@@ -59,8 +62,7 @@
         minTalkPerBed: 4,         // per-bed talk step floor
     });
 
-    // Seeds unlock by visit count, so returning brings something new (never
-    // taken away). Visit counts are total distinct days visited.
+    /** @deprecated visit-count only; prefer H.SEED_UNLOCK with harvest milestones. */
     const UNLOCK_AT_VISIT = Object.freeze({ lettuce: 0, mint: 0, cucumber: 0, tomato: 2, sunflower: 3, apple: 4 });
 
     // General, widely-published growing tips (not from the sun-hour source).
@@ -189,7 +191,8 @@
         if (!p) return null;
         return Object.assign({}, p, {
             tips: TIPS[id] || [],
-            unlockAtVisit: UNLOCK_AT_VISIT[id] || 0,
+            unlockAtVisit: (H.SEED_UNLOCK[id] && H.SEED_UNLOCK[id].visits) || 0,
+            unlockHarvests: (H.SEED_UNLOCK[id] && H.SEED_UNLOCK[id].harvests) || 0,
             sunCost: p.cost,
         });
     }
@@ -204,20 +207,42 @@
             visitDays: [],
             journal: [],
             settings: { pace: 'standard', breaths: 4, chart: true, lighting: 'auto', offsetDays: 0 },
+            pantry: H.emptyPantry(),
+            decor: H.emptyDecor(),
+            spareSeeds: H.emptySpareSeeds(),
         };
     }
 
     function sanitizePlot(p) {
         if (!p || typeof p !== 'object' || !L.plantById(p.plantId)) return null;
         const stage = Math.max(1, Math.min(MAX_STAGE, Math.round(Number(p.stage) || 1)));
-        return {
+        return H.extendPlotSanitize({
             plantId: p.plantId,
             plantedDay: typeof p.plantedDay === 'string' ? p.plantedDay : null,
             stage,
             sunBank: Math.max(0, Number(p.sunBank) || 0),
             lastGrowDay: typeof p.lastGrowDay === 'string' ? p.lastGrowDay : null,
             matureDay: typeof p.matureDay === 'string' ? p.matureDay : null,
-        };
+            picked: p.picked,
+            pickDay: p.pickDay,
+            matureWater: p.matureWater,
+            matureFert: p.matureFert,
+        });
+    }
+
+    function advanceRegrowPlots(state, today) {
+        const key = today || dayKey(new Date());
+        state.plots.forEach((p) => {
+            if (!p || !p.picked) return;
+            const cfg = H.plantHarvestCfg(p.plantId);
+            if (cfg.mode !== 'regrow' || !p.pickDay) return;
+            if (daysBetween(p.pickDay, key) >= cfg.regrowDays) {
+                p.picked = false;
+                p.pickDay = null;
+                p.matureWater = 0;
+                p.matureFert = 0;
+            }
+        });
     }
 
     /** Parse saved JSON (string or object). Bad / old / missing data -> fresh state. */
@@ -227,7 +252,8 @@
             try { obj = JSON.parse(raw); } catch { obj = null; }
         }
         const fresh = createState(now);
-        if (!obj || typeof obj !== 'object' || obj.version !== STATE_VERSION) return fresh;
+        if (!obj || typeof obj !== 'object') return fresh;
+        if (obj.version !== STATE_VERSION && obj.version !== 3) return fresh;
         const s = fresh;
         s.createdDay = typeof obj.createdDay === 'string' ? obj.createdDay : s.createdDay;
         s.wellnessAck = obj.wellnessAck === true;
@@ -243,6 +269,17 @@
         s.settings.chart = st.chart !== false;
         s.settings.lighting = LIGHTINGS.includes(st.lighting) ? st.lighting : 'auto';
         s.settings.offsetDays = Number.isFinite(Number(st.offsetDays)) ? Math.max(0, Math.round(Number(st.offsetDays))) : 0;
+        s.pantry = H.sanitizePantry(obj.pantry);
+        s.decor = H.sanitizeDecor(obj.decor);
+        s.spareSeeds = H.sanitizeSpareSeeds(obj.spareSeeds);
+        if (obj.version === 3) {
+            s.pantry = H.emptyPantry();
+            s.decor = H.emptyDecor();
+            s.spareSeeds = H.emptySpareSeeds();
+        }
+        s.version = STATE_VERSION;
+        advanceRegrowPlots(s, dayKey(now instanceof Date ? now : new Date(now === undefined ? Date.now() : now)));
+        H.syncDecorUnlocks(s);
         return s;
     }
 
@@ -251,11 +288,11 @@
     function visitCount(state) { return state.visitDays.length; }
 
     function isUnlocked(state, plantId) {
-        return visitCount(state) >= (UNLOCK_AT_VISIT[plantId] || 0);
+        return H.isSeedUnlocked(state, plantId, visitCount);
     }
 
     function unlockedPlants(state) {
-        return L.PLANTS.filter((p) => isUnlocked(state, p.id)).map((p) => p.id);
+        return H.unlockedPlantsByHarvest(state, visitCount, L.PLANTS.map((p) => p.id));
     }
 
     function emptyPlots(state) {
@@ -285,7 +322,11 @@
         if (!isUnlocked(state, plantId)) return { ok: false, reason: 'locked' };
         const d = now instanceof Date ? now : new Date(now);
         const day = dayKey(d);
-        state.plots[i] = { plantId, plantedDay: day, stage: 1, sunBank: 0, lastGrowDay: null, matureDay: null };
+        state.plots[i] = {
+            plantId, plantedDay: day, stage: 1, sunBank: 0, lastGrowDay: null, matureDay: null,
+            picked: false, pickDay: null, matureWater: null, matureFert: null,
+        };
+        if (state.spareSeeds && state.spareSeeds[plantId] > 0) state.spareSeeds[plantId] -= 1;
         addJournal(state, { day, ts: d.getTime(), kind: 'planted', plantId, plot: i, stage: 1,
             text: `Planted ${kind.name.toLowerCase()} in bed ${i + 1}.` });
         return { ok: true, plot: i };
@@ -388,8 +429,9 @@
         const waiting = [];
         const tended = [];
 
+        advanceRegrowPlots(state, day);
         state.plots.forEach((p, i) => {
-            if (!p || p.stage >= MAX_STAGE) return;
+            if (!p || p.stage >= MAX_STAGE || p.picked) return;
             const kind = L.plantById(p.plantId);
             const cost = kind.cost;
             const br = byPlot[i];
@@ -411,7 +453,13 @@
             p.stage += 1;
             p.sunBank = 0;
             p.lastGrowDay = day;
-            if (p.stage >= MAX_STAGE) p.matureDay = day;
+            if (p.stage >= MAX_STAGE) {
+                p.matureDay = day;
+                p.matureWater = water;
+                p.matureFert = fert;
+                p.picked = false;
+                p.pickDay = null;
+            }
             grew.push({ plot: i, plantId: p.plantId, name: kind.name, from, to: p.stage, mature: p.stage >= MAX_STAGE });
             addJournal(state, {
                 day, ts: d.getTime(), kind: p.stage >= MAX_STAGE ? 'mature' : 'stage', plantId: p.plantId, plot: i, stage: p.stage,
@@ -532,7 +580,7 @@
     // ------------------------------------------------------------------
     // One daily visit, step by step.
     // ------------------------------------------------------------------
-    const STEPS = Object.freeze(['greeting', 'pick', 'smile', 'talk', 'breathe-offer', 'breathe', 'summary']);
+    const STEPS = Object.freeze(['greeting', 'pick-harvest', 'harvest-hold', 'pick', 'smile', 'talk', 'breathe-offer', 'breathe', 'summary']);
 
     function emptyBedTally() {
         return { smileWeighted: 0, smileSecondsRaw: 0, talkSecondsRaw: 0, breathsDone: 0, breathSkipped: false, breathTaken: false };
@@ -544,23 +592,30 @@
          * update(dt, input) with input = { happiness 0..1|null, talking bool|null, faceVisible bool }
          */
         constructor(opts) {
-            const o = Object.assign({ fast: false, plots: [] }, opts);
+            const o = Object.assign({ fast: false, plots: [], today: null }, opts);
             const baseSmile = o.smileSeconds || (o.fast ? TUNING.fastSmileSeconds : TUNING.smileSeconds);
             const baseTalk = o.talkSeconds || (o.fast ? TUNING.fastTalkSeconds : TUNING.talkSeconds);
             this.baseSmileSeconds = baseSmile;
             this.baseTalkSeconds = baseTalk;
             this.fast = !!o.fast;
-            this.plantedBeds = Array.isArray(o.plantedBeds)
-                ? o.plantedBeds.slice()
-                : plantedPlotIndices(o.plots);
-            const n = Math.max(1, this.plantedBeds.length);
+            this.today = o.today || dayKey(new Date());
+            this.plots = o.plots || [];
+            this.tendBeds = Array.isArray(o.tendBeds)
+                ? o.tendBeds.slice()
+                : H.tendablePlotIndices(this.plots, this.today);
+            this.harvestQueue = Array.isArray(o.harvestQueue)
+                ? o.harvestQueue.slice()
+                : H.readyPlotIndices(this.plots, this.today);
+            this.plantedBeds = this.tendBeds;
+            const n = Math.max(1, this.plantedBeds.length || this.harvestQueue.length || 1);
             this.smileSeconds = perBedStepSeconds(baseSmile, n, TUNING.minSmilePerBed);
             this.talkSeconds = perBedStepSeconds(baseTalk, n, TUNING.minTalkPerBed);
+            this.harvestSeconds = H.HARVEST_HOLD_SECONDS;
             this.pace = o.pace === 'gentle' ? 'gentle' : 'standard';
             this.breathCount = clampBreaths(o.breaths);
-            this.plots = o.plots || [];
             this.step = 'greeting';
             this.stepTime = 0;
+            this.harvestSmile = 0;
             this.detector = new L.SmileDetector();
             this.h = null;
             this.smiling = false;
@@ -576,7 +631,11 @@
             this.events = [];
             this.bedTally = Object.create(null);
             this.plantRound = 0;
-            this.selectedPlot = this.plantedBeds.length ? this.plantedBeds[0] : null;
+            this.harvestRound = 0;
+            this.phase = this.harvestQueue.length ? 'harvest' : 'tend';
+            this.harvestedPlots = [];
+            this.pendingHarvests = [];
+            this.selectedPlot = null;
             this.live = emptyBedTally();
         }
 
@@ -627,13 +686,25 @@
             return false;
         }
 
+        selectablePlots() {
+            if (this.step === 'pick-harvest') {
+                return this.harvestQueue.filter((i) => !this.harvestedPlots.includes(i));
+            }
+            if (this.step === 'pick') return this.plantedBeds;
+            return [];
+        }
+
         stepDuration() {
             if (this.step === 'smile') return this.smileSeconds;
             if (this.step === 'talk') return this.talkSeconds;
+            if (this.step === 'harvest-hold') return this.harvestSeconds;
             if (this.step === 'breathe') return this.pacer ? this.pacer.total : 0;
             return 0;
         }
-        stepRemaining() { return Math.max(0, this.stepDuration() - (this.step === 'breathe' ? this.breathT : this.stepTime)); }
+        stepRemaining() {
+            if (this.step === 'harvest-hold') return Math.max(0, this.harvestSeconds - this.harvestSmile);
+            return Math.max(0, this.stepDuration() - (this.step === 'breathe' ? this.breathT : this.stepTime));
+        }
 
         go(step) {
             if (!STEPS.includes(step)) throw new Error('unknown step ' + step);
@@ -650,6 +721,9 @@
                 this.breathTaken = true;
                 this.live.breathTaken = true;
             }
+            if (step === 'harvest-hold') {
+                this.harvestSmile = 0;
+            }
             if (step === 'smile' || step === 'talk' || step === 'breathe' || step === 'breathe-offer' || step === 'pick') {
                 this._syncLiveFromTally();
             }
@@ -657,22 +731,43 @@
             return step;
         }
 
+        _remainingHarvest() {
+            return this.harvestQueue.filter((i) => !this.harvestedPlots.includes(i));
+        }
+
+        remainingHarvestCount() { return this._remainingHarvest().length; }
+
         begin() {
+            const remH = this._remainingHarvest();
+            if (remH.length) {
+                this.phase = 'harvest';
+                this.selectedPlot = remH[0];
+                return this.go('pick-harvest');
+            }
             if (!this.plantedBeds.length) return this.go('summary');
+            this.phase = 'tend';
             this.plantRound = 0;
             this.selectedPlot = this.plantedBeds[0];
             return this.go('pick');
         }
 
         confirmPick() {
+            if (this.step === 'pick-harvest' && this.selectedPlot != null) return this.go('harvest-hold');
             if (this.step !== 'pick' || this.selectedPlot == null) return this.step;
             return this.go('smile');
         }
 
+        confirmHarvestInstant() {
+            if (this.step !== 'harvest-hold') return this.step;
+            this.harvestSmile = this.harvestSeconds;
+            return this._completeHarvest();
+        }
+
         setSelectedPlot(plot) {
             const i = Number(plot);
-            if (!(i >= 0 && i < PLOTS) || !this.plantedBeds.includes(i)) return false;
-            if (this.step !== 'pick') return false;
+            const list = this.selectablePlots();
+            if (!(i >= 0 && i < PLOTS) || !list.includes(i)) return false;
+            if (this.step !== 'pick' && this.step !== 'pick-harvest') return false;
             this.selectedPlot = i;
             this._syncLiveFromTally();
             this.events.push({ type: 'select', plot: i });
@@ -680,14 +775,56 @@
         }
 
         moveSelection(dir) {
-            if (this.step !== 'pick') return this.selectedPlot;
-            const next = movePlotSelection(this.selectedPlot, dir, this.plantedBeds);
+            if (this.step !== 'pick' && this.step !== 'pick-harvest') return this.selectedPlot;
+            const list = this.selectablePlots();
+            const next = movePlotSelection(this.selectedPlot, dir, list);
             if (next !== null && next !== this.selectedPlot) {
                 this.selectedPlot = next;
                 this._syncLiveFromTally();
                 this.events.push({ type: 'select', plot: next });
             }
             return this.selectedPlot;
+        }
+
+        _completeHarvest() {
+            if (this.selectedPlot == null) return this.go('summary');
+            this.pendingHarvests.push(this.selectedPlot);
+            this.harvestedPlots.push(this.selectedPlot);
+            this.harvestRound += 1;
+            this.events.push({ type: 'harvest-ready', plot: this.selectedPlot });
+            const rem = this._remainingHarvest();
+            if (rem.length) {
+                this.selectedPlot = rem[0];
+                return this.go('pick-harvest');
+            }
+            if (this.plantedBeds.length) {
+                this.phase = 'tend';
+                this.plantRound = 0;
+                this.selectedPlot = this.plantedBeds[0];
+                return this.go('pick');
+            }
+            return this.go('summary');
+        }
+
+        skipHarvestBed() {
+            if (this.step !== 'pick-harvest' && this.step !== 'harvest-hold') return this.step;
+            const rem = this._remainingHarvest().filter((i) => i !== this.selectedPlot);
+            const rest = this._remainingHarvest();
+            if (this.step === 'harvest-hold' && this.selectedPlot != null) {
+                const idx = rest.indexOf(this.selectedPlot);
+                if (idx >= 0) rest.splice(idx, 1);
+            }
+            if (!rest.length) {
+                if (this.plantedBeds.length) {
+                    this.phase = 'tend';
+                    this.plantRound = 0;
+                    this.selectedPlot = this.plantedBeds[0];
+                    return this.go('pick');
+                }
+                return this.go('summary');
+            }
+            this.selectedPlot = rest[0];
+            return this.go('pick-harvest');
         }
 
         hasMorePlants() { return this.plantRound + 1 < this.plantedBeds.length; }
@@ -706,6 +843,8 @@
 
         skip() {
             if (this.step === 'greeting') return this.begin();
+            if (this.step === 'pick-harvest') return this.skipHarvestBed();
+            if (this.step === 'harvest-hold') return this.skipHarvestBed();
             if (this.step === 'pick') return this.confirmPick();
             if (this.step === 'smile') return this.go('talk');
             if (this.step === 'talk') return this.go('breathe-offer');
@@ -739,7 +878,10 @@
             this.smiling = faceVisible ? this.detector.update(this.h) : false;
             this.talking = faceVisible && inp.talking === true;
 
-            if (this.step === 'smile' || this.step === 'talk') {
+            if (this.step === 'harvest-hold') {
+                if (faceVisible && this.smiling) this.harvestSmile += step;
+                if (this.harvestSmile >= this.harvestSeconds) this._completeHarvest();
+            } else if (this.step === 'smile' || this.step === 'talk') {
                 if (faceVisible) this.stepTime += step;
                 if (this.step === 'smile' && this.smiling && faceVisible) {
                     const on = L.DEFAULTS.smileOn;
@@ -792,6 +934,7 @@
             const n = Math.max(1, beds.length);
             return Object.assign({
                 beds,
+                harvestPlots: this.pendingHarvests.slice(),
                 breathSkipped: beds.some((b) => b.breathSkipped),
                 breathTaken: beds.some((b) => b.breathTaken),
                 peakHappiness: this.peak,
@@ -804,6 +947,23 @@
                 breaths: totals.breaths,
             });
         }
+    }
+
+    function applySessionHarvests(state, plotIndices, now) {
+        const out = [];
+        for (const plot of plotIndices || []) {
+            const r = H.harvestPlot(state, plot, now, L.plantById);
+            if (r.ok) out.push(r);
+        }
+        return out;
+    }
+
+    function newUnlocksAfterHarvest(state, beforeSeeds, beforeDecor) {
+        H.syncDecorUnlocks(state);
+        const afterSeeds = unlockedPlants(state);
+        const seeds = afterSeeds.filter((id) => !beforeSeeds.includes(id));
+        const decor = state.decor.unlocked.filter((id) => !beforeDecor.includes(id));
+        return { seeds, decor };
     }
 
     /** Short human sentence for a waiting plant (no guilt, nothing wilts). */
@@ -820,9 +980,11 @@
         const out = [];
         for (let i = 0; i < days; i++) {
             clock.nextDay();
+            advanceRegrowPlots(state, clock.today());
             const beds = [];
             state.plots.forEach((p, plot) => {
-                if (!p) return;
+                if (!p || H.isPlotRegrowing(p, clock.today()) || p.picked) return;
+                if (p.stage >= MAX_STAGE) return;
                 beds.push({
                     plot,
                     sunHours: 12 * q,
@@ -831,12 +993,18 @@
                     breaths: q > 0.8 ? 4 : 0,
                 });
             });
-            out.push(applyVisit(state, { beds }, clock.now()));
+            const visitOut = applyVisit(state, { beds }, clock.now());
+            const harvested = [];
+            for (const plot of H.readyPlotIndices(state.plots, clock.today())) {
+                const h = H.harvestPlot(state, plot, clock.now(), L.plantById);
+                if (h.ok) harvested.push(h);
+            }
+            out.push(Object.assign(visitOut, { harvested }));
         }
         return out;
     }
 
-    return {
+    return Object.assign({
         STATE_VERSION, PLOTS, MAX_STAGE, STAGES, TUNING, UNLOCK_AT_VISIT, TIPS, LIGHTINGS, LIGHTING_LABELS,
         PACES, MIN_BREATHS, MAX_BREATHS, STEPS,
         dayKey, dayStart, daysBetween, addDaysKey, weekStartKey,
@@ -845,5 +1013,21 @@
         emptyPlots, plantedCount, matureCount, score, plantSeed, weeklyVisits, visitedToday, applyVisit,
         clampBreaths, BreathPacer, VisitSession, waitingText, simulateDays,
         neighborPlot, movePlotSelection, plantedPlotIndices, firstPlantedPlot, perBedStepSeconds, visitBedResults,
-    };
+        advanceRegrowPlots, applySessionHarvests, newUnlocksAfterHarvest,
+    }, {
+        isPlotReady: H.isPlotReady,
+        isPlotRegrowing: H.isPlotRegrowing,
+        readyPlotIndices: H.readyPlotIndices,
+        tendablePlotIndices: H.tendablePlotIndices,
+        computeYield: H.computeYield,
+        harvestPlot: (s, i, now) => H.harvestPlot(s, i, now, L.plantById),
+        placeDecor: H.placeDecor,
+        makeAllReady: H.makeAllReady,
+        decorUnlocked: (s) => H.decorUnlocked(s),
+        syncDecorUnlocks: (s) => H.syncDecorUnlocks(s),
+        SEED_UNLOCK: H.SEED_UNLOCK,
+        DECOR_UNLOCKS: H.DECOR_UNLOCKS,
+        HARVEST_HOLD_SECONDS: H.HARVEST_HOLD_SECONDS,
+        PLANT_HARVEST: H.PLANT_HARVEST,
+    });
 });

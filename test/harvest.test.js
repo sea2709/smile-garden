@@ -1,0 +1,126 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const L = require('../game/logic.js');
+const H = require('../game/harvest.js');
+const V = require('../game/visit.js');
+
+const at = (y, m, d, h = 10) => new Date(y, m - 1, d, h, 0, 0, 0);
+
+test('computeYield: base 1, +1 full water, +1 fertilizer, never below 1', () => {
+    const p = { plantId: 'tomato', matureWater: 1, matureFert: 1 };
+    assert.equal(H.computeYield(p), 3);
+    assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0, matureFert: 0 }), 1);
+    assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0.5, matureFert: 0 }), 1);
+});
+
+test('harvestPlot pull clears bed and grants spare seed', () => {
+    const s = V.createState(at(2026, 11, 16));
+    V.plantSeed(s, 0, 'lettuce', at(2026, 11, 16));
+    s.plots[0].stage = 5;
+    const r = H.harvestPlot(s, 0, '2026-11-16', L.plantById);
+    assert.equal(r.ok, true);
+    assert.equal(r.mode, 'pull');
+    assert.equal(s.plots[0], null);
+    assert.equal(s.spareSeeds.lettuce, 1);
+    assert.equal(s.pantry.items.lettuce.count, 1);
+});
+
+test('harvestPlot regrow marks picked and increments pantry', () => {
+    const s = V.createState(at(2026, 11, 16));
+    s.visitDays = ['2026-11-15', '2026-11-16'];
+    V.plantSeed(s, 0, 'tomato', at(2026, 11, 16));
+    s.plots[0].stage = 5;
+    s.plots[0].matureWater = 1;
+    const r = H.harvestPlot(s, 0, '2026-11-16', L.plantById);
+    assert.equal(r.ok, true);
+    assert.equal(r.yield, 2);
+    assert.equal(s.plots[0].picked, true);
+    assert.equal(s.plots[0].pickDay, '2026-11-16');
+    assert.equal(H.isPlotReady(s.plots[0], '2026-11-16'), false);
+    assert.equal(H.isPlotRegrowing(s.plots[0], '2026-11-16'), true);
+    assert.equal(H.isPlotReady(s.plots[0], '2026-11-18'), true);
+});
+
+test('advanceRegrowPlots clears picked after regrow days', () => {
+    const s = V.createState(at(2026, 11, 16));
+    V.plantSeed(s, 0, 'mint', at(2026, 11, 16));
+    s.plots[0].stage = 5;
+    H.harvestPlot(s, 0, '2026-11-16', L.plantById);
+    V.advanceRegrowPlots(s, '2026-11-16');
+    assert.equal(s.plots[0].picked, true);
+    V.advanceRegrowPlots(s, '2026-11-17');
+    assert.equal(s.plots[0].picked, false);
+    assert.equal(H.isPlotReady(s.plots[0], '2026-11-17'), true);
+});
+
+test('seed unlocks use harvest milestones with visit fallback', () => {
+    const s = V.createState(at(2026, 11, 16));
+    assert.equal(V.isUnlocked(s, 'tomato'), false);
+    s.visitDays.push('2026-11-15', '2026-11-16');
+    assert.equal(V.isUnlocked(s, 'tomato'), true);
+    const s2 = V.createState(at(2026, 11, 16));
+    s2.pantry.totalHarvests = 1;
+    assert.equal(V.isUnlocked(s2, 'tomato'), true);
+    const s3 = V.createState(at(2026, 11, 16));
+    s3.pantry.totalHarvests = 2;
+    assert.equal(V.isUnlocked(s3, 'sunflower'), false);
+    s3.visitDays = ['2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13'];
+    assert.equal(V.isUnlocked(s3, 'sunflower'), true);
+});
+
+test('decor unlocks and placement persist', () => {
+    const s = V.createState(at(2026, 11, 16));
+    s.pantry.totalHarvests = 2;
+    H.syncDecorUnlocks(s);
+    assert.ok(s.decor.unlocked.includes('lantern'));
+    assert.equal(V.placeDecor(s, 'nw-path', 'lantern').ok, true);
+    const raw = V.serializeState(s);
+    const back = V.loadState(raw, at(2026, 11, 16));
+    assert.equal(back.decor.placements['nw-path'], 'lantern');
+    assert.equal(V.placeDecor(back, 'nw-path', 'birdbath').ok, false);
+    back.pantry.totalHarvests = 8;
+    H.syncDecorUnlocks(back);
+    assert.ok(back.decor.unlocked.includes('bench'));
+});
+
+test('loadState v3 migrates with empty pantry and decor', () => {
+    const now = at(2026, 11, 16);
+    const legacy = {
+        version: 3,
+        wellnessAck: true,
+        plots: [{ plantId: 'mint', stage: 3, sunBank: 1, plantedDay: '2026-11-10' }],
+        visitDays: ['2026-11-16'],
+        journal: [],
+        settings: { pace: 'standard', breaths: 4, chart: true, lighting: 'auto', offsetDays: 0 },
+    };
+    const s = V.loadState(JSON.stringify(legacy), now);
+    assert.equal(s.version, V.STATE_VERSION);
+    assert.equal(s.pantry.totalHarvests, 0);
+    assert.deepEqual(s.decor.placements, {});
+    assert.equal(s.spareSeeds.mint || 0, 0);
+    assert.equal(s.plots[0].plantId, 'mint');
+});
+
+test('applySessionHarvests applies pending visit harvests', () => {
+    const s = V.createState(at(2026, 11, 16));
+    V.plantSeed(s, 0, 'cucumber', at(2026, 11, 16));
+    s.plots[0].stage = 5;
+    const list = V.applySessionHarvests(s, [0], at(2026, 11, 16));
+    assert.equal(list.length, 1);
+    assert.equal(s.pantry.totalHarvests, 1);
+});
+
+test('simulateDays performs harvests on ready beds', () => {
+    const s = V.createState(at(2026, 11, 16));
+    V.plantSeed(s, 0, 'lettuce', at(2026, 11, 16));
+    const clock = new V.GameClock({ now: () => at(2026, 11, 16).getTime() });
+    for (let i = 0; i < 4; i++) {
+        V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, clock.now());
+        clock.nextDay();
+    }
+    assert.equal(s.plots[0].stage, 5);
+    const out = V.simulateDays(s, clock, 1, 1);
+    assert.ok(out[0].harvested && out[0].harvested.length >= 1);
+});

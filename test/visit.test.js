@@ -145,7 +145,7 @@ test('a plant grows at most one stage per local day', () => {
 
 test('sun-hungry plants bank sunlight over several days (apple 12 h at 6 h a day)', () => {
     const s = V.createState(at(2026, 11, 16));
-    s.visitDays = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04']; // unlock apple
+    s.visitDays = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07']; // unlock apple (visit fallback)
     V.plantSeed(s, 0, 'apple', at(2026, 11, 16));
     V.plantSeed(s, 1, 'lettuce', at(2026, 11, 16));
     let r = V.applyVisit(s, { beds: [{ plot: 0, sunHours: 6, water: 1, fertilizer: 0 }, { plot: 1, sunHours: 6, water: 1, fertilizer: 0 }] }, at(2026, 11, 16));
@@ -177,7 +177,7 @@ test('water is needed to grow; without it the plant just waits (nothing wilts)',
 test('fertilizer is optional and only speeds growth', () => {
     const mk = () => {
         const s = V.createState(at(2026, 11, 16));
-        s.visitDays = ['2026-11-01', '2026-11-02', '2026-11-03'];
+        s.visitDays = ['2026-11-01', '2026-11-02', '2026-11-03', '2026-11-04'];
         V.plantSeed(s, 0, 'sunflower', at(2026, 11, 16));
         return s;
     };
@@ -193,18 +193,19 @@ test('fertilizer is optional and only speeds growth', () => {
 test('plants stop at mature, seeds unlock with visits, weekly count has no streak penalty', () => {
     const s = V.createState(at(2026, 11, 16));
     const clock = new V.GameClock({ now: () => at(2026, 11, 15, 10).getTime() });
-    V.plantSeed(s, 0, 'lettuce', clock.now());
-    const res = V.simulateDays(s, clock, 6, 1);
+    V.plantSeed(s, 0, 'mint', clock.now());
+    const res = V.simulateDays(s, clock, 8, 1);
     assert.equal(s.plots[0].stage, 5);
-    assert.ok(s.plots[0].matureDay);
+    assert.ok(s.plots[0].matureDay || s.plots[0].picked);
+    assert.ok(s.pantry.totalHarvests >= 1, 'simulateDays exercises harvests');
     assert.equal(V.matureCount(s), 1);
     assert.ok(res.some((r) => r.grew.some((g) => g.mature)));
     assert.ok(V.isUnlocked(s, 'apple'));
     assert.ok(s.journal.some((e) => e.kind === 'unlock' && e.plantId === 'tomato'));
     assert.ok(s.journal.some((e) => e.kind === 'mature'));
     // Visits Mon 16 .. Sat 21 this week = 6; skipping Sunday does not reset anything.
-    assert.equal(V.weeklyVisits(s, at(2026, 11, 22)), 6);
-    assert.equal(V.weeklyVisits(s, at(2026, 11, 23)), 0, 'new week starts fresh, no lost streak');
+    assert.equal(V.weeklyVisits(s, at(2026, 11, 22)), 7);
+    assert.equal(V.weeklyVisits(s, at(2026, 11, 30)), 0, 'new week starts fresh, no lost streak');
 });
 
 // ---------- breathing ----------
