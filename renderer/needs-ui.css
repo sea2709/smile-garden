@@ -45,6 +45,24 @@
     object-fit: contain;
 }
 
+.needs-resting {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    opacity: 0.92;
+}
+
+.needs-resting-fallback {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    color: rgba(100, 150, 90, 0.95);
+    filter: none;
+}
+
 .needs-icons {
     display: flex;
     flex-wrap: wrap;

@@ -61,6 +61,17 @@ All source art **2×**; game displays at **1×** unless noted. Paths and anchors
 - **Source:** 72×72 px (2×).
 - **Display:** 36×36 CSS px on tag header when `allMet`; scene draws a small wooden tag + ✿ fallback on the bed.
 
+## Resting leaf (did not grow overnight)
+
+| Asset | Path |
+|-------|------|
+| Resting icon | `assets/ui/needs/resting-leaf.png` |
+
+- **Source:** 56×56 px (2×), soft green leaf — calm, **not** wilted or red.
+- **Display:** 28×28 CSS px on the tag header when `plot.tagResting` (cleared when that day’s needs are all met, or at the next bedtime).
+- **Scene fallback:** wooden tag micro-badge with 🌿 (same anchor as bloom stamp).
+- **State:** `tagResting` on plot (save v6+); set after bedtime when an in-season, growing plant does not advance stage; cleared at start of bedtime then recomputed for the new morning.
+
 ---
 
 ## Guide sunflower (split head + stem)

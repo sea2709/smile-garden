@@ -92,6 +92,37 @@ test('save v6 migration clears staked and bumps version', () => {
     assert.equal(s.plots[0].staked, false);
 });
 
+test('tagResting set after incomplete overnight growth, cleared when allMet', () => {
+    const d = new Date(2026, 10, 16);
+    const s = V.createState(d);
+    V.plantSeed(s, 0, 'lettuce', d);
+    s.dailyTends[0] = { day: 1, sun: 1, water: 1, fertilizer: 0, stake: false, allMet: false };
+    V.goToBed(s, d);
+    assert.equal(s.plots[0].tagResting, true);
+    const needs = L.plantNeeds('lettuce');
+    V.applyVisit(s, {
+        careMode: true,
+        careBeds: [{
+            plot: 0,
+            progress: { sun: needs.sun, water: needs.water, fertilizer: needs.fertilizer, stake: false },
+            allMet: true,
+        }],
+    }, new Date(2026, 10, 17, 10));
+    assert.equal(s.plots[0].tagResting, false);
+});
+
+test('tagResting clears at next bedtime even if needs still incomplete', () => {
+    const d = new Date(2026, 10, 16);
+    const s = V.createState(d);
+    V.plantSeed(s, 0, 'mint', d);
+    s.dailyTends[0] = { day: 1, sun: 1, water: 0, fertilizer: 0, stake: false, allMet: false };
+    V.goToBed(s, d);
+    assert.equal(s.plots[0].tagResting, true);
+    s.dailyTends[0] = { day: 2, sun: 1, water: 1, fertilizer: 0, stake: false, allMet: false };
+    V.goToBed(s, new Date(2026, 10, 17, 22));
+    assert.equal(s.plots[0].tagResting, true, 'still resting after another night without growth');
+});
+
 test('morning reset clears daily tends', () => {
     const s = V.createState(new Date(2026, 10, 16));
     s.dailyTends[0] = { day: 1, sun: 2, water: 1, fertilizer: 0, allMet: false };

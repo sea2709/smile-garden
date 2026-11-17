@@ -17,7 +17,7 @@
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub', 'meter-sun', 'meter-water', 'meter-fert',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-sunflower', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-plant-name', 'needs-icons', 'needs-bloom-stamp', 'needs-tag-img', 'needs-tag-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-sunflower', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-plant-name', 'needs-icons', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'needs-tag-img', 'needs-tag-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -116,6 +116,12 @@
         const view = state.plots.map((p, i) => {
             if (!p) return null;
             const regrow = V.isPlotRegrowing(p, today);
+            const careAllMet = session && session.careProgressFor && C.allNeedsMet(
+                session.careProgressFor(i),
+                L.plantNeeds(p.plantId),
+                p.staked,
+            );
+            const tendedAllMet = state.version >= 6 && D.plotTendedToday(state, i);
             return {
                 plantId: p.plantId,
                 stage: p.stage,
@@ -123,11 +129,8 @@
                 ready: V.isPlotReady(p, today),
                 tendedToday: D.plotTendedToday(state, i),
                 staked: !!p.staked,
-                careAllMet: session && session.careProgressFor && C.allNeedsMet(
-                    session.careProgressFor(i),
-                    L.plantNeeds(p.plantId),
-                    p.staked,
-                ),
+                careAllMet,
+                tagResting: !!p.tagResting && !careAllMet && !tendedAllMet,
             };
         });
         scene.setPlots(view, instant ? { instant: true } : undefined);
@@ -540,10 +543,16 @@
         els.needsPlantName.textContent = `${kind.name} · bed ${plot + 1}`;
         bindNeedsArt(els.needsTagImg, ART.needs.plantTag, els.needsTagFallback);
         const allMet = C.allNeedsMet(prog, needs, pl.staked);
-        if (ART.needs.bloomStamp) {
-            bindNeedsArt(els.needsBloomStamp, ART.needs.bloomStamp, null);
+        const showResting = !!pl.tagResting && !allMet;
+        if (els.needsBloomStamp) {
+            if (ART.needs.bloomStamp) bindNeedsArt(els.needsBloomStamp, ART.needs.bloomStamp, null);
             els.needsBloomStamp.hidden = !allMet;
-        } else els.needsBloomStamp.hidden = !allMet;
+        }
+        if (els.needsRestingStamp) {
+            bindNeedsArt(els.needsRestingStamp, ART.needs.restingLeaf, els.needsRestingFallback);
+            els.needsRestingStamp.hidden = !showResting;
+            if (els.needsRestingFallback) els.needsRestingFallback.hidden = !showResting || !els.needsRestingStamp.hidden;
+        }
         const box = els.needsIcons;
         box.textContent = '';
         const keys = ['sun', 'water', 'fertilizer', 'stake'];

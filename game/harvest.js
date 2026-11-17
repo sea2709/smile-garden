@@ -98,6 +98,7 @@
             picked: p.picked === true,
             pickDay: typeof p.pickDay === 'string' ? p.pickDay : null,
             staked: p.staked === true,
+            tagResting: p.tagResting === true,
         matureWater: p.matureWater == null ? null : Math.max(0, Math.min(1, Number(p.matureWater) || 0)),
             matureFert: p.matureFert == null ? null : Math.max(0, Math.min(1, Number(p.matureFert) || 0)),
             tendedDay: Number.isFinite(Number(p.tendedDay)) ? Math.round(Number(p.tendedDay)) : p.tendedDay,

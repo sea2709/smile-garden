@@ -245,6 +245,25 @@
             matureFert: p.matureFert,
             tendedDay: p.tendedDay,
             staked: p.staked === true,
+            tagResting: p.tagResting === true,
+        });
+    }
+
+    /** Morning tag: gentle “resting” when a plant did not grow overnight (v6). */
+    function applyTagRestingAfterBedtime(state, growthOut) {
+        if (state.version < 6) return;
+        const grew = new Set((growthOut.grew || []).map((g) => g.plot));
+        const season = state.season || D.seasonForDayNumber(state.dayNumber);
+        const dayKeyStr = D.gardenDayKey(state.dayNumber);
+        state.plots.forEach((p, i) => {
+            if (!p || p.stage >= MAX_STAGE || p.picked) return;
+            if (H.isPlotRegrowing(p, dayKeyStr)) return;
+            if (!D.isPlantInSeason(p.plantId, season)) return;
+            if (grew.has(i)) {
+                p.tagResting = false;
+                return;
+            }
+            p.tagResting = true;
         });
     }
 
@@ -398,7 +417,7 @@
         const day = calendarKey(state, d);
         state.plots[i] = {
             plantId, plantedDay: day, stage: 1, sunBank: 0, lastGrowDay: null, matureDay: null,
-            picked: false, pickDay: null, matureWater: null, matureFert: null,
+            picked: false, pickDay: null, matureWater: null, matureFert: null, tagResting: false,
         };
         if (state.spareSeeds && state.spareSeeds[plantId] > 0) state.spareSeeds[plantId] -= 1;
         addJournal(state, { day, ts: d.getTime(), kind: 'planted', plantId, plot: i, stage: 1,
@@ -615,6 +634,9 @@
 
     function goToBed(state, now) {
         const d = now instanceof Date ? now : new Date(now);
+        if (state.version >= 6) {
+            state.plots.forEach((p) => { if (p) p.tagResting = false; });
+        }
         const out = applyOvernightGrowth(state, d);
         const completedDay = state.dayNumber;
         const completedKey = D.gardenDayKey(completedDay);
@@ -625,6 +647,7 @@
         state.seasonDay = D.seasonDayNumber(state.dayNumber);
         state.gardenMinutes = D.DEFAULT_DAY_CONFIG.startMinutes;
         state.dailyTends = {};
+        if (state.version >= 6) applyTagRestingAfterBedtime(state, out);
         const day = completedKey;
         if (!state.visitDays.includes(day)) {
             state.visitDays.push(day);
@@ -666,6 +689,7 @@
                 if (!p) continue;
                 const needs = L.plantNeeds(p.plantId);
                 if (needs.stake && b.progress && b.progress.stake) p.staked = true;
+                if (C.allNeedsMet(b.progress, needs, p.staked)) p.tagResting = false;
                 const kind = L.plantById(p.plantId);
                 tended.push({ plot: b.plot, plantId: p.plantId, name: kind.name });
             }
