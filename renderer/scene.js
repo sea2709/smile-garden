@@ -45,6 +45,9 @@
         const genericHarvest = { day: null, night: null };
         const produceImgs = {};
         const basketImg = (ART.produce && ART.produce.basket) ? loadImage(ART.produce.basket) : null;
+        const logoDayImg = (ART.ui && ART.ui.logoDay) ? loadImage(ART.ui.logoDay) : null;
+        const logoNightImg = (ART.ui && ART.ui.logoNight) ? loadImage(ART.ui.logoNight) : null;
+        let logoOnCanvas = false;
         if (ART.harvest) {
             readyStrips.day = loadImage(ART.readyStripSrc('day'));
             readyStrips.night = loadImage(ART.readyStripSrc('night'));
@@ -58,6 +61,16 @@
                 if (ART.produce) produceImgs[id] = loadImage(ART.produce.src(id));
             }
         }
+
+        const C = window.SmileCritters;
+        const critterImgs = {};
+        if (ART.critters && ART.critters.strips) {
+            for (const key of Object.keys(ART.critters.strips)) {
+                const src = ART.critterStripSrc(key);
+                if (src) critterImgs[key] = loadImage(src);
+            }
+        }
+        let reducedMotion = C && C.prefersReducedMotion();
 
         const fxImgs = {};
         if (ART.effects) for (const n of ART.effects.names) fxImgs[n] = loadImage(ART.effectSrc(n));
@@ -406,12 +419,22 @@
             return { img: null, generic: false };
         }
 
-        function harvestLocalToWorld(plot, lx, ly) {
+        function plotStageMeta(plotIndex, stage) {
+            const pl = plots[plotIndex];
+            if (!pl || !ART.plants[pl.plantId]) return null;
+            if (stage === 'picked') return ART.plants[pl.plantId].stages[4];
+            const st = typeof stage === 'number' ? stage : pl.stage;
+            return ART.plants[pl.plantId].stages[Math.max(0, Math.min(4, st - 1))];
+        }
+
+        function harvestLocalToWorld(plot, lx, ly, plantId) {
             const H = ART.harvest;
             const p = ART.plots[plot];
             const s = p.w / 180;
+            const meta = plantId && ART.plants[plantId] ? ART.plants[plantId].stages[4] : null;
+            const ax = H.frameW / 2;
             return {
-                x: p.x + (lx - H.frameW / 2) * s,
+                x: p.x + (lx - ax) * s,
                 y: p.y - 4 + (ly - H.soilY) * s,
             };
         }
@@ -435,16 +458,19 @@
             return null;
         }
 
-        function drawHarvestFrame(i, frame, img, alpha) {
+        function drawHarvestFrame(i, frame, img, alpha, plantId) {
             const H = ART.harvest;
             if (!ready(img) || !H || alpha <= 0.01) return;
             const p = ART.plots[i];
             const s = p.w / 180;
+            const id = plantId || (plots[i] && plots[i].plantId);
+            const meta = id && ART.plants[id] ? ART.plants[id].stages[4] : null;
+            const ax = H.frameW / 2;
             ctx.save();
             ctx.globalAlpha = Math.min(1, alpha);
             ctx.translate(p.x, p.y - 4);
             ctx.scale(s, s);
-            ctx.drawImage(img, frame * H.frameW, 0, H.frameW, H.frameH, -H.frameW / 2, -H.soilY, H.frameW, H.frameH);
+            ctx.drawImage(img, frame * H.frameW, 0, H.frameW, H.frameH, -ax, -H.soilY, H.frameW, H.frameH);
             ctx.restore();
         }
 
@@ -490,7 +516,7 @@
             const img = readyStrips[kind];
             if (ready(img) && H) {
                 const frame = Math.floor(t * H.fps + i * 2) % H.readyCount;
-                drawHarvestFrame(i, frame, img, 1);
+                drawHarvestFrame(i, frame, img, 1, pl.plantId);
                 return;
             }
             const p = ART.plots[i];
@@ -573,7 +599,7 @@
             const [bx, by] = H.basketInFrame;
             const lx = 100 + (bx - 100) * t;
             const ly = 140 + (by - 140) * t;
-            const w = harvestLocalToWorld(a.plot, lx, ly);
+            const w = harvestLocalToWorld(a.plot, lx, ly, a.plantId);
             const bed = ART.plots[a.plot];
             const sz = (ART.produce.size || 128) * (bed.w / 180) * 0.38;
             ctx.save();
@@ -594,7 +620,7 @@
                 if (f >= maxF) { harvestAnims.splice(n, 1); continue; }
                 if (f < 0) continue;
                 if (ready(img)) {
-                    drawHarvestFrame(a.plot, f, img, 1);
+                    drawHarvestFrame(a.plot, f, img, 1, a.plantId);
                     if (generic) drawHarvestProduceFly(a, f);
                 }
             }
@@ -822,7 +848,10 @@
             ctx.globalCompositeOperation = kind === 'sun' ? 'lighter' : 'source-over';
             ctx.translate(p.x, p.y - 4);
             ctx.scale(s, s);
-            ctx.drawImage(img, frame * E.frameW, 0, E.frameW, E.frameH, -E.frameW / 2, -E.soilY, E.frameW, E.frameH);
+            const pl = plots[i];
+            const meta = pl && pl.plantId ? plotStageMeta(i, pl.stage) : null;
+            const ax = E.frameW / 2;
+            ctx.drawImage(img, frame * E.frameW, 0, E.frameW, E.frameH, -ax, -E.soilY, E.frameW, E.frameH);
             ctx.restore();
         }
         function drawEffectSprites(t) {
@@ -845,6 +874,87 @@
             }
         }
 
+        function drawCritterPlaceholder(x, y, color, sc) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(sc, sc);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 16, 11, 0, 0, TAU);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(50, 40, 20, 0.35)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawCritters(t) {
+            if (!ART.critters || !C) return;
+            const alpha = C.critterDayAlpha(lighting, prevLighting, lightFade);
+            if (alpha < 0.02) return;
+            const motionScale = C.motionScaleFromReduced(reducedMotion);
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            for (const entry of ART.critters.roster) {
+                const spec = ART.critters.strips[entry.strip];
+                if (!spec) continue;
+                const img = critterImgs[entry.strip];
+                const pos = C.wanderPosition(entry, t, ART.critters.bounds);
+                const defaultFrames = spec.kind === 'bee' ? 4 : 8;
+                const frameCount = ready(img)
+                    ? C.stripFrameCount(img.naturalWidth, spec.frameW)
+                    : defaultFrames;
+                const frame = C.animFrameIndex(t + (entry.phase || 0), spec.fps, frameCount, { reducedMotion, motionScale });
+                const drawScale = spec.scale != null ? spec.scale : 0.32;
+                const { frameW: fw, frameH: fh } = spec;
+                if (!ready(img)) {
+                    const ph = ART.critters.placeholder || {};
+                    const col = ph[entry.strip] || ph.butterfly || '#e8a050';
+                    drawCritterPlaceholder(pos.x, pos.y, col, drawScale * 2.2);
+                    continue;
+                }
+                ctx.save();
+                ctx.translate(pos.x, pos.y);
+                if (spec.kind === 'butterfly') {
+                    ctx.rotate(C.butterflyHeadingRad(pos.vx, pos.vy));
+                    ctx.scale(drawScale, drawScale);
+                    ctx.drawImage(img, frame * fw, 0, fw, fh, -fw / 2, -fh / 2, fw, fh);
+                } else if (spec.kind === 'bee') {
+                    const flip = C.beeFlipX(pos.vx);
+                    ctx.scale(drawScale * (flip ? -1 : 1), drawScale);
+                    ctx.drawImage(img, frame * fw, 0, fw, fh, -fw / 2, -fh / 2, fw, fh);
+                } else {
+                    ctx.scale(drawScale, drawScale);
+                    ctx.drawImage(img, frame * fw, 0, fw, fh, -fw / 2, -fh / 2, fw, fh);
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        function drawLogoHud() {
+            const hud = ART.logoHud;
+            if (!hud || !C) return;
+            const layers = C.logoLayerAlphas(lighting, prevLighting, lightFade);
+            const dayReady = ready(logoDayImg);
+            const nightReady = ready(logoNightImg);
+            logoOnCanvas = dayReady || nightReady;
+            if (!logoOnCanvas) return;
+            const { x, y, w, h } = hud;
+            if (dayReady && layers.day > 0.02) {
+                ctx.save();
+                ctx.globalAlpha = layers.day;
+                ctx.drawImage(logoDayImg, x, y, w, h);
+                ctx.restore();
+            }
+            if (nightReady && layers.night > 0.02) {
+                ctx.save();
+                ctx.globalAlpha = layers.night;
+                ctx.drawImage(logoNightImg, x, y, w, h);
+                ctx.restore();
+            }
+        }
+
         function drawVignette() {
             const g = ctx.createRadialGradient(640, 380, 300, 640, 380, 820);
             g.addColorStop(0, 'rgba(60, 40, 20, 0)');
@@ -862,15 +972,21 @@
             drawDecorations(t);
             drawSunShafts(t);
             drawPlants(t);
+            drawCritters(t);
             drawEffectSprites(t);
             drawParticles(t);
             drawHarvestAnims();
             drawBasketIcon(t);
+            drawLogoHud();
             drawVignette();
         }
 
         return { resize, update, draw, setLighting, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
-            get lighting() { return lighting; }, images: { bgImgs, plantImgs } };
+            get lighting() { return lighting; },
+            get reducedMotion() { return reducedMotion; },
+            setReducedMotion(v) { reducedMotion = !!v; },
+            get logoOnCanvas() { return logoOnCanvas; },
+            images: { bgImgs, plantImgs, critterImgs, logoDayImg, logoNightImg } };
     }
 
     window.SmileScene = { createScene };

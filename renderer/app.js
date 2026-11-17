@@ -1258,6 +1258,7 @@
         if (session && screen === 'visit') updateVisit(dt, t);
         scene.update(dt, t);
         scene.draw(t);
+        document.body.dataset.canvasLogo = scene.logoOnCanvas ? '1' : '0';
         renderMeters();
         const chartOn = state.settings.chart && screen === 'visit';
         if (els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;

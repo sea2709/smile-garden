@@ -100,6 +100,11 @@ async function run(win, outDir) {
     await G(`g.show('idle')`);
     await shot('09-golden-hour-garden.png');
 
+    await lightingTo('midday');
+    await G(`g.show('idle')`);
+    await sleep(3500);
+    await shot('critters-midday-garden.png');
+
     // --- a night visit: poor reading -> "turn on a light" ---
     await G('g.nextDay()');
     await lightingTo('night');

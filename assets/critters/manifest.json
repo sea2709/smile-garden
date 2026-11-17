@@ -1,0 +1,32 @@
+{
+  "butterfly-monarch": {
+    "frames": 8,
+    "size": [
+      200,
+      200
+    ],
+    "fps": 12,
+    "faces": "up (top view); rotate toward travel direction",
+    "anchor": "center"
+  },
+  "butterfly-white": {
+    "frames": 8,
+    "size": [
+      200,
+      200
+    ],
+    "fps": 12,
+    "faces": "up (top view); rotate toward travel direction",
+    "anchor": "center"
+  },
+  "bee": {
+    "frames": 4,
+    "size": [
+      200,
+      200
+    ],
+    "fps": 16,
+    "faces": "left; flip for rightward travel",
+    "anchor": "center"
+  }
+}
