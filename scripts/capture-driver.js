@@ -382,8 +382,16 @@ async function runStakeArt(win, outDir) {
     await lightingTo('midday');
     await G('g.prepCaptureGarden()');
     await sleep(900);
-    await G(`g.setStretchHudDemo('left-hold')`);
+    await G(`g.setStretchHudDemo('tilted-guide')`);
     await sleep(1200);
+    const stemTilt = await js(`(() => {
+        const el = document.getElementById('stretch-sunflower-stem');
+        return el ? el.style.transform : '';
+    })()`, true);
+    if (!/rotate\s*\(\s*-2[0-9]/i.test(stemTilt)) throw new Error(`stretch stem not tilted: ${stemTilt}`);
+    await shot('stake-guide-tilted.png');
+    await G(`g.setStretchHudDemo('ring-midfill')`);
+    await sleep(900);
     const ringSum = await js(`(() => {
         const c = document.getElementById('stretch-ring');
         if (!c) return 0;
@@ -394,13 +402,14 @@ async function runStakeArt(win, outDir) {
         return sum;
     })()`);
     if (ringSum < 400) throw new Error(`stretch vine ring fill weak (sum=${ringSum})`);
+    const ringFrame = await G('g.stretchDemoSnap && g.stretchDemoSnap.ringFrame');
+    if (ringFrame !== 7) throw new Error(`expected ring frame 7 for midfill, got ${ringFrame}`);
     const leftOnly = await js(`(() => {
         const row = document.querySelector('.stretch-rings');
         const rings = document.querySelectorAll('#stretch-ring').length;
         return { oldRow: !!(row && row.offsetParent), rings };
     })()`, true);
     if (leftOnly.oldRow) throw new Error('legacy dual ring row still visible');
-    await shot('stake-guide-tilted.png');
     await shot('stake-ring-midfill.png');
     await G('g.clearStretchHudDemo()');
     await G(`g.show('idle')`);

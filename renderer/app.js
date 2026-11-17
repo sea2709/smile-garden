@@ -634,6 +634,7 @@
         if (rowsEl) {
             rowsEl.textContent = '';
             const half = (n) => n / 2;
+            const rowsOriginY = half(ART.needs.cardRows[0].row[1]);
             for (const rowSpec of ART.needs.cardRows) {
                 const key = rowSpec.key;
                 const req = C.dotsForNeed(needs, key);
@@ -643,7 +644,8 @@
                 btn.type = 'button';
                 btn.className = 'need-row' + (done ? ' need-row--done' : '');
                 const [rx0, ry0, rx1, ry1] = rowSpec.row;
-                const rowTop = half(ry0);
+                const rowAbsTop = half(ry0);
+                const rowTop = rowAbsTop - rowsOriginY;
                 btn.style.top = `${rowTop}px`;
                 btn.style.height = `${half(ry1 - ry0)}px`;
                 const [ix0, iy0, ix1, iy1] = rowSpec.icon;
@@ -652,7 +654,7 @@
                 icon.alt = '';
                 icon.src = artUrl(ART.needsIconSrc(key, cardCareLight));
                 icon.style.left = `${half(ix0)}px`;
-                icon.style.top = `${half(iy0) - rowTop}px`;
+                icon.style.top = `${half(iy0) - rowAbsTop}px`;
                 icon.style.width = `${half(ix1 - ix0)}px`;
                 icon.style.height = `${half(iy1 - iy0)}px`;
                 icon.onerror = () => { icon.replaceWith(document.createTextNode(NEED_EMOJI[key] || '•')); };
@@ -670,7 +672,7 @@
                     dot.style.width = `${dotSz}px`;
                     dot.style.height = `${dotSz}px`;
                     dot.style.left = `${half(cent[0]) - dotSz / 2}px`;
-                    dot.style.top = `${half(cent[1]) - rowTop - dotSz / 2}px`;
+                    dot.style.top = `${half(cent[1]) - rowAbsTop - dotSz / 2}px`;
                     dot.style.position = 'absolute';
                     dot.onerror = () => {
                         const span = document.createElement('span');
@@ -687,7 +689,7 @@
                     check.alt = '';
                     check.src = artUrl(ART.needsDoneSrc(cardCareLight));
                     check.style.left = `${half(sx0)}px`;
-                    check.style.top = `${half(sy0) - rowTop}px`;
+                    check.style.top = `${half(sy0) - rowAbsTop}px`;
                     check.style.width = `${half(sx1 - sx0)}px`;
                     check.style.height = `${half(sy1 - sy0)}px`;
                     btn.append(check);
@@ -1015,6 +1017,39 @@
         };
     }
 
+    let stretchRingScratch = null;
+    function softenRingFrameAlpha(ctx, img) {
+        const iw = img.naturalWidth || img.width;
+        const ih = img.naturalHeight || img.height;
+        if (!stretchRingScratch || stretchRingScratch.width !== iw || stretchRingScratch.height !== ih) {
+            stretchRingScratch = document.createElement('canvas');
+            stretchRingScratch.width = iw;
+            stretchRingScratch.height = ih;
+        }
+        const sctx = stretchRingScratch.getContext('2d');
+        sctx.clearRect(0, 0, iw, ih);
+        sctx.drawImage(img, 0, 0);
+        const d = sctx.getImageData(0, 0, iw, ih);
+        const data = d.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+            let a = data[i + 3];
+            const mx = Math.max(r, g, b);
+            const mn = Math.min(r, g, b);
+            const isPlate = mx < 120 && mx - mn < 36;
+            const isVegetal = g > r + 5 && g > b + 3;
+            const isFill = isVegetal && mx > 90;
+            if (isPlate && !isFill) a = 0;
+            else if (a < 64 && !isFill) a = 0;
+            else if (mx < 90 && !isFill) a = 0;
+            data[i + 3] = a;
+        }
+        sctx.putImageData(d, 0, 0);
+        ctx.drawImage(stretchRingScratch, 0, 0, ctx.canvas.width, ctx.canvas.height);
+    }
+
     function drawStretchRing(canvas, progress, done) {
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
@@ -1024,10 +1059,13 @@
         const night = lighting === 'night';
         const frames = night ? stretchRingArt.framesNight : stretchRingArt.framesDay;
         const p = done ? 1 : Math.max(0, Math.min(1, progress));
-        const frame = Math.max(1, Math.round(p * (STRETCH_RING_FRAMES - 1)));
+        let frame = Math.max(1, Math.round(p * (STRETCH_RING_FRAMES - 1)));
+        if (stretchHudDemoLock && stretchDemoSnap && Number.isFinite(stretchDemoSnap.ringFrame)) {
+            frame = Math.max(0, Math.min(STRETCH_RING_FRAMES - 1, Math.round(stretchDemoSnap.ringFrame)));
+        }
         const frameImg = frames && frames[frame];
         if (frameImg && frameImg.naturalWidth > 0) {
-            ctx.drawImage(frameImg, 0, 0, w, h);
+            softenRingFrameAlpha(ctx, frameImg);
         } else if (!frames) {
             ctx.strokeStyle = 'rgba(150, 120, 80, 0.35)';
             ctx.lineWidth = 6;
@@ -2104,6 +2142,7 @@
         get session() { return session; },
         get screen() { return screen; },
         get scene() { return scene; },
+        get stretchDemoSnap() { return stretchDemoSnap; },
         clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness,
         plant: (id, plot) => plant(id, plot),
         begin: () => (screen === 'greeting' || screen === 'idle' ? beginVisit() : null),
@@ -2408,7 +2447,9 @@
         },
         setStretchHudDemo(mode) {
             const modes = {
-                'left-hold': { leftProgress: 0.68, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -22, activeSide: 'left', complete: false, needsFaceHint: false },
+                'tilted-guide': { leftProgress: 0.12, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -26, activeSide: 'left', ringFrame: 2, complete: false, needsFaceHint: false },
+                'ring-midfill': { leftProgress: 7 / 11, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -4, activeSide: 'left', ringFrame: 7, complete: false, needsFaceHint: false },
+                'left-hold': { leftProgress: 7 / 11, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -22, activeSide: 'left', complete: false, needsFaceHint: false },
                 'right-hold': { leftProgress: 1, rightProgress: 0.72, leftDone: true, rightDone: false, rollDeg: 19, activeSide: 'right', complete: false, needsFaceHint: false },
                 done: { leftProgress: 1, rightProgress: 1, leftDone: true, rightDone: true, rollDeg: 2, activeSide: null, complete: true, needsFaceHint: false },
             };

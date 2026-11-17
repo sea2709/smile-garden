@@ -68,6 +68,7 @@
     margin: 0 auto;
     background: transparent;
     overflow: visible;
+    isolation: isolate;
 }
 
 /* One vine ring behind the guide (stake-manifest placeOverGuide: −20,12 in 160×220 box). */
@@ -80,6 +81,7 @@
     z-index: 0;
     pointer-events: none;
     background: transparent;
+    image-rendering: auto;
 }
 
 .stretch-guide-stem {
