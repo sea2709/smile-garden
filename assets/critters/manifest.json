@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "strips": {
+    "butterfly-monarch": {
+      "file": "butterfly-monarch-strip.png",
+      "frameW": 128,
+      "frameH": 112,
+      "fps": 12,
+      "anchor": "center",
+      "kind": "butterfly",
+      "faces": "up"
+    },
+    "butterfly-white": {
+      "file": "butterfly-white-strip.png",
+      "frameW": 128,
+      "frameH": 112,
+      "fps": 12,
+      "anchor": "center",
+      "kind": "butterfly",
+      "faces": "up"
+    },
+    "bee": {
+      "file": "bee-strip.png",
+      "frameW": 112,
+      "frameH": 96,
+      "fps": 16,
+      "anchor": "center",
+      "kind": "bee",
+      "faces": "left"
+    }
+  }
+}

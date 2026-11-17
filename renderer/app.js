@@ -1274,6 +1274,15 @@
         }
         show(state.wellnessAck ? 'greeting' : 'wellness');
         document.body.dataset.ready = '1';
+        const brandLogo = document.getElementById('brand-logo');
+        if (brandLogo) {
+            brandLogo.addEventListener('load', () => {
+                brandLogo.hidden = false;
+                const mark = document.querySelector('.brand-mark');
+                if (mark) mark.hidden = true;
+            }, { once: true });
+            brandLogo.addEventListener('error', () => brandLogo.remove(), { once: true });
+        }
     }
 
     // Dev/test hooks (used by scripts/capture-driver.js; harmless otherwise).

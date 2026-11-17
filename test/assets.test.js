@@ -76,6 +76,24 @@ test('decoration art and per-spot scale', () => {
     }
 });
 
+test('critter strips and day backdrops without painted insects', () => {
+    assert.ok(ART.critters);
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'critters', 'manifest.json'), 'utf8'));
+    for (const [key, spec] of Object.entries(manifest.strips)) {
+        assert.ok(ART.critters.strips[key], `art critters ${key}`);
+        assert.equal(ART.critters.strips[key].frameW, spec.frameW);
+        assert.ok(fs.existsSync(path.join(root, 'assets', 'critters', spec.file)), spec.file);
+        const buf = fs.readFileSync(path.join(root, 'assets', 'critters', spec.file));
+        const w = buf.readUInt32BE(16);
+        const Cmod = require('../game/critters.js');
+        const frames = Cmod.stripFrameCount(w, spec.frameW);
+        assert.equal(frames, key === 'bee' ? 4 : 8, `${key} frame count`);
+    }
+    for (const day of ['dawn', 'midday', 'golden-hour']) {
+        assert.ok(ART.backgrounds[day].endsWith('.png'), day);
+    }
+});
+
 test('selection ring art: 8 day/night sprites and backdrop offsets', () => {
     assert.ok(ART.selection);
     for (let b = 1; b <= 8; b++) {

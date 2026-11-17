@@ -59,6 +59,16 @@
             }
         }
 
+        const C = window.SmileCritters;
+        const critterImgs = {};
+        if (ART.critters && ART.critters.strips) {
+            for (const key of Object.keys(ART.critters.strips)) {
+                const src = ART.critterStripSrc(key);
+                if (src) critterImgs[key] = loadImage(src);
+            }
+        }
+        let reducedMotion = C && C.prefersReducedMotion();
+
         const fxImgs = {};
         if (ART.effects) for (const n of ART.effects.names) fxImgs[n] = loadImage(ART.effectSrc(n));
         const ringImgs = { day: [], night: [] };
@@ -845,6 +855,64 @@
             }
         }
 
+        function drawCritterPlaceholder(x, y, color, sc) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.scale(sc, sc);
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 16, 11, 0, 0, TAU);
+            ctx.fill();
+            ctx.strokeStyle = 'rgba(50, 40, 20, 0.35)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.restore();
+        }
+
+        function drawCritters(t) {
+            if (!ART.critters || !C) return;
+            const alpha = C.critterDayAlpha(lighting, prevLighting, lightFade);
+            if (alpha < 0.02) return;
+            const motionScale = C.motionScaleFromReduced(reducedMotion);
+            const drawScale = ART.critters.drawScale || 0.5;
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            for (const entry of ART.critters.roster) {
+                const spec = ART.critters.strips[entry.strip];
+                if (!spec) continue;
+                const img = critterImgs[entry.strip];
+                const pos = C.wanderPosition(entry, t, ART.critters.bounds);
+                const defaultFrames = spec.kind === 'bee' ? 4 : 8;
+                const frameCount = ready(img)
+                    ? C.stripFrameCount(img.naturalWidth, spec.frameW)
+                    : defaultFrames;
+                const frame = C.animFrameIndex(t + (entry.phase || 0), spec.fps, frameCount, { reducedMotion, motionScale });
+                const { frameW: fw, frameH: fh } = spec;
+                if (!ready(img)) {
+                    const ph = ART.critters.placeholder || {};
+                    const col = ph[entry.strip] || ph.butterfly || '#e8a050';
+                    drawCritterPlaceholder(pos.x, pos.y, col, drawScale * 2.2);
+                    continue;
+                }
+                ctx.save();
+                ctx.translate(pos.x, pos.y);
+                if (spec.kind === 'butterfly') {
+                    ctx.rotate(C.butterflyHeadingRad(pos.vx, pos.vy));
+                    ctx.scale(drawScale, drawScale);
+                    ctx.drawImage(img, frame * fw, 0, fw, fh, -fw / 2, -fh / 2, fw, fh);
+                } else if (spec.kind === 'bee') {
+                    const flip = C.beeFlipX(pos.vx);
+                    ctx.scale(drawScale * (flip ? -1 : 1), drawScale);
+                    ctx.drawImage(img, frame * fw, 0, fw, fh, -fw / 2, -fh / 2, fw, fh);
+                } else {
+                    ctx.scale(drawScale, drawScale);
+                    ctx.drawImage(img, frame * fw, 0, fw, fh, -fw / 2, -fh / 2, fw, fh);
+                }
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
         function drawVignette() {
             const g = ctx.createRadialGradient(640, 380, 300, 640, 380, 820);
             g.addColorStop(0, 'rgba(60, 40, 20, 0)');
@@ -862,6 +930,7 @@
             drawDecorations(t);
             drawSunShafts(t);
             drawPlants(t);
+            drawCritters(t);
             drawEffectSprites(t);
             drawParticles(t);
             drawHarvestAnims();
@@ -870,7 +939,10 @@
         }
 
         return { resize, update, draw, setLighting, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
-            get lighting() { return lighting; }, images: { bgImgs, plantImgs } };
+            get lighting() { return lighting; },
+            get reducedMotion() { return reducedMotion; },
+            setReducedMotion(v) { reducedMotion = !!v; },
+            images: { bgImgs, plantImgs, critterImgs } };
     }
 
     window.SmileScene = { createScene };

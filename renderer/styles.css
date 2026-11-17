@@ -44,7 +44,8 @@ button { font-family: inherit; }
     display: flex; align-items: center; gap: 16px; padding: 0 18px;
     background: linear-gradient(to bottom, rgba(251, 245, 230, 0.82), rgba(251, 245, 230, 0));
 }
-.brand { font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: 0.2px; white-space: nowrap; }
+.brand { display: inline-flex; align-items: center; gap: 8px; font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: 0.2px; white-space: nowrap; }
+.brand-logo { height: 30px; width: auto; object-fit: contain; display: block; }
 .brand-mark { color: var(--rose); }
 .chips { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
 .chip {
