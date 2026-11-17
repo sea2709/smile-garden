@@ -8,13 +8,12 @@ const V = require('../game/visit.js');
 
 const at = (y, m, d, h = 10) => new Date(y, m - 1, d, h, 0, 0, 0);
 
-test('computeYield: base 1, +1 full water, +1 fertilizer, +1 staked, never below 1', () => {
+test('computeYield: base 1, +1 full water, +1 fertilizer, never below 1 (staking is not a yield bonus)', () => {
     const p = { plantId: 'tomato', matureWater: 1, matureFert: 1 };
     assert.equal(H.computeYield(p), 3);
     assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0, matureFert: 0 }), 1);
     assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0.5, matureFert: 0 }), 1);
-    assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0, matureFert: 0, staked: true }), 2);
-    assert.equal(H.computeYield({ plantId: 'lettuce', matureWater: 0, matureFert: 0, staked: true }), 1, 'low plants ignore stray staked flag');
+    assert.equal(H.computeYield({ plantId: 'tomato', matureWater: 0, matureFert: 0, staked: true }), 1);
 });
 
 test('harvestPlot pull clears bed and grants spare seed', () => {
@@ -122,8 +121,15 @@ test('simulateDays performs harvests on ready beds', () => {
     const s = V.createState(at(2026, 11, 16));
     V.plantSeed(s, 0, 'lettuce', at(2026, 11, 16));
     const clock = new V.GameClock({ now: () => at(2026, 11, 16).getTime() });
+    const L = require('../game/logic.js');
+    const C = require('../game/care-needs.js');
+    const needs = L.plantNeeds('lettuce');
     for (let i = 0; i < 4; i++) {
-        V.applyVisit(s, { beds: [{ plot: 0, sunHours: 12, water: 1, fertilizer: 0 }] }, clock.now());
+        const progress = { sun: needs.sun, water: needs.water, fertilizer: needs.fertilizer, stake: false };
+        V.applyVisit(s, {
+            careMode: true,
+            careBeds: [{ plot: 0, progress, allMet: C.allNeedsMet(progress, needs, false) }],
+        }, clock.now());
         V.goToBed(s, clock.now());
         clock.nextDay();
     }

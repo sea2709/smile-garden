@@ -160,6 +160,10 @@ test('breath UI art: manifest pills, icons, dots and breath-ui.css', () => {
 });
 
 test('stretch UI art: manifest paths, css, and art spec doc', () => {
+    assert.ok(ART.needs);
+    assert.ok(ART.needs.plantTag.includes('needs/'));
+    assert.ok(ART.needs.bloomStamp.includes('bloom'));
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'needs-ui.css')));
     assert.ok(ART.stretch);
     assert.ok(ART.stretch.guideSunflower.includes('stretch/'));
     assert.ok(ART.stretch.stakeDay.includes('stake-day'));
@@ -168,7 +172,7 @@ test('stretch UI art: manifest paths, css, and art spec doc', () => {
     assert.ok(ART.plantStakeSrc('day').includes('stake-day'));
     assert.ok(ART.plantStakeLoopSrc('night').includes('stake-loop'));
     assert.ok(fs.existsSync(path.join(root, 'renderer', 'stretch-ui.css')));
-    assert.ok(fs.existsSync(path.join(root, 'docs', 'ART-STRETCH.md')));
+    assert.ok(fs.existsSync(path.join(root, 'docs', 'ART-NEEDS.md')));
     assert.ok(fs.existsSync(path.join(root, 'game', 'stretch.js')));
 });
 

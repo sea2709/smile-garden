@@ -605,7 +605,7 @@
     const PLANTS = Object.freeze([
         Object.freeze({
             id: 'lettuce', name: 'Lettuce', emoji: '🥬',
-            needs: Object.freeze({ stake: false }),
+            needs: Object.freeze({ sun: 1, water: 3, fertilizer: 1, stake: false }),
             sunHours: 4, sunHoursLabel: '4 hours',
             cost: 4, difficulty: 'easy', difficultyLabel: 'Easy',
             blurb: 'Leafy lettuce is happy with about 4 hours of sun. Keep the soil moist so the leaves stay sweet, not bitter.',
@@ -614,7 +614,7 @@
         }),
         Object.freeze({
             id: 'mint', name: 'Mint', emoji: '🌿',
-            needs: Object.freeze({ stake: false }),
+            needs: Object.freeze({ sun: 1, water: 3, fertilizer: 1, stake: false }),
             sunHours: 5, sunHoursLabel: '4–6 hours',
             cost: 5, difficulty: 'easy', difficultyLabel: 'Easy',
             blurb: 'Mint likes 4–6 hours of sun, or a little shade. It spreads, so give it its own plot and keep the soil moist.',
@@ -623,7 +623,7 @@
         }),
         Object.freeze({
             id: 'cucumber', name: 'Cucumber', emoji: '🥒',
-            needs: Object.freeze({ stake: true }),
+            needs: Object.freeze({ sun: 2, water: 3, fertilizer: 2, stake: true }),
             sunHours: 7, sunHoursLabel: '6–8 hours',
             cost: 7, difficulty: 'medium', difficultyLabel: 'Medium',
             blurb: 'Cucumbers want 6–8 hours of direct sun and steady water. Give the vine room to climb.',
@@ -632,7 +632,7 @@
         }),
         Object.freeze({
             id: 'tomato', name: 'Tomato', emoji: '🍅',
-            needs: Object.freeze({ stake: true }),
+            needs: Object.freeze({ sun: 3, water: 2, fertilizer: 3, stake: true }),
             sunHours: 8, sunHoursLabel: '7–8 hours',
             cost: 8, difficulty: 'medium', difficultyLabel: 'Medium',
             blurb: 'Tomatoes are sun lovers: 7–8 hours if you can. Warmth and regular water help the fruit ripen.',
@@ -641,7 +641,7 @@
         }),
         Object.freeze({
             id: 'sunflower', name: 'Sunflower', emoji: '🌻',
-            needs: Object.freeze({ stake: true }),
+            needs: Object.freeze({ sun: 3, water: 1, fertilizer: 1, stake: true }),
             sunHours: 8, sunHoursLabel: '6–8+ hours',
             cost: 10, difficulty: 'hard', difficultyLabel: 'Hard',
             blurb: 'Sunflowers thrive in full sun, 6–8 hours or more. Plant them where they can stretch tall and drink the light.',
@@ -650,7 +650,7 @@
         }),
         Object.freeze({
             id: 'apple', name: 'Apple tree', emoji: '🍎',
-            needs: Object.freeze({ stake: true }),
+            needs: Object.freeze({ sun: 3, water: 2, fertilizer: 2, stake: true }),
             sunHours: 8, sunHoursLabel: '8 hours',
             cost: 12, difficulty: 'hard', difficultyLabel: 'Hard',
             blurb: 'Apple trees need a full 8 hours of sun. A tree takes patience — more smiles to reach the fruit.',
@@ -667,7 +667,13 @@
 
     function plantNeeds(id) {
         const p = plantById(id);
-        return (p && p.needs) ? p.needs : DEFAULT_PLANT_NEEDS;
+        if (!p || !p.needs) return DEFAULT_PLANT_NEEDS;
+        return Object.freeze({
+            sun: Math.max(0, Math.min(3, Math.round(Number(p.needs.sun) || 0))),
+            water: Math.max(0, Math.min(3, Math.round(Number(p.needs.water) || 0))),
+            fertilizer: Math.max(0, Math.min(3, Math.round(Number(p.needs.fertilizer) || 0))),
+            stake: !!p.needs.stake,
+        });
     }
 
     function plantNeedsStake(id) {

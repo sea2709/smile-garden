@@ -1,0 +1,100 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const L = require('../game/logic.js');
+const C = require('../game/care-needs.js');
+const V = require('../game/visit.js');
+const D = require('../game/day.js');
+
+test('plant needs table matches design', () => {
+    assert.deepEqual(L.plantNeeds('lettuce'), { sun: 1, water: 3, fertilizer: 1, stake: false });
+    assert.deepEqual(L.plantNeeds('mint'), { sun: 1, water: 3, fertilizer: 1, stake: false });
+    assert.deepEqual(L.plantNeeds('cucumber'), { sun: 2, water: 3, fertilizer: 2, stake: true });
+    assert.deepEqual(L.plantNeeds('tomato'), { sun: 3, water: 2, fertilizer: 3, stake: true });
+    assert.deepEqual(L.plantNeeds('sunflower'), { sun: 3, water: 1, fertilizer: 1, stake: true });
+    assert.deepEqual(L.plantNeeds('apple'), { sun: 3, water: 2, fertilizer: 2, stake: true });
+});
+
+test('dot unit lengths', () => {
+    assert.deepEqual(C.CARE_DOT_SECONDS, { sun: 10, water: 10, fertilizer: 15 });
+});
+
+test('dot accounting fills each need independently', () => {
+    const needs = L.plantNeeds('tomato');
+    let p = C.emptyProgress();
+    p = C.addDotTime(p, 'sun', 10, needs);
+    assert.equal(p.sun, 1);
+    p = C.addDotTime(p, 'sun', 20, needs);
+    assert.equal(p.sun, 3);
+    p = C.addDotTime(p, 'water', 20, needs);
+    assert.equal(p.water, 2);
+});
+
+test('all needs required for growth flag', () => {
+    const needs = L.plantNeeds('tomato');
+    const partial = { sun: 3, water: 2, fertilizer: 2, stake: false };
+    assert.equal(C.allNeedsMet(partial, needs, false), false);
+    const full = { sun: 3, water: 2, fertilizer: 3, stake: true };
+    assert.equal(C.allNeedsMet(full, needs, true), true);
+});
+
+test('staked plants satisfy stake need daily without redoing stretch', () => {
+    const needs = L.plantNeeds('tomato');
+    const p = { sun: 3, water: 2, fertilizer: 3, stake: false };
+    assert.equal(C.allNeedsMet(p, needs, true), true);
+});
+
+test('free-order care session stores progress per bed', () => {
+    const plots = [{ plantId: 'tomato', stage: 2, sunBank: 0, staked: false }];
+    const session = new V.VisitSession({ plots, plantedBeds: [0], gardenDay: 3 });
+    session.selectedPlot = 0;
+    session.startCare('water');
+    assert.equal(session.step, 'care-water');
+    session.startCare('sun');
+    assert.equal(session.step, 'care-sun');
+});
+
+test('grows one stage overnight only when allMet', () => {
+    const s = V.createState(new Date(2026, 10, 16));
+    V.plantSeed(s, 0, 'lettuce', new Date(2026, 10, 16));
+    const day = s.dayNumber;
+    s.dailyTends[0] = { day, sun: 1, water: 3, fertilizer: 1, stake: false, allMet: true };
+    const out = V.goToBed(s, new Date(2026, 10, 16, 22));
+    assert.equal(s.plots[0].stage, 2);
+    assert.equal(out.grew.length, 1);
+    const s2 = V.createState(new Date(2026, 10, 16));
+    V.plantSeed(s2, 1, 'lettuce', new Date(2026, 10, 16));
+    s2.dailyTends[1] = { day: s2.dayNumber, sun: 1, water: 1, fertilizer: 0, stake: false, allMet: false };
+    const out2 = V.goToBed(s2, new Date(2026, 10, 16, 22));
+    assert.equal(s2.plots[1].stage, 1);
+    assert.equal(out2.grew.length, 0);
+});
+
+test('save v6 migration clears staked and bumps version', () => {
+    const raw = {
+        version: 5,
+        plots: [{ plantId: 'tomato', stage: 3, sunBank: 0, staked: true }],
+        dayNumber: 2,
+        gardenMinutes: 360,
+        season: 'spring',
+        seasonDay: 2,
+        dailyTends: {},
+        visitDays: [],
+        journal: [],
+        settings: {},
+        pantry: {},
+        decor: {},
+        spareSeeds: {},
+    };
+    const s = V.loadState(JSON.stringify(raw), new Date());
+    assert.equal(s.version, 6);
+    assert.equal(s.plots[0].staked, false);
+});
+
+test('morning reset clears daily tends', () => {
+    const s = V.createState(new Date(2026, 10, 16));
+    s.dailyTends[0] = { day: 1, sun: 2, water: 1, fertilizer: 0, allMet: false };
+    V.goToBed(s, new Date(2026, 10, 16, 22));
+    assert.deepEqual(s.dailyTends, {});
+});

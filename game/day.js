@@ -178,13 +178,21 @@ function recordDayTending(state, beds, dayNumber, plantById) {
         const p = state.plots[i];
         if (!p) continue;
         if (!state.dailyTends) state.dailyTends = {};
-        state.dailyTends[i] = {
-            day,
-            sunHours: Math.max(0, Number(b.sunHours) || 0),
-            water: Math.max(0, Math.min(1, Number(b.water) || 0)),
-            fertilizer: Math.max(0, Math.min(1, Number(b.fertilizer) || 0)),
-            breaths: Number(b.breaths) || 0,
-        };
+        if (state.version >= 6 && b.progress) {
+            const rec = Object.assign({ day }, b.progress, {
+                allMet: !!b.allMet,
+                stake: !!b.stake,
+            });
+            state.dailyTends[i] = rec;
+        } else {
+            state.dailyTends[i] = {
+                day,
+                sunHours: Math.max(0, Number(b.sunHours) || 0),
+                water: Math.max(0, Math.min(1, Number(b.water) || 0)),
+                fertilizer: Math.max(0, Math.min(1, Number(b.fertilizer) || 0)),
+                breaths: Number(b.breaths) || 0,
+            };
+        }
         p.tendedDay = day;
         const kind = plantById(p.plantId);
         out.push({ plot: i, plantId: p.plantId, name: kind ? kind.name : p.plantId });
@@ -195,7 +203,9 @@ function recordDayTending(state, beds, dayNumber, plantById) {
 function plotTendedToday(state, plotIndex) {
     const p = state.plots[plotIndex];
     const t = state.dailyTends && state.dailyTends[plotIndex];
-    return !!(p && t && t.day === state.dayNumber);
+    if (!p || !t || t.day !== state.dayNumber) return false;
+    if (state.version >= 6) return t.allMet === true;
+    return true;
 }
 
 function tendablePlotIndicesDay(state, harvestApi) {
@@ -207,7 +217,10 @@ function tendablePlotIndicesDay(state, harvestApi) {
         if (harvestApi.isPlotReady(p, key)) return;
         if (harvestApi.isPlotRegrowing(p, key)) return;
         if (p.stage >= harvestApi.MAX_STAGE) return;
-        if (plotTendedToday(state, i)) return;
+        if (state.version >= 6) {
+            const t = state.dailyTends && state.dailyTends[i];
+            if (t && t.day === day && t.allMet) return;
+        } else if (plotTendedToday(state, i)) return;
         if (!isPlantInSeason(p.plantId, state.season)) return;
         out.push(i);
     });

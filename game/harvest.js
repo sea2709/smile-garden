@@ -161,7 +161,6 @@
         const f = p.matureFert == null ? 0 : p.matureFert;
         if (w >= WATER_FULL) y += 1;
         if (f > 0) y += 1;
-        if (p.staked && logicNeedsStake(p.plantId)) y += 1;
         return y;
     }
 

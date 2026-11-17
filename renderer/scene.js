@@ -1184,7 +1184,23 @@
                 }
                 drawReadyLoop(i, t);
                 if (tendPlot === i) drawSelectionRing(i, t);
-                if (pl.tendedToday && tendPlot !== i) {
+                if (pl.careAllMet) {
+                    const p = ART.plots[i];
+                    const off = ART.needs && ART.needs.tagOffset ? ART.needs.tagOffset : [0, -42];
+                    ctx.save();
+                    ctx.translate(p.x + off[0], p.y + off[1]);
+                    ctx.fillStyle = 'rgba(198, 155, 98, 0.95)';
+                    ctx.strokeStyle = 'rgba(90, 60, 30, 0.7)';
+                    ctx.lineWidth = 1;
+                    roundRect(ctx, -14, -10, 28, 20, 3);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.fillStyle = 'rgba(200, 80, 120, 0.92)';
+                    ctx.font = '11px system-ui,sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('✿', 0, 4);
+                    ctx.restore();
+                } else if (pl.tendedToday && tendPlot !== i) {
                     const p = ART.plots[i];
                     ctx.save();
                     ctx.globalAlpha = 0.42 + 0.08 * Math.sin(t * 2 + i);

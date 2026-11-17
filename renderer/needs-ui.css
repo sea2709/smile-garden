@@ -1,0 +1,131 @@
+/* Per-plant needs card (wooden tag + icon row) */
+.needs-card {
+    position: fixed;
+    right: max(12px, env(safe-area-inset-right));
+    top: 118px;
+    width: min(280px, calc(100vw - 24px));
+    z-index: 28;
+    padding: 12px 14px 14px;
+    box-shadow: 0 8px 28px rgba(40, 28, 12, 0.18);
+}
+
+.needs-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.needs-tag-img {
+    width: 40px;
+    height: 48px;
+    object-fit: contain;
+    flex-shrink: 0;
+}
+
+.needs-tag-fallback {
+    width: 40px;
+    height: 48px;
+    border-radius: 4px 4px 2px 2px;
+    background: linear-gradient(180deg, #c9a66b 0%, #a8844a 100%);
+    border: 1px solid #6b4f2a;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35);
+    flex-shrink: 0;
+}
+
+.needs-plant-name {
+    font-weight: 600;
+    font-size: 1.05rem;
+    flex: 1;
+}
+
+.needs-bloom {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+}
+
+.needs-icons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.need-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 58px;
+    padding: 6px 8px 8px;
+    border-radius: 10px;
+    border: 1px solid rgba(80, 55, 28, 0.22);
+    background: rgba(255, 250, 240, 0.9);
+    cursor: pointer;
+    font: inherit;
+    color: inherit;
+}
+
+.need-btn:hover,
+.need-btn:focus-visible {
+    border-color: rgba(120, 80, 30, 0.45);
+    background: #fffdf8;
+}
+
+.need-btn.need-done {
+    opacity: 0.72;
+    border-color: rgba(90, 140, 70, 0.45);
+}
+
+.need-icon {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+.need-dots {
+    display: flex;
+    gap: 3px;
+}
+
+.need-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: rgba(90, 70, 40, 0.2);
+    border: 1px solid rgba(60, 45, 25, 0.25);
+}
+
+.need-dot.on {
+    background: rgba(255, 200, 80, 0.95);
+    border-color: rgba(140, 90, 20, 0.5);
+}
+
+.need-dot.water.on {
+    background: rgba(100, 170, 255, 0.9);
+    border-color: rgba(40, 90, 160, 0.5);
+}
+
+.need-dot.fert.on {
+    background: rgba(120, 200, 120, 0.95);
+    border-color: rgba(50, 110, 50, 0.5);
+}
+
+.need-dot.stake.on {
+    background: rgba(180, 140, 90, 0.95);
+}
+
+body[data-step='care-hub'] .step-track span[data-step='smile'],
+body[data-step='care-hub'] .step-track span[data-step='talk'],
+body[data-step='care-hub'] .step-track span[data-step='breathe'] {
+    opacity: 0.35;
+}
+
+body[data-step='care-hub'] .step-track::before {
+    content: 'Today\'s needs · any order';
+    display: block;
+    font-size: 0.78rem;
+    opacity: 0.75;
+    margin-bottom: 4px;
+}

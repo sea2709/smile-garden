@@ -81,7 +81,7 @@
             let talking = false;
 
             if (auto) {
-                if (phase === 'smile') {
+                if (phase === 'smile' || phase === 'care-sun') {
                     target = smileLevel(phaseT);
                     if (night && !darkDone && phaseT > 4 && phaseT < 7.5) {
                         face = false;
@@ -90,7 +90,7 @@
                         if (night && phaseT >= 7.5) darkDone = true;
                         setValidation('Ok');
                     }
-                } else if (phase === 'talk') {
+                } else if (phase === 'talk' || phase === 'care-water') {
                     talking = talkingAt(phaseT);
                     target = 0.32 + (talking ? 0.1 : 0) + Math.sin(phaseT * 0.9) * 0.05;
                     setValidation('Ok');
@@ -132,7 +132,7 @@
             // near ~6 breaths/min (matches the guided standard pace).
             visitT += dt;
             if (visitT > 25) {
-                const settling = visitT < 35 && phase !== 'breathe';
+                const settling = visitT < 35 && phase !== 'breathe' && phase !== 'care-breathe';
                 const rate = 5.6 + Math.sin(visitT * 0.35) * 0.35 + (noise() - 0.5) * 0.15;
                 const confidence = settling ? 30 + (visitT - 25) : 55 + Math.min(20, visitT - 35);
                 em.emit('breathing', {

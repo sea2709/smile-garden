@@ -185,6 +185,26 @@
             return '../assets/effects/harvest-' + kind + '-strip.png';
         },
         basketHud: Object.freeze({ x: 1195, y: 68, w: 36, h: 36 }),
+        needs: Object.freeze({
+            scale2x: true,
+            plantTag: '../assets/ui/needs/plant-tag.png',
+            needsCard: '../assets/ui/needs/needs-card-bg.png',
+            iconSun: '../assets/ui/needs/icon-sun.png',
+            iconWater: '../assets/ui/needs/icon-water.png',
+            iconFertilizer: '../assets/ui/needs/icon-fertilizer.png',
+            iconStake: '../assets/ui/needs/icon-stake.png',
+            dotEmpty: '../assets/ui/needs/dot-empty.png',
+            dotFullSun: '../assets/ui/needs/dot-full-sun.png',
+            dotFullWater: '../assets/ui/needs/dot-full-water.png',
+            dotFullFert: '../assets/ui/needs/dot-full-fert.png',
+            bloomStamp: '../assets/ui/needs/bloom-stamp.png',
+            tagPixels: Object.freeze([80, 96]),
+            tagAnchor: Object.freeze({ x: 0.5, y: 1 }),
+            cardPixels: Object.freeze([560, 420]),
+            iconPixels: Object.freeze([64, 64]),
+            bloomPixels: Object.freeze([72, 72]),
+            tagOffset: Object.freeze([0, -42]),
+        }),
         stretch: Object.freeze({
             scale2x: true,
             /** Combined guide (fallback); Heily ships head + stem separately. */

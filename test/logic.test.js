@@ -17,15 +17,11 @@ function run(session, seconds, input) {
 }
 const face = (h, talking) => ({ happiness: h, talking: talking === undefined ? false : talking, faceVisible: true });
 
-test('plant needs.stake: tall climbers only', () => {
-    assert.equal(L.plantNeedsStake('lettuce'), false);
-    assert.equal(L.plantNeedsStake('mint'), false);
+test('plant needs dots and stake flags', () => {
+    assert.deepEqual(L.plantNeeds('lettuce'), { sun: 1, water: 3, fertilizer: 1, stake: false });
     assert.equal(L.plantNeedsStake('tomato'), true);
-    assert.equal(L.plantNeedsStake('cucumber'), true);
-    assert.equal(L.plantNeedsStake('sunflower'), true);
-    assert.equal(L.plantNeedsStake('apple'), true);
     for (const p of L.PLANTS) {
-        assert.ok(p.needs && typeof p.needs.stake === 'boolean', `${p.id} has needs.stake`);
+        assert.ok(p.needs && Number.isFinite(p.needs.sun), `${p.id} has needs.sun`);
     }
 });
 

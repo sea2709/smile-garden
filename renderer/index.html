@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="./styles.css">
     <link rel="stylesheet" href="./breath-ui.css">
     <link rel="stylesheet" href="./stretch-ui.css">
+    <link rel="stylesheet" href="./needs-ui.css">
 </head>
 <body data-screen="loading" data-ready="0">
 <div id="app" class="app">
@@ -50,7 +51,7 @@
     </div>
     <div id="mock-badge" class="mock-badge" hidden>
         <b id="mock-mode">Demo player</b>
-        <span>Hold <span class="kbd">S</span> smile · <span class="kbd">T</span> talk · <span class="kbd">F</span> look away · <span class="kbd">A</span> auto</span>
+        <span>Hold <span class="kbd">S</span> smile · <span class="kbd">T</span> talk · <span class="kbd">F</span> look away · <span class="kbd">[</span>/<span class="kbd">]</span> neck tilt · <span class="kbd">A</span> auto</span>
     </div>
 
     <!-- Reading hint (validation / no face / night light) -->
@@ -91,6 +92,17 @@
     </section>
 
     <!-- Standalone stretch / stake care (not chained to smile/talk/breath) -->
+    <section id="needs-card" class="needs-card parchment" hidden aria-label="Plant needs">
+        <div class="needs-card-head">
+            <img id="needs-tag-img" class="needs-tag-img" width="40" height="48" alt="" hidden>
+            <div id="needs-tag-fallback" class="needs-tag-fallback" aria-hidden="true"></div>
+            <span id="needs-plant-name" class="needs-plant-name"></span>
+            <img id="needs-bloom-stamp" class="needs-bloom" width="36" height="36" alt="All needs met today" hidden>
+        </div>
+        <div id="needs-icons" class="needs-icons"></div>
+        <button id="btn-needs-done" class="btn btn-primary btn-small" type="button">Done tending for now</button>
+    </section>
+
     <section id="stretch-care-panel" class="stretch-care-panel parchment" hidden aria-label="Neck stretch care">
         <div class="stretch-care-head">
             <span class="stretch-care-tag">🌻 Stake care</span>
@@ -161,10 +173,10 @@
             <h1 id="greet-title">Good morning, gardener</h1>
             <p id="greet-status" class="lead"></p>
             <ol class="visit-plan">
-                <li><span class="dot dot-sun"></span><b>Smile</b> for about <span id="plan-smile">45</span> s: sunlight</li>
-                <li><span class="dot dot-water"></span><b>Talk</b> to your plants for about <span id="plan-talk">30</span> s: water</li>
-                <li><span class="dot dot-fert"></span><b>Breathe</b> calmly, if you like: fertilizer (optional)</li>
-                <li><span class="dot dot-stretch"></span><b>Stretch</b> your neck on tall plants, if you like: stakes them for a richer harvest (optional)</li>
+                <li><span class="dot dot-sun"></span><b>Sun dots</b> — smile (~10 s each)</li>
+                <li><span class="dot dot-water"></span><b>Water dots</b> — talk (~10 s each)</li>
+                <li><span class="dot dot-fert"></span><b>Fertilizer dots</b> — guided breath (~15 s each)</li>
+                <li><span class="dot dot-stretch"></span><b>Stake</b> — one neck stretch on tall climbers (once until harvest)</li>
             </ol>
             <p id="greet-note" class="note"></p>
             <div class="actions">
@@ -271,6 +283,7 @@
 <script src="../game/clock-arc.js"></script>
 <script src="../game/clock-layout.js"></script>
 <script src="../game/hud-layout.js"></script>
+<script src="../game/care-needs.js"></script>
 <script src="../game/visit.js"></script>
 <script src="../game/critters.js"></script>
 <script src="../game/season-particles.js"></script>
