@@ -1,4 +1,5 @@
 // game/camera-check.js — pre-game camera check pass logic (no DOM / SDK).
+(function () {
 'use strict';
 
 const CHECKS = Object.freeze(['smile', 'talk', 'breath', 'stretch']);
@@ -190,11 +191,12 @@ const api = {
     createCameraCheckSession,
 };
 
+if (typeof window !== 'undefined') {
+    window.SmileCameraCheck = api;
+} else if (typeof self !== 'undefined') {
+    self.SmileCameraCheck = api;
+}
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
 }
-if (typeof self !== 'undefined') {
-    self.SmileCameraCheck = api;
-} else if (typeof window !== 'undefined') {
-    window.SmileCameraCheck = api;
-}
+})();

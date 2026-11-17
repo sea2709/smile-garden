@@ -1,4 +1,5 @@
 // game/critters.js — daytime garden critters (pure logic for paths, flip, rotation, frames).
+(function () {
 'use strict';
 
 const TAU = Math.PI * 2;
@@ -111,9 +112,10 @@ const api = {
     wanderPosition,
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = api;
-}
 if (typeof window !== 'undefined') {
     window.SmileCritters = api;
 }
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+}
+})();

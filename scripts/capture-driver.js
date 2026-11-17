@@ -216,9 +216,13 @@ async function run(win, outDir) {
     await sleep(900);
     await shot('01-wellness-notice.png');
 
-    await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
-    await sleep(1200);
-    await waitFor('camera check', (d) => d.screen === 'camera-check', 20000);
+    await G(`g.ackWellness()`);
+    await sleep(400);
+    if ((await ds()).screen !== 'camera-check') {
+        await G(`g.openCameraCheck()`);
+        await sleep(400);
+    }
+    await waitFor('camera check', (d) => d.screen === 'camera-check', 25000);
     await shot('camera-check-initial.png');
     await js(`window.__smileGarden.setCameraCheckDemo({ passed: ['smile', 'talk'], active: 'breath' })`);
     await sleep(500);
@@ -242,6 +246,10 @@ async function run(win, outDir) {
     await sleep(450);
     await shot('camera-check-denied.png');
     await G('g.setCameraDeniedDemo(false)');
+    if (process.env.SMILE_GARDEN_CAPTURE_CAMERA_ONLY === '1') {
+        app.quit();
+        return;
+    }
     await G('g.finishCameraCheck()');
     await sleep(800);
     await shot('02-garden-idle-dawn.png');

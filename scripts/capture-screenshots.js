@@ -15,8 +15,9 @@ const root = path.join(__dirname, '..');
 const outDir = path.join(root, 'docs');
 fs.mkdirSync(outDir, { recursive: true });
 const timeOnly = process.env.SMILE_GARDEN_TIME_SHOTS === '1';
-const keepPng = new Set(['breath-mockup.png']);
-if (!timeOnly) {
+const cameraOnly = process.env.SMILE_GARDEN_CAPTURE_CAMERA_ONLY === '1';
+const keepPng = new Set(['breath-mockup.png', 'camera-check-mockup.png']);
+if (!timeOnly && !cameraOnly) {
     for (const f of fs.readdirSync(outDir)) {
         if (f.endsWith('.png') && !keepPng.has(f)) fs.unlinkSync(path.join(outDir, f));
     }

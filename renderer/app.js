@@ -261,8 +261,8 @@
                 els.ccNote.hidden = true;
             }
         }
+        const active = cameraCheckSession && cameraCheckSession.active;
         if (CCUI) {
-            const active = cameraCheckSession && cameraCheckSession.active;
             els.breathGuide.hidden = active !== 'breath';
             els.stretchGuide.hidden = active !== 'stretch';
             if (active === 'breath') renderBreathRate();
@@ -359,7 +359,12 @@
     }
 
     function afterWellnessOrResume() {
-        if (CC.shouldShowCameraCheck(state)) openCameraCheck();
+        if (!CC) {
+            console.error('[smile-garden] SmileCameraCheck module missing');
+            show(state.version >= 5 ? 'idle' : 'greeting');
+            return;
+        }
+        if (CC.shouldShowCameraCheck(state)) void openCameraCheck();
         else show(state.version >= 5 ? 'idle' : 'greeting');
     }
 
@@ -2146,7 +2151,7 @@
         get session() { return session; },
         get screen() { return screen; },
         get scene() { return scene; },
-        clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker,         ackWellness,
+        clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker,         ackWellness: () => ackWellness(),
         openCameraCheck: () => openCameraCheck(),
         finishCameraCheck: () => finishCameraCheckFlow(),
         selectCameraCheck(key) {
@@ -2255,11 +2260,16 @@
             state = V.createState(new Date());
             gardenClock.state = state;
             clock.offsetDays = 0;
+            cameraCheckSession = null;
+            lastCameraCheckSnap = null;
+            cameraDeniedDemo = false;
+            cameraCheckGridMounted = false;
             plotsForScene({ instant: true });
             scene.setSeason(state.season);
             refreshLighting();
             renderHud();
             document.body.dataset.gardenV = state.version >= 5 ? '5' : '4';
+            show('wellness');
         },
         setGardenTime(m) {
             state.version = 5;

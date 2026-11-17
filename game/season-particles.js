@@ -1,4 +1,5 @@
 // game/season-particles.js — drifting season particles (pool pick, reseed rules, night swap).
+(function () {
 'use strict';
 
 const TAU = Math.PI * 2;
@@ -147,9 +148,10 @@ const api = {
     mulberry,
 };
 
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = api;
-}
 if (typeof window !== 'undefined') {
     window.SmileSeasonParticles = api;
 }
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = api;
+}
+})();
