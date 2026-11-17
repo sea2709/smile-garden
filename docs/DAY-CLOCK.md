@@ -16,19 +16,16 @@ Smile Garden replaces the one-off “visit” loop with an in-game day that runs
 
 ## Art hooks
 
-Full contract in `docs/ART-NEEDED.md` (paths registered in `renderer/art.js`):
+Authoritative file list: **`assets/time-manifest.json`** (wired in `renderer/art.js`; procedural fallbacks if a PNG is missing).
 
-- **Clock** — `assets/ui/clock-frame-{day|night}.png` (320×128 @2x → 160×64 at backdrop 640,40), `clock-sun.png` / `clock-moon.png` on the arc.
-- **Seasons** — `assets/seasons/{season}-{day|night}.png` full-frame overlays; `particle-{petal|leaf|snow}.png` drift above plants.
-- **Bedtime** — `ui/bedtime-window-glow.png`; **morning** — `ui/morning-card.png` (~700×600) for the overnight reveal.
+- **Clock** — `assets/ui/clock/clock-frame-{day|night}.png`, `sun-token.png`, `moon-token.png`, `clock-front-{day|night}.png` (drawn **after** tokens). Arc in frame @2x: centre **(160.6, 183.1)**, radius **150.6**, **147° → 33°** (6:00 → 18:00); moon rests at the right end after 18:00. Season ribbon + label at **(640, 88)**.
+- **Seasons** — `assets/seasons/{season}-{day|night}.png`; particles under `assets/seasons/particles/` (25 sprites; summer night uses fireflies).
+- **Bedtime** — `assets/bedtime/window-glow.png` (+ optional `window-dark.png`); **morning** — `assets/bedtime/morning-card.png`; bed control icon `assets/ui/bed-button-icon.png`.
 
 ## Screenshots
 
-Capture with demo mode after planting:
-
 ```bash
-npm start
-# Demo tools: advance time / go to bed; or use window.__smileGarden
+xvfb-run -a npm run screenshots
 ```
 
-Suggested frames: midday tend, golden hour, late night, morning reveal (`docs/day-*.png` when captured).
+Captures include `clock-{dawn,noon,dusk,night}.png`, `season-*.png`, `bedtime-window-glow.png`, `morning-card.png`, and `logo-{day,night}-full.png` under `docs/`.

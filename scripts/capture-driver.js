@@ -12,7 +12,73 @@ const { app } = require('electron');
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+async function runTimeArt(win, outDir) {
+    const wc = win.webContents;
+    const js = (code) => wc.executeJavaScript(code, true);
+    const G = (expr) => js(`(() => { const g = window.__smileGarden; return ${expr}; })()`);
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const shot = async (name) => {
+        await sleep(200);
+        const img = await wc.capturePage();
+        fs.writeFileSync(path.join(outDir, name), img.toPNG());
+        console.log('[capture] wrote', name, img.getSize());
+    };
+    const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(2000); };
+    const t0 = Date.now();
+    while (Date.now() - t0 < 60000) {
+        const ready = await js("document.body.dataset.ready === '1'");
+        if (ready) break;
+        await sleep(120);
+    }
+    await G('g.reset()');
+    await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
+    await sleep(800);
+    await G('g.setGardenTime(6 * 60)');
+    await G(`g.setSeason('spring')`);
+    await G(`g.show('idle')`);
+    await sleep(1200);
+    await shot('clock-dawn-6am.png');
+    await G('g.setGardenTime(12 * 60)');
+    await sleep(900);
+    await shot('clock-noon.png');
+    await G('g.setGardenTime(17 * 60 + 45)');
+    await sleep(900);
+    await shot('clock-dusk.png');
+    await G('g.setGardenTime(22 * 60)');
+    await sleep(900);
+    await shot('clock-night.png');
+    for (const [season, name] of [['spring', 'season-spring.png'], ['summer', 'season-summer.png'], ['autumn', 'season-autumn.png'], ['winter', 'season-winter.png']]) {
+        await G(`g.setSeason('${season}')`);
+        await G('g.setGardenTime(12 * 60)');
+        await sleep(1100);
+        await shot(name);
+    }
+    await G('g.setGardenTime(22 * 60)');
+    await G(`g.setSeason('summer')`);
+    await G('g.previewBedtimeGlow()');
+    await sleep(300);
+    await shot('bedtime-window-glow.png');
+    await G('g.clearBedtimeLayers()');
+    await G('g.previewMorningCard()');
+    await sleep(1200);
+    await shot('morning-card.png');
+    await G(`g.show('idle')`);
+    await G('g.setGardenTime(12 * 60)');
+    await lightingTo('midday');
+    await sleep(1000);
+    await shot('logo-day-full.png');
+    await lightingTo('night');
+    await G('g.setGardenTime(22 * 60)');
+    await sleep(1000);
+    await shot('logo-night-full.png');
+}
+
 async function run(win, outDir) {
+    if (process.env.SMILE_GARDEN_TIME_SHOTS === '1') {
+        await runTimeArt(win, outDir);
+        app.quit();
+        return;
+    }
     fs.mkdirSync(outDir, { recursive: true });
     const wc = win.webContents;
     const js = (code) => wc.executeJavaScript(code, true);
@@ -159,6 +225,8 @@ async function run(win, outDir) {
     await G('g.toggleDev(true)');
     await sleep(600);
     await shot('20-demo-tools.png');
+
+    await runTimeArt(win, outDir);
     app.quit();
 }
 

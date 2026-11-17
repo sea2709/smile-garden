@@ -83,45 +83,58 @@
         ui: {
             pantryShelf: '../assets/ui/pantry-shelf.png',
             unlockSeedCard: '../assets/ui/unlock-seed-card.png',
-            morningCard: '../assets/ui/morning-card.png',
-            bedtimeWindowGlow: '../assets/ui/bedtime-window-glow.png',
             logoDay: '../assets/ui/logo-day.png',
             logoNight: '../assets/ui/logo-night.png',
             logoFallback: 'Smile Garden',
         },
-        /** Painted HUD clock on the garden canvas (see docs/ART-NEEDED.md). */
+        /** Authoritative paths: assets/time-manifest.json */
         clock: Object.freeze({
+            scale2x: true,
+            display: Object.freeze({ w: 160, h: 64, cx: 640, cy: 40 }),
             frameSrc(kind) {
-                return '../assets/ui/clock-frame-' + (kind === 'night' ? 'night' : 'day') + '.png';
+                return '../assets/ui/clock/clock-frame-' + (kind === 'night' ? 'night' : 'day') + '.png';
+            },
+            frontSrc(kind) {
+                return '../assets/ui/clock/clock-front-' + (kind === 'night' ? 'night' : 'day') + '.png';
             },
             framePixels: Object.freeze([320, 128]),
-            display: Object.freeze({ w: 160, h: 64, cx: 640, cy: 40 }),
-            sunSrc: '../assets/ui/clock-sun.png',
-            moonSrc: '../assets/ui/clock-moon.png',
-            iconPixels: Object.freeze([64, 64]),
-            iconDisplay: 32,
-            arc: Object.freeze({ cx: 640, cy: 52, r: 46, start: Math.PI, end: 0 }),
+            sunSrc: '../assets/ui/clock/sun-token.png',
+            moonSrc: '../assets/ui/clock/moon-token.png',
+            tokenPixels: Object.freeze([64, 64]),
+            tokenDisplay: 32,
+            arc: Object.freeze({ centerX: 160.6, centerY: 183.1, radius: 150.6, startDeg: 147, endDeg: 33 }),
+            ribbonSrc(kind) {
+                return kind === 'night' ? '../assets/ui/clock/season-ribbon-night.png' : '../assets/ui/clock/season-ribbon.png';
+            },
+            ribbonPixels: Object.freeze([280, 61]),
+            ribbonDisplay: Object.freeze({ w: 140, h: 30, cx: 640, cy: 88 }),
         }),
-        /** Full-frame season overlays + drifting particles (see docs/ART-NEEDED.md). */
+        bedtime: Object.freeze({
+            bedButtonIcon: '../assets/ui/bed-button-icon.png',
+            windowGlow: '../assets/bedtime/window-glow.png',
+            windowDark: '../assets/bedtime/window-dark.png',
+            morningCard: '../assets/bedtime/morning-card.png',
+            morningCardSize: Object.freeze([700, 600]),
+            morningTextSafe: Object.freeze([60, 290, 640, 560]),
+        }),
         seasons: Object.freeze({
             overlaySrc(season, kind) {
                 return '../assets/seasons/' + season + '-' + (kind === 'night' ? 'night' : 'day') + '.png';
             },
             overlayPixels: Object.freeze([1280, 720]),
-            particleSrc(kind) {
-                return '../assets/seasons/particle-' + kind + '.png';
+            particleSrc(name) {
+                return '../assets/seasons/particles/' + name + '.png';
             },
-            particlePixels: Object.freeze([48, 48]),
-            particleDisplay: 24,
-            particleKind(season) {
-                if (season === 'spring') return 'petal';
-                if (season === 'autumn') return 'leaf';
-                if (season === 'winter') return 'snow';
-                return null;
-            },
+            particleScale: 0.5,
+            particlePools: Object.freeze({
+                spring: ['petal-1', 'petal-2', 'petal-3', 'petal-4', 'petal-5', 'blossom-1', 'blossom-2', 'blossom-3'],
+                summerDay: ['seed-fluff', 'pollen'],
+                summerNight: ['firefly'],
+                autumn: ['leaf-1', 'leaf-2', 'leaf-3', 'leaf-4', 'leaf-5', 'leaf-6'],
+                winter: ['snowflake-1', 'snowflake-2', 'snowflake-3', 'snowflake-4', 'snowflake-5', 'snowflake-6'],
+            }),
         }),
-        morningCard: Object.freeze({ w: 700, h: 600, textTop: 0.42 }),
-        logoHud: Object.freeze({ x: 20, y: 20, w: 184, h: 49 }),
+        logoHud: Object.freeze({ x: 20, y: 20, w: 184, h: 49, srcPixels: Object.freeze([368, 98]) }),
         critters: Object.freeze({
             dir: '../assets/critters/',
             bounds: Object.freeze({ width: 1280, height: 720, hudTop: 92, margin: 48 }),

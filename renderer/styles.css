@@ -47,6 +47,9 @@ button { font-family: inherit; }
 .brand { display: inline-flex; align-items: center; min-width: 120px; font-family: var(--serif); font-size: 22px; font-weight: 600; letter-spacing: 0.2px; white-space: nowrap; }
 .brand-fallback { color: var(--ink); transition: opacity 0.4s ease; }
 body[data-canvas-logo="1"] .brand-fallback { opacity: 0; position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+body[data-canvas-logo="1"] .brand { min-width: 0; width: 0; flex: 0 0 auto; overflow: visible; pointer-events: none; }
+.btn-bed .btn-bed-icon { width: 28px; height: 28px; margin-right: 6px; vertical-align: middle; }
+body[data-painted-clock="1"] .chip-day #day-chip-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
 .chips { display: flex; gap: 8px; flex: 1; flex-wrap: wrap; }
 .chip {
     display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px;

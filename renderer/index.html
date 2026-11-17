@@ -104,7 +104,9 @@
         <span id="idle-text">Your garden is resting.</span>
         <button id="btn-plant-idle" class="btn btn-soft" type="button">🌱 Plant a seed</button>
         <button id="btn-visit" class="btn btn-primary" type="button">Tend your plants</button>
-        <button id="btn-bed" class="btn btn-soft" type="button" title="Growth happens overnight when you choose">🌙 Go to bed</button>
+        <button id="btn-bed" class="btn btn-soft btn-bed" type="button" title="Growth happens overnight when you choose">
+            <img class="btn-bed-icon" src="../assets/ui/bed-button-icon.png" alt="" width="28" height="28"> Go to bed
+        </button>
     </div>
 
     <div id="plot-tip" class="plot-tip" hidden></div>
@@ -239,6 +241,7 @@
 <script src="../game/logic.js"></script>
 <script src="../game/harvest.js"></script>
 <script src="../game/day.js"></script>
+<script src="../game/clock-arc.js"></script>
 <script src="../game/visit.js"></script>
 <script src="../game/critters.js"></script>
 <script src="./art.js"></script>

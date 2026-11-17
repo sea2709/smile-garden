@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const D = require('../game/day.js');
 const V = require('../game/visit.js');
+const C = require('../game/clock-arc.js');
 
 test('garden clock pauses at late night and advances with real time', () => {
     const s = V.createState(new Date());
@@ -61,6 +62,27 @@ test('season gating pauses out-of-season plants overnight', () => {
     const out = V.goToBed(s, d);
     assert.equal(out.grew.length, 0);
     assert.equal(s.plots[0].stage, 1);
+});
+
+test('clock arc places sun token at 6:00, noon, and 18:00', () => {
+    const tol = 0.35;
+    const at = (h, m) => h * 60 + m;
+    const expectSunAt = (mins, deg, needFullSun) => {
+        const st = C.clockTokenState(mins);
+        if (needFullSun) assert.ok(st.sunAlpha > 0.9, `sun visible at ${mins}`);
+        assert.ok(Math.abs(st.sunDeg - deg) < 0.05, `sunDeg ${st.sunDeg} vs ${deg} at ${mins}m`);
+        const p = C.tokenFrameXY(st.sunDeg);
+        const exp = C.tokenFrameXY(deg);
+        assert.ok(Math.abs(p.x - exp.x) < tol && Math.abs(p.y - exp.y) < tol, `${mins}m → (${p.x},${p.y}) vs (${exp.x},${exp.y})`);
+    };
+    expectSunAt(at(6, 0), 147, true);
+    expectSunAt(at(12, 0), 90, true);
+    expectSunAt(at(18, 0), 33, false);
+    const night = C.clockTokenState(at(21, 0));
+    assert.ok(night.moonAlpha > 0.9 && night.sunAlpha < 0.1);
+    const moon = C.tokenFrameXY(night.moonDeg);
+    const moonRest = C.tokenFrameXY(33);
+    assert.ok(Math.abs(moon.x - moonRest.x) < tol && Math.abs(moon.y - moonRest.y) < tol);
 });
 
 test('persistence round-trips garden clock fields', () => {

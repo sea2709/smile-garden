@@ -15,7 +15,8 @@
     "start:mock:fast": "electron . --mock --fast",
     "test": "node --test test/logic.test.js test/visit.test.js test/harvest.test.js test/critters.test.js test/plant-meta.test.js test/day.test.js test/assets.test.js",
     "check": "node scripts/check-syntax.js",
-    "screenshots": "node scripts/capture-screenshots.js"
+    "screenshots": "node scripts/capture-screenshots.js",
+    "screenshots:time": "SMILE_GARDEN_TIME_SHOTS=1 node scripts/capture-screenshots.js"
   },
   "dependencies": {
     "@smartspectra/node-sdk": "^3.5.0"

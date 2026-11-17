@@ -167,7 +167,9 @@
 
     function syncGardenClockHud() {
         if (state.version < 5) return;
-        scene.setGardenClock(state.gardenMinutes);
+        const seasonLabel = D.SEASON_LABELS[state.season] || state.season;
+        const label = `Day ${state.dayNumber} · ${seasonLabel} · ${D.formatGardenTime(state.gardenMinutes)}`;
+        scene.setGardenClock(state.gardenMinutes, label);
         if (els.gardenClock) els.gardenClock.hidden = true;
     }
 
@@ -752,7 +754,7 @@
         if (!host) return;
         host.hidden = false;
         host.textContent = '';
-        const cardSrc = ART.ui && ART.ui.morningCard;
+        const cardSrc = (ART.bedtime && ART.bedtime.morningCard) || (ART.ui && ART.ui.morningCard);
         const img = new Image();
         img.alt = '';
         img.className = 'morning-card-img';
@@ -838,9 +840,11 @@
         const steps = 14;
         for (let i = 1; i <= steps; i++) {
             scene.setBedtimeGlow(i / steps);
+            if (i > steps - 4) scene.setBedtimeDark((i - (steps - 4)) / 4);
             await new Promise((r) => setTimeout(r, 65));
         }
         scene.setBedtimeGlow(0);
+        scene.setBedtimeDark(0);
         const night = V.goToBed(state, clock.now());
         state.morningPending = null;
         save();
@@ -1510,6 +1514,31 @@
         toggleDev,
         makeAllReady: () => { V.makeAllReady(state); save(); plotsForScene({ instant: true }); renderHud(); },
         reset() { localStorage.removeItem(STORE_KEY); state = V.createState(new Date()); clock.offsetDays = 0; plotsForScene({ instant: true }); renderHud(); },
+        setGardenTime(m) {
+            state.version = 5;
+            state.gardenMinutes = D.clampMinutes(m);
+            refreshLighting();
+            renderHud();
+        },
+        setSeason(season) {
+            state.season = season;
+            scene.setSeason(season);
+            renderHud();
+        },
+        async previewBedtimeGlow() {
+            scene.setLighting('night');
+            document.body.dataset.lighting = 'night';
+            for (let i = 1; i <= 10; i++) {
+                scene.setBedtimeGlow(i / 10);
+                if (i > 6) scene.setBedtimeDark((i - 6) / 4);
+                await new Promise((r) => setTimeout(r, 40));
+            }
+        },
+        clearBedtimeLayers() { scene.setBedtimeGlow(0); scene.setBedtimeDark(0); refreshLighting(); },
+        async previewMorningCard() {
+            renderMorningSummary({ grew: [{ plot: 0, name: 'Lettuce', from: 1, to: 2, mature: false }] });
+            show('summary');
+        },
     };
 
     document.addEventListener('visibilitychange', () => {
