@@ -17,7 +17,7 @@
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub', 'meter-sun', 'meter-water', 'meter-fert',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-count', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -51,7 +51,7 @@
     let lighting = 'midday';
     let devOpen = false;
 
-    const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', faceGoneAt: 0 };
+    const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', faceGoneAt: 0, breathing: null };
 
     // ------------------------------------------------------------------
     // Screens
@@ -378,6 +378,15 @@
         }
         source.on('expression', (e) => { signal.h = e.happiness; signal.hAt = performance.now(); });
         source.on('talking', (e) => { signal.talking = !!e.detected; signal.talkAt = performance.now(); });
+        source.on('breathing', (b) => {
+            if (!b || typeof b.rate !== 'number') return;
+            signal.breathing = {
+                rate: b.rate,
+                confidence: typeof b.confidence === 'number' ? b.confidence : 0,
+                stable: !!b.stable,
+                at: performance.now(),
+            };
+        });
         source.on('validation', (v) => { signal.validation = v.code; });
         source.on('status', (s) => { document.body.dataset.status = s; });
         source.on('error', (e) => showError('SmartSpectra error', `${e.name}: ${e.message || ''}`, !config.mock));
@@ -400,6 +409,7 @@
         refreshBasketChip(0);
         els.basketChip.hidden = session.harvestQueue.length === 0;
         trace.clear();
+        signal.breathing = null;
         talkPromptIdx = Math.floor(Math.random() * TALK_PROMPTS.length);
         show('visit');
         session.begin();
@@ -436,7 +446,13 @@
         els.stepText.textContent = copy.text;
         els.breathGuide.hidden = step !== 'breathe';
         renderStepActions(step);
-        if (step === 'breathe') renderBreathCount(0);
+        if (step !== 'breathe') {
+            els.breathRate.hidden = true;
+            els.breathRate.removeAttribute('data-state');
+        } else {
+            renderBreathCount(0);
+            renderBreathRate();
+        }
         syncTendRing();
     }
 
@@ -519,6 +535,29 @@
         }
     }
 
+    function renderBreathRate() {
+        const el = els.breathRate;
+        if (!el) return;
+        const fresh = signal.breathing && performance.now() - signal.breathing.at < 2500;
+        if (!fresh) {
+            el.hidden = false;
+            el.dataset.state = 'warming';
+            el.textContent = 'Listening for your breath…';
+            return;
+        }
+        const b = signal.breathing;
+        const bpm = Math.round(b.rate * 10) / 10;
+        if (b.stable) {
+            el.hidden = false;
+            el.dataset.state = 'stable';
+            el.textContent = `${bpm} breaths/min`;
+        } else {
+            el.hidden = false;
+            el.dataset.state = 'settling';
+            el.textContent = `Settling… ~${bpm} breaths/min`;
+        }
+    }
+
     function currentInput() {
         const now = performance.now();
         const fresh = signal.hAt && now - signal.hAt < 700;
@@ -587,6 +626,7 @@
             document.body.dataset.breathPhase = b.phase;
             document.body.dataset.breath = String(session.breathsDone);
             renderBreathCount(session.breathsDone);
+            renderBreathRate();
             els.stepLive.textContent = `🍃 Breath ${Math.min(session.pacer.breaths, b.breath + 1)} of ${session.pacer.breaths} · fertilizer ${Math.round(session.fertilizer * 100)}%`;
             scene.setEffects({ breath: b.size });
         }
@@ -1264,7 +1304,7 @@
         } else if (config.sdkLoadError || !config.hasApiKey) {
             els.btnBegin.disabled = true;
             showError(config.sdkLoadError ? 'SmartSpectra SDK could not load' : 'Missing API key',
-                (config.sdkLoadError || 'Set SMARTSPECTRA_API_KEY and restart (free key: https://physiology.presagetech.com/auth/register).') +
+                (config.sdkLoadError || 'Set SMARTSPECTRA_API_KEY in `.env` (or your environment) and restart (free key: https://physiology.presagetech.com/auth/register).') +
                 ' You can still play with the keyboard.', true);
         } else {
             try { await loadScript('../dist/sdk-source.bundle.js'); } catch {
