@@ -92,6 +92,10 @@
         let lighting = 'midday';
         let prevLighting = null;
         let lightFade = 1;
+        /** @type {null | Record<string, number>} */
+        let lightWeights = null;
+        let season = 'spring';
+        let daylight = true;
         let plots = new Array(8).fill(null);   // { plantId, stage, ready?, pickedSprite? }
         let decorPlacements = {}; // spotId -> decorId
         const harvestAnims = []; // { plot, plantId, t0, pull }
@@ -161,10 +165,32 @@
         }
 
         function setLighting(l) {
+            lightWeights = null;
             if (l === lighting) return;
             prevLighting = lighting;
             lighting = l;
             lightFade = 0;
+            daylight = l !== 'night';
+        }
+
+        function setLightingBlend(weights) {
+            const w = Object.assign({ dawn: 0, midday: 0, 'golden-hour': 0, night: 0 }, weights || {});
+            let primary = 'midday';
+            let best = -1;
+            for (const k of ['dawn', 'midday', 'golden-hour', 'night']) {
+                if ((w[k] || 0) > best) { best = w[k]; primary = k; }
+            }
+            if (primary !== lighting) {
+                prevLighting = lighting;
+                lighting = primary;
+                lightFade = 0;
+            }
+            lightWeights = w;
+            daylight = (w.night || 0) < 0.55;
+        }
+
+        function setSeason(s) {
+            season = s || 'spring';
         }
 
         function setDecor(decorState) {
@@ -182,6 +208,7 @@
                     stage: raw.stage,
                     ready: !!raw.ready,
                     pickedSprite: !!raw.pickedSprite,
+                    tendedToday: !!raw.tendedToday,
                 } : null;
                 const o = plots[i];
                 if (animate && n && (!o || o.plantId !== n.plantId)) {
@@ -341,7 +368,57 @@
         }
 
         // ------------------------------------------------------------------
+        function drawSeasonOverlay() {
+            const reg = ART.seasonOverlays && ART.seasonOverlays[season];
+            if (reg) return;
+            const t = performance.now() / 1000;
+            ctx.save();
+            const a = 0.2;
+            if (season === 'spring') {
+                for (let i = 0; i < 22; i++) {
+                    const x = (i * 137.5 + t * 12) % ART.width;
+                    const y = 80 + (i * 41) % 220;
+                    ctx.fillStyle = `rgba(255, 182, 193, ${a * (0.5 + 0.5 * Math.sin(t + i))})`;
+                    ctx.beginPath();
+                    ctx.ellipse(x, y, 5, 3, 0.3, 0, TAU);
+                    ctx.fill();
+                }
+            } else if (season === 'autumn') {
+                for (let i = 0; i < 16; i++) {
+                    const x = (i * 151 + t * 18) % ART.width;
+                    const y = 60 + ((i * 53 + t * 22) % 280);
+                    ctx.fillStyle = `rgba(210, 120, 50, ${a})`;
+                    ctx.fillRect(x, y, 6, 3);
+                }
+            } else if (season === 'winter') {
+                for (let i = 0; i < 40; i++) {
+                    const x = (i * 97 + t * 4) % ART.width;
+                    const y = (i * 31 + t * 8) % (ART.height * 0.55);
+                    ctx.fillStyle = `rgba(240, 248, 255, ${a * 0.8})`;
+                    ctx.fillRect(x, y, 2, 2);
+                }
+            }
+            ctx.restore();
+        }
+
         function drawBackdrop() {
+            if (lightWeights) {
+                ctx.fillStyle = '#e9e0c9';
+                ctx.fillRect(0, 0, ART.width, ART.height);
+                for (const k of ['dawn', 'midday', 'golden-hour', 'night']) {
+                    const alpha = lightWeights[k] || 0;
+                    if (alpha < 0.008) continue;
+                    const img = bgImgs[k];
+                    if (!ready(img)) continue;
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    ctx.drawImage(img, 0, 0, ART.width, ART.height);
+                    ctx.restore();
+                }
+                drawSeasonOverlay();
+                ctx.globalAlpha = 1;
+                return;
+            }
             const cur = bgImgs[lighting];
             const prev = prevLighting ? bgImgs[prevLighting] : null;
             if (prev && ready(prev) && lightFade < 1) {
@@ -355,6 +432,7 @@
                 ctx.fillStyle = '#e9e0c9';
                 ctx.fillRect(0, 0, ART.width, ART.height);
             }
+            drawSeasonOverlay();
             ctx.globalAlpha = 1;
         }
 
@@ -689,6 +767,16 @@
                 }
                 drawReadyLoop(i, t);
                 if (tendPlot === i) drawSelectionRing(i, t);
+                if (pl.tendedToday && tendPlot !== i) {
+                    const p = ART.plots[i];
+                    ctx.save();
+                    ctx.globalAlpha = 0.42 + 0.08 * Math.sin(t * 2 + i);
+                    ctx.fillStyle = 'rgba(168, 210, 148, 0.95)';
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y + 6, 5.5, 0, TAU);
+                    ctx.fill();
+                    ctx.restore();
+                }
                 const an = anims[i];
                 if (an) {
                     const k = (now - an.t0) / an.dur;
@@ -890,6 +978,7 @@
 
         function drawCritters(t) {
             if (!ART.critters || !C) return;
+            if (!daylight) return;
             const alpha = C.critterDayAlpha(lighting, prevLighting, lightFade);
             if (alpha < 0.02) return;
             const motionScale = C.motionScaleFromReduced(reducedMotion);
@@ -981,7 +1070,7 @@
             drawVignette();
         }
 
-        return { resize, update, draw, setLighting, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
+        return { resize, update, draw, setLighting, setLightingBlend, setSeason, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient,
             get lighting() { return lighting; },
             get reducedMotion() { return reducedMotion; },
             setReducedMotion(v) { reducedMotion = !!v; },

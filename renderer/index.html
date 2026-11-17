@@ -18,8 +18,11 @@
             <span id="brand-fallback" class="brand-fallback">Smile Garden</span>
         </div>
         <div class="chips">
-            <span id="clock-chip" class="chip">…</span>
-            <span id="week-chip" class="chip" title="Visits this week (Mon–Sun). No streaks to keep: every visit counts.">
+            <span id="clock-chip" class="chip chip-day" title="Garden day and time">
+                <canvas id="garden-clock" class="garden-clock" width="72" height="36" aria-hidden="true"></canvas>
+                <span id="day-chip-text">…</span>
+            </span>
+            <span id="week-chip" class="chip" title="Days tended this season (7-day seasons). No streak pressure.">
                 <span class="week-dots" id="week-dots"></span><span id="week-text">0 visits this week</span>
             </span>
             <span id="score-chip" class="chip chip-score" title="Plots filled / plots grown to maturity">🌱 0/8</span>
@@ -96,11 +99,12 @@
         <div class="breath-safety">Gentle, never strained, no holding. If you feel dizzy or uncomfortable, stop and breathe normally.</div>
     </section>
 
-    <!-- Idle: start today's visit ---------------------------------------- -->
+    <!-- Idle: tend in the garden ----------------------------------------- -->
     <div id="idle-bar" class="idle-bar parchment-soft" hidden>
         <span id="idle-text">Your garden is resting.</span>
         <button id="btn-plant-idle" class="btn btn-soft" type="button">🌱 Plant a seed</button>
-        <button id="btn-visit" class="btn btn-primary" type="button">Start today's visit</button>
+        <button id="btn-visit" class="btn btn-primary" type="button">Tend your plants</button>
+        <button id="btn-bed" class="btn btn-soft" type="button" title="Growth happens overnight when you choose">🌙 Go to bed</button>
     </div>
 
     <div id="plot-tip" class="plot-tip" hidden></div>
@@ -158,7 +162,7 @@
     <section id="screen-summary" class="overlay overlay-right" hidden>
         <div class="card parchment summary">
             <div class="eyebrow" id="sum-date"></div>
-            <h1 id="sum-title">Lovely visit</h1>
+            <h1 id="sum-title">Your garden grew overnight</h1>
             <div class="sum-stats">
                 <div><span class="dot dot-sun"></span><b id="sum-sun">0 h</b><small>sunlight</small></div>
                 <div><span class="dot dot-water"></span><b id="sum-water">0%</b><small>water</small></div>
@@ -233,6 +237,7 @@
 
 <script src="../game/logic.js"></script>
 <script src="../game/harvest.js"></script>
+<script src="../game/day.js"></script>
 <script src="../game/visit.js"></script>
 <script src="../game/critters.js"></script>
 <script src="./art.js"></script>
