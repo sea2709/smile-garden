@@ -14,7 +14,9 @@
 
     <!-- Top bar ---------------------------------------------------------- -->
     <header class="topbar">
-        <div class="brand"><span class="brand-mark">❀</span> Smile Garden</div>
+        <div class="brand" aria-label="Smile Garden">
+            <span id="brand-fallback" class="brand-fallback">Smile Garden</span>
+        </div>
         <div class="chips">
             <span id="clock-chip" class="chip">…</span>
             <span id="week-chip" class="chip" title="Visits this week (Mon–Sun). No streaks to keep: every visit counts.">
@@ -232,6 +234,7 @@
 <script src="../game/logic.js"></script>
 <script src="../game/harvest.js"></script>
 <script src="../game/visit.js"></script>
+<script src="../game/critters.js"></script>
 <script src="./art.js"></script>
 <script src="./mock-source.js"></script>
 <script src="./scene.js"></script>
