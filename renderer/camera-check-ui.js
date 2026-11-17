@@ -135,11 +135,23 @@
         });
     }
 
-    function renderStatus(faceEl, lightEl, camEl, snap) {
-        faceEl.className = 'cc-status-row' + (snap.faceFound ? ' ok' : ' bad');
-        faceEl.innerHTML = '<span class="dot"></span><span>Face found</span>';
-        lightEl.className = 'cc-status-row' + (snap.lightingOk ? ' ok' : (snap.faceFound ? ' warn' : ''));
-        lightEl.innerHTML = '<span class="dot"></span><span>Lighting OK</span>';
+    function renderStatus(faceEl, lightEl, camEl, snap, opts) {
+        const denied = !!(opts && opts.denied) || !!(snap && snap.cameraDenied);
+        const noCamera = denied || !!(snap && snap.noCamera);
+        if (noCamera) {
+            faceEl.hidden = false;
+            faceEl.className = 'cc-status-row bad';
+            faceEl.innerHTML = '<span class="dot"></span><span>No camera</span>';
+            lightEl.hidden = true;
+            lightEl.textContent = '';
+        } else {
+            faceEl.hidden = false;
+            lightEl.hidden = false;
+            faceEl.className = 'cc-status-row' + (snap.faceFound ? ' ok' : ' bad');
+            faceEl.innerHTML = '<span class="dot"></span><span>Face found</span>';
+            lightEl.className = 'cc-status-row' + (snap.lightingOk ? ' ok' : (snap.faceFound ? ' warn' : ''));
+            lightEl.innerHTML = '<span class="dot"></span><span>Lighting OK</span>';
+        }
         const msg = snap.cameraMessage;
         if (msg && msg.text) {
             camEl.hidden = false;

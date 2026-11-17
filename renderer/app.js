@@ -20,7 +20,7 @@
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
         'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-card-bg', 'needs-card-fallback', 'needs-plant-name', 'needs-rows', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
-        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now',
+        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -287,8 +287,13 @@
             els.stretchGuide.hidden = active !== 'stretch';
             if (active === 'breath') renderBreathRate();
             if (active === 'stretch') renderStretchHud();
-            CCUI.renderStatus(els.ccStatusFace, els.ccStatusLight, els.ccStatusCamera, snap);
+            CCUI.renderStatus(els.ccStatusFace, els.ccStatusLight, els.ccStatusCamera, snap, {
+                denied: cameraDeniedDemo || !!snap.cameraDenied || !!snap.noCamera,
+            });
             CCUI.renderPackets(els.ccPackets, snap, active, ART, artUrl, { denied: cameraDeniedDemo });
+            if (els.btnCcRetry) {
+                els.btnCcRetry.hidden = !(cameraDeniedDemo || snap.cameraDenied || snap.noCamera);
+            }
         }
         if (els.ccFaceOutline) {
             els.ccFaceOutline.classList.toggle('found', !!snap.faceFound);
@@ -346,6 +351,35 @@
         }
         if (source && source.setPhase) source.setPhase('camera-check-smile');
         renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
+    }
+
+    async function retryCameraCheck() {
+        if (!cameraCheckSession) return;
+        cameraDeniedDemo = false;
+        cameraCheckDemoLock = false;
+        signal.validation = 'Ok';
+        signal.faceGoneAt = 0;
+        const ok = await ensureSource();
+        if (!ok) {
+            cameraDeniedDemo = !config.mock;
+            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
+            return;
+        }
+        try {
+            if (!sourceReady) {
+                await source.start();
+                sourceReady = true;
+            }
+            state.cameraCheckNote = null;
+            if (source.setPhase && cameraCheckSession.active) {
+                source.setPhase(`camera-check-${cameraCheckSession.active}`);
+            }
+            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
+        } catch (e) {
+            CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
+            save();
+            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
+        }
     }
 
     function finishCameraCheckFlow() {
@@ -2113,6 +2147,7 @@
     function ackWellness() { state.wellnessAck = true; save(); afterWellnessOrResume(); }
     if (els.btnCcStart) els.btnCcStart.addEventListener('click', finishCameraCheckFlow);
     if (els.btnCcSkipNow) els.btnCcSkipNow.addEventListener('click', finishCameraCheckFlow);
+    if (els.btnCcRetry) els.btnCcRetry.addEventListener('click', () => { void retryCameraCheck(); });
     els.btnGreetPlant.addEventListener('click', () => openPicker());
     els.btnBegin.addEventListener('click', beginVisit);
     els.btnPickerClose.addEventListener('click', closePicker);
@@ -2375,6 +2410,7 @@
         get stretchDemoSnap() { return stretchDemoSnap; },
         clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness: () => ackWellness(),
         openCameraCheck: () => openCameraCheck(),
+        retryCameraCheck: () => retryCameraCheck(),
         finishCameraCheck: () => finishCameraCheckFlow(),
         selectCameraCheck(key) {
             if (!cameraCheckSession || !key) return;

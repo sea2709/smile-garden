@@ -33,10 +33,16 @@ function faceFound(sample) {
 function cameraStatusMessage(sample) {
     const s = sample || {};
     if (s.cameraDenied) {
-        return { level: 'error', text: 'Camera permission was denied. Allow the camera in system settings, or use keyboard mode from the banner below.' };
+        return {
+            level: 'error',
+            text: 'Camera permission was denied. Allow camera access in system settings, then tap Try again — or use Skip for now / Start my garden to continue.',
+        };
     }
     if (s.noCamera) {
-        return { level: 'error', text: 'No camera was found on this device.' };
+        return {
+            level: 'error',
+            text: 'No camera was found on this device. Tap Try again after connecting one, or use Skip for now / Start my garden to continue.',
+        };
     }
     if (s.sourceError) {
         return { level: 'warn', text: s.sourceError };
@@ -161,6 +167,8 @@ function createCameraCheckSession(options) {
             faceFound: faceFound(s),
             lightingOk: lightingOk !== false ? !!lightingOk : inferLightingOk(s),
             cameraMessage: cameraStatusMessage(s),
+            cameraDenied: !!s.cameraDenied,
+            noCamera: !!s.noCamera,
             stretchSnap: stretchSnap || (stretchFlow ? stretchFlow.snapshot() : null),
         };
     }

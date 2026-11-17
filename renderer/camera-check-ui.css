@@ -154,7 +154,8 @@
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 10px;
+    top: 10px;
+    bottom: auto;
     width: auto;
     z-index: 3;
     display: flex;
@@ -257,8 +258,19 @@
 
 .cc-packet.on img,
 .cc-packet.on .cc-packet-fallback {
-    outline: 3px solid rgba(125, 154, 91, 0.75);
-    outline-offset: 2px;
+    outline: none;
+    animation: cc-packet-listen-glow 2.2s ease-in-out infinite;
+}
+
+@keyframes cc-packet-listen-glow {
+    0%, 100% {
+        filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2))
+            drop-shadow(0 0 8px rgba(125, 154, 91, 0.35));
+    }
+    50% {
+        filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.2))
+            drop-shadow(0 0 18px rgba(144, 184, 98, 0.72));
+    }
 }
 
 .cc-packet-label {
@@ -386,6 +398,28 @@
 .cc-btn.skip:hover,
 .cc-btn.skip:focus-visible {
     border-image-source: url('../assets/ui/camera-check/btn-secondary-hover.png');
+}
+
+.cc-btn.retry {
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 160px;
+    color: #3f5a2a;
+    border-image-source: url('../assets/ui/camera-check/btn-primary.png');
+}
+
+.cc-btn.retry:hover,
+.cc-btn.retry:focus-visible {
+    transform: translateX(-50%) translateY(-1px);
+    border-image-source: url('../assets/ui/camera-check/btn-primary-hover.png');
+}
+
+.cc-btn.retry:active {
+    transform: translateX(-50%) translateY(1px);
+}
+
+.cc-btn.retry[hidden] {
+    display: none !important;
 }
 
 .cc-btn[data-fallback="1"] {
