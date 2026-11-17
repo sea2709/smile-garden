@@ -19,7 +19,7 @@
         'breath-sub', 'breath-count', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
-        'screen-summary', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
+        'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
         'btn-sum-done', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
         'dev-ready', 'dev-fill', 'dev-reset', 'basket-chip', 'basket-count', 'screen-unlock', 'unlock-title', 'unlock-body', 'unlock-art', 'btn-unlock-ok',
         'error-banner', 'error-title', 'error-message', 'btn-error-keyboard', 'btn-error-dismiss']) {
@@ -165,31 +165,10 @@
         scene.setSeason(state.season);
     }
 
-    function drawGardenClock() {
-        const canvas = els.gardenClock;
-        if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const w = canvas.width;
-        const h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-        const m = state.gardenMinutes;
-        const dayFrac = (m - D.DEFAULT_DAY_CONFIG.startMinutes) /
-            (D.DEFAULT_DAY_CONFIG.lateNightStop - D.DEFAULT_DAY_CONFIG.startMinutes);
-        const t = Math.max(0, Math.min(1, dayFrac));
-        const cx = w / 2;
-        const cy = h - 2;
-        const r = w * 0.42;
-        ctx.strokeStyle = 'rgba(120, 95, 60, 0.35)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, Math.PI, 0);
-        ctx.stroke();
-        const angle = Math.PI + t * Math.PI;
-        const sun = t < 0.72;
-        ctx.fillStyle = sun ? '#f0b84a' : '#d8dce8';
-        ctx.beginPath();
-        ctx.arc(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r, sun ? 4.5 : 3.5, 0, Math.PI * 2);
-        ctx.fill();
+    function syncGardenClockHud() {
+        if (state.version < 5) return;
+        scene.setGardenClock(state.gardenMinutes);
+        if (els.gardenClock) els.gardenClock.hidden = true;
     }
 
     function renderHud() {
@@ -197,7 +176,7 @@
         if (state.version >= 5) {
             const seasonLabel = D.SEASON_LABELS[state.season] || state.season;
             els.dayChipText.textContent = `Day ${state.dayNumber} · ${seasonLabel} · ${D.formatGardenTime(state.gardenMinutes)}`;
-            drawGardenClock();
+            syncGardenClockHud();
         } else {
             const time = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
             els.dayChipText.textContent = `${fmtDate(now)} · ${time} · ${V.LIGHTING_LABELS[lighting]}${state.settings.lighting !== 'auto' ? ' (demo light)' : ''}`;
@@ -768,10 +747,46 @@
         if (out.seedUnlocks.length || out.decorUnlocks.length) showUnlockReveal(out.seedUnlocks, out.decorUnlocks);
     }
 
+    function mountMorningCard(title, body) {
+        const host = els.sumCardArt;
+        if (!host) return;
+        host.hidden = false;
+        host.textContent = '';
+        const cardSrc = ART.ui && ART.ui.morningCard;
+        const img = new Image();
+        img.alt = '';
+        img.className = 'morning-card-img';
+        img.src = cardSrc || ART.card;
+        const copy = document.createElement('div');
+        copy.className = 'morning-card-copy';
+        const h = document.createElement('h1');
+        h.textContent = title;
+        const p = document.createElement('p');
+        p.className = 'lead';
+        p.textContent = body;
+        copy.append(h, p);
+        img.onerror = () => { els.sumTitle.hidden = false; els.sumDate.hidden = false; };
+        img.onload = () => { els.sumTitle.hidden = true; els.sumDate.hidden = true; };
+        host.append(img, copy);
+        if (cardSrc) {
+            els.sumCard.classList.add('summary-painted');
+        }
+    }
+
     function renderMorningSummary(night) {
         const out = night || { grew: [], waiting: [], tended: [] };
-        els.sumDate.textContent = `Day ${state.dayNumber} · ${D.SEASON_LABELS[state.season]} · ${D.formatGardenTime(state.gardenMinutes)}`;
-        els.sumTitle.textContent = out.grew.length ? 'Your garden grew overnight' : 'A quiet night in the garden';
+        const title = out.grew.length ? 'Your garden grew overnight' : 'A quiet night in the garden';
+        const body = `Day ${state.dayNumber} · ${D.SEASON_LABELS[state.season]} · ${D.formatGardenTime(state.gardenMinutes)}`;
+        els.sumDate.textContent = body;
+        els.sumTitle.textContent = title;
+        els.sumTitle.hidden = false;
+        els.sumDate.hidden = false;
+        if (els.sumCardArt) {
+            els.sumCardArt.hidden = true;
+            els.sumCardArt.textContent = '';
+            els.sumCard.classList.remove('summary-painted');
+        }
+        if (state.version >= 5) mountMorningCard(title, body);
         els.sumSun.textContent = '—';
         els.sumWater.textContent = '—';
         els.sumFert.textContent = '—';
@@ -820,7 +835,12 @@
         scene.setLighting('night');
         state.gardenMinutes = D.DEFAULT_DAY_CONFIG.lateNightStop;
         save();
-        await new Promise((r) => setTimeout(r, 900));
+        const steps = 14;
+        for (let i = 1; i <= steps; i++) {
+            scene.setBedtimeGlow(i / steps);
+            await new Promise((r) => setTimeout(r, 65));
+        }
+        scene.setBedtimeGlow(0);
         const night = V.goToBed(state, clock.now());
         state.morningPending = null;
         save();
@@ -1386,6 +1406,7 @@
         const dt = Math.min(0.1, t - lastT);
         lastT = t;
         if (session && screen === 'visit') updateVisit(dt, t);
+        if (state.version >= 5) syncGardenClockHud();
         if (state.version >= 5 && document.visibilityState === 'visible' && screen !== 'wellness') {
             gardenClock.tick(dt * 1000);
             saveAcc += dt;
