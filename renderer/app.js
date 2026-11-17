@@ -14,10 +14,10 @@
     const $ = (id) => document.getElementById(id);
     const els = {};
     for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-live',
-        'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub', 'meter-sun', 'meter-water', 'meter-fert',
-        'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'step-panel', 'step-track',
+        'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
+        'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-sunflower', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-plant-name', 'needs-icons', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'needs-tag-img', 'needs-tag-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring-left', 'stretch-ring-right', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-plant-name', 'needs-icons', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'needs-tag-img', 'needs-tag-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -290,11 +290,25 @@
     }
 
     const meterImgs = {};
-    for (const k of ['sun', 'water', 'fertilizer']) {
+    for (const k of ['sun', 'water', 'fertilizer', 'stake']) {
         meterImgs[k] = new Image();
-        meterImgs[k].src = `../assets/ui/meter-${k}.png`;
+        meterImgs[k].src = k === 'stake' ? '../assets/ui/meter-stake.png' : `../assets/ui/meter-${k}.png`;
     }
-    const METER_COLORS = { sun: ['#fbe29a', '#e3a22a'], water: ['#d2e5f4', '#5b92c6'], fertilizer: ['#dfe8b8', '#7b9646'] };
+    const METER_COLORS = { sun: ['#fbe29a', '#e3a22a'], water: ['#d2e5f4', '#5b92c6'], fertilizer: ['#dfe8b8', '#7b9646'], stake: ['#ece2b8', '#9c8c4c'] };
+    const stretchRingArt = { track: null, trackNight: null, full: null, fullNight: null, ready: false };
+    function ensureStretchRingArt() {
+        if (stretchRingArt.ready || !ART.stretch) return;
+        const s = ART.stretch;
+        stretchRingArt.track = new Image();
+        stretchRingArt.track.src = artUrl(s.ringTrack);
+        stretchRingArt.trackNight = new Image();
+        stretchRingArt.trackNight.src = artUrl(s.ringTrackNight);
+        stretchRingArt.full = new Image();
+        stretchRingArt.full.src = artUrl(s.ringFull);
+        stretchRingArt.fullNight = new Image();
+        stretchRingArt.fullNight.src = artUrl(s.ringFullNight);
+        stretchRingArt.ready = true;
+    }
     function drawMeter(canvas, kind, frac) {
         const meta = ART.meters[kind];
         const img = meterImgs[kind];
@@ -350,11 +364,17 @@
         if (lastResult && lastResult.day === dayKey) return { sun: lastResult.sunHours, water: lastResult.water, fert: lastResult.fertilizer, fertUsed: lastResult.fertilizer > 0 };
         return { sun: 0, water: 0, fert: 0, fertUsed: false };
     }
+    function stakeMeterFrac() {
+        if (!session) return 0;
+        const snap = stretchHudDemoLock && stretchDemoSnap ? stretchDemoSnap : (session.stretchSnap || {});
+        return Math.max(0, Math.min(1, ((snap.leftProgress || 0) + (snap.rightProgress || 0)) / 2));
+    }
     function renderMeters() {
         const m = meterValues();
         drawMeter(els.meterSun, 'sun', m.sun / V.TUNING.maxSunHours);
         drawMeter(els.meterWater, 'water', m.water);
         drawMeter(els.meterFert, 'fertilizer', m.fert);
+        if (els.meterStake) drawMeter(els.meterStake, 'stake', stakeMeterFrac());
         const step = session ? session.step : '';
         const care = step.startsWith('care-');
         if (care && session && session.selectedPlot != null) {
@@ -376,6 +396,15 @@
         els.meterSunWrap.classList.toggle('active', step === 'smile' || step === 'care-sun');
         els.meterWaterWrap.classList.toggle('active', step === 'talk' || step === 'care-water');
         els.meterFertWrap.classList.toggle('active', step === 'breathe' || step === 'breathe-offer' || step === 'care-breathe');
+        if (els.meterStakeWrap) {
+            els.meterStakeWrap.classList.toggle('active', step === 'stretch' || step === 'stretch-offer');
+            const stakeVal = stakeMeterFrac();
+            if (els.meterStakeVal) {
+                els.meterStakeVal.textContent = step === 'stretch' || step === 'stretch-offer'
+                    ? `${Math.round(stakeVal * 100)}%`
+                    : '—';
+            }
+        }
     }
 
     // ------------------------------------------------------------------
@@ -566,7 +595,7 @@
             const iconPath = key === 'sun' ? ART.needs.iconSun
                 : key === 'water' ? ART.needs.iconWater
                     : key === 'fertilizer' ? ART.needs.iconFertilizer
-                        : ART.needs.iconStake;
+                        : (lighting === 'night' ? ART.needs.iconStakeNight : ART.needs.iconStake);
             const icon = document.createElement('img');
             icon.className = 'need-icon';
             icon.alt = '';
@@ -882,30 +911,41 @@
 
     function drawStretchRing(canvas, progress, done) {
         if (!canvas) return;
+        ensureStretchRingArt();
         const ctx = canvas.getContext('2d');
         const w = canvas.width;
         const h = canvas.height;
+        const disp = w;
         ctx.clearRect(0, 0, w, h);
-        const cx = w / 2;
-        const cy = h / 2;
-        const r = w * 0.38;
-        ctx.lineWidth = 5;
-        ctx.strokeStyle = 'rgba(150, 120, 80, 0.35)';
-        ctx.beginPath();
-        ctx.arc(cx, cy, r, 0, Math.PI * 2);
-        ctx.stroke();
+        const night = lighting === 'night';
+        const track = night ? stretchRingArt.trackNight : stretchRingArt.track;
+        const full = night ? stretchRingArt.fullNight : stretchRingArt.full;
         const p = done ? 1 : Math.max(0, Math.min(1, progress));
-        if (p > 0.01) {
-            ctx.strokeStyle = done ? 'rgba(125, 154, 91, 0.95)' : 'rgba(125, 154, 91, 0.75)';
+        if (track && track.complete && track.naturalWidth) {
+            ctx.drawImage(track, 0, 0, track.naturalWidth, track.naturalHeight, 0, 0, disp, disp);
+        } else {
+            ctx.strokeStyle = 'rgba(150, 120, 80, 0.35)';
+            ctx.lineWidth = 8;
             ctx.beginPath();
-            ctx.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * p);
+            ctx.arc(disp / 2, disp / 2, disp * 0.38, 0, Math.PI * 2);
             ctx.stroke();
         }
+        if (p > 0.004 && full && full.complete && full.naturalWidth) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.moveTo(disp / 2, disp / 2);
+            ctx.arc(disp / 2, disp / 2, disp / 2, -Math.PI / 2, -Math.PI / 2 + p * Math.PI * 2);
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(full, 0, 0, full.naturalWidth, full.naturalHeight, 0, 0, disp, disp);
+            ctx.restore();
+        }
         if (done) {
-            ctx.fillStyle = 'rgba(125, 154, 91, 0.9)';
-            ctx.font = 'bold 22px Nunito, sans-serif';
+            ctx.fillStyle = 'rgba(125, 154, 91, 0.92)';
+            ctx.font = `bold ${Math.round(disp * 0.11)}px Nunito, sans-serif`;
             ctx.textAlign = 'center';
-            ctx.fillText('✓', cx, cy + 8);
+            ctx.textBaseline = 'middle';
+            ctx.fillText('✓', disp / 2, disp / 2 + disp * 0.02);
         }
     }
 
@@ -915,32 +955,63 @@
             ? stretchDemoSnap
             : (session && session.stretchSnap) || {};
         const roll = snap.rollDeg || 0;
-        const img = els.stretchSunflower;
-        if (ART.stretch && img && !img.dataset.fallback) {
-            img.onerror = () => {
-                img.dataset.fallback = '1';
-                const fb = document.createElement('div');
-                fb.className = 'stretch-flower-fallback';
-                fb.textContent = '🌻';
-                img.replaceWith(fb);
+        const s = ART.stretch;
+        const theta = Math.max(-(s && s.headRollClamp) || 28, Math.min((s && s.headRollClamp) || 28, roll));
+        const rad = (theta * Math.PI) / 180;
+        const arm = (s && s.headArmLength) || 143;
+        const pv = (s && s.stemPivotInBox) || [80, 216];
+        const night = lighting === 'night';
+        const stemEl = els.stretchSunflowerStem || document.getElementById('stretch-sunflower-stem');
+        const headEl = els.stretchSunflower;
+        const fullEl = els.stretchGuideFull;
+        if (s && stemEl && headEl && !stemEl.dataset.fallback) {
+            const stemSrc = night ? s.guideStemNight : s.guideStem;
+            const headSrc = night ? s.guideHeadNight : s.guideHead;
+            stemEl.onerror = () => {
+                stemEl.dataset.fallback = '1';
+                stemEl.hidden = true;
+                headEl.hidden = true;
+                if (fullEl) {
+                    fullEl.hidden = false;
+                    fullEl.src = artUrl(s.guideFull);
+                    fullEl.onerror = () => {
+                        fullEl.replaceWith(Object.assign(document.createElement('div'), {
+                            className: 'stretch-flower-fallback',
+                            textContent: '🌻',
+                        }));
+                    };
+                }
             };
-            const stemEl = document.getElementById('stretch-sunflower-stem');
-            const headSrc = ART.stretch.guideSunflowerHead;
-            const stemSrc = ART.stretch.guideSunflowerStem;
-            const pv = ART.stretch.guidePivot || { x: 0.5, y: 0.75 };
-            if (img) {
-                img.style.transformOrigin = `${pv.x * 100}% ${pv.y * 100}%`;
-                if (!img.src) img.src = artUrl(headSrc || ART.stretch.guideSunflower);
-            }
-            if (stemEl && stemSrc && !stemEl.dataset.fallback) {
-                stemEl.onerror = () => { stemEl.dataset.fallback = '1'; stemEl.hidden = true; };
-                if (!stemEl.src) stemEl.src = artUrl(stemSrc);
-                stemEl.hidden = false;
-            }
+            if (!stemEl.src) stemEl.src = artUrl(stemSrc);
+            if (!headEl.src) headEl.src = artUrl(headSrc);
+            stemEl.hidden = false;
+            headEl.hidden = false;
+            const piv = s.stemPivotInStem || [64, 152];
+            stemEl.style.transformOrigin = `${piv[0]}px ${piv[1]}px`;
+            stemEl.style.transform = `rotate(${theta}deg)`;
+            const hx = pv[0] + arm * Math.sin(rad);
+            const hy = pv[1] + arm * (-Math.cos(rad));
+            headEl.style.left = `${hx}px`;
+            headEl.style.top = `${hy}px`;
+            headEl.style.transform = `translate(-50%, -50%) rotate(${theta * (s.headRollGain || 1.15)}deg)`;
         }
-        const flowerEl = document.querySelector('.stretch-flower-fallback') || img;
-        if (flowerEl && flowerEl.tagName !== 'DIV') {
-            flowerEl.style.transform = `rotate(${Math.max(-32, Math.min(32, roll * 1.4))}deg)`;
+        const hintL = els.stretchHintLeft;
+        const hintR = els.stretchHintRight;
+        if (hintL && hintR && s) {
+            const hl = night ? s.hintLeftNight : s.hintLeft;
+            const hr = night ? s.hintRightNight : s.hintRight;
+            if (!hintL.src) hintL.src = artUrl(hl);
+            if (!hintR.src) hintR.src = artUrl(hr);
+            hintL.hidden = false;
+            hintR.hidden = false;
+            const showLeft = !snap.leftDone && (!snap.rightDone || snap.activeSide === 'left');
+            const showRight = !snap.rightDone && snap.leftDone;
+            hintL.style.opacity = showLeft ? '0.92' : '0';
+            hintR.style.opacity = showRight || (!snap.leftDone && snap.activeSide === 'right') ? '0.92' : (snap.leftDone && !snap.rightDone ? '0.92' : '0');
+            if (!snap.leftDone && !snap.rightDone && !snap.activeSide) {
+                hintL.style.opacity = '0.55';
+                hintR.style.opacity = '0';
+            }
         }
         drawStretchRing(els.stretchRingLeft, snap.leftProgress, snap.leftDone);
         drawStretchRing(els.stretchRingRight, snap.rightProgress, snap.rightDone);
@@ -1057,11 +1128,16 @@
         const on = L.DEFAULTS.smileOn;
         const smileAmt = (step === 'smile' || step === 'care-sun' || step === 'harvest-hold') && session.smiling
             ? 0.45 + 0.55 * L.clamp01((session.h - on) / (1 - on)) : 0;
+        const stretchSnap = session.stretchSnap || {};
+        const stakeAmt = step === 'stretch'
+            ? Math.max(stretchSnap.leftProgress || 0, stretchSnap.rightProgress || 0)
+            : 0;
         scene.setEffects({
             plot: session.selectedPlot,
             sun: smileAmt,
             water: (step === 'talk' || step === 'care-water') && session.talking ? 1 : 0,
             fert: (step === 'breathe' || step === 'care-breathe') ? 0.9 : 0,
+            stake: stakeAmt,
         });
         renderNeedsCard();
         renderMeters();
@@ -1966,6 +2042,23 @@
             });
             if (needs.stake && !p.staked) session.setCareProgress(plot, Object.assign(session.careProgressFor(plot), { stake: true }));
             renderNeedsCard();
+        },
+        /** Mock capture: fill one care meter then return to the hub without waiting on face input. */
+        completeCareNeedForCapture(needKey) {
+            if (!session || session.selectedPlot == null) return null;
+            const plot = session.selectedPlot;
+            const p = state.plots[plot];
+            if (!p || !p.plantId) return null;
+            const needs = L.plantNeeds(p.plantId);
+            const prog = Object.assign({}, session.careProgressFor(plot));
+            if (needKey === 'sun') prog.sun = needs.sun;
+            else if (needKey === 'water') prog.water = needs.water;
+            else if (needKey === 'fertilizer') prog.fertilizer = needs.fertilizer;
+            else return null;
+            session.setCareProgress(plot, prog);
+            const step = session.skip();
+            onStep(step);
+            return step;
         },
         startBreathing: (o) => session && session.startBreathing(o || {}),
         launchStretchCare(returnStep) {

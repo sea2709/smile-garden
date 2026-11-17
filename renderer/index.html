@@ -65,6 +65,7 @@
         <figure class="meter" id="meter-sun-wrap"><canvas id="meter-sun" class="meter-canvas"></canvas><figcaption><b>Sunlight</b><span id="meter-sun-val">0 h</span></figcaption></figure>
         <figure class="meter" id="meter-water-wrap"><canvas id="meter-water" class="meter-canvas"></canvas><figcaption><b>Water</b><span id="meter-water-val">0%</span></figcaption></figure>
         <figure class="meter" id="meter-fert-wrap"><canvas id="meter-fert" class="meter-canvas"></canvas><figcaption><b>Fertilizer</b><span id="meter-fert-val">optional</span></figcaption></figure>
+        <figure class="meter" id="meter-stake-wrap"><canvas id="meter-stake" class="meter-canvas"></canvas><figcaption><b>Stake</b><span id="meter-stake-val">—</span></figcaption></figure>
     </div>
 
     <!-- Step panel (during a visit) -------------------------------------- -->
@@ -117,13 +118,16 @@
 
     <!-- Breathing guide (center) ----------------------------------------- -->
     <div id="stretch-guide" class="stretch-guide" hidden>
-        <div class="stretch-flower-pivot" id="stretch-flower-pivot">
-            <img id="stretch-sunflower-stem" class="stretch-sunflower-stem" width="96" height="96" alt="" hidden>
-            <img id="stretch-sunflower" class="stretch-sunflower" width="96" height="96" alt="">
-        </div>
         <div class="stretch-rings">
-            <div class="stretch-ring"><canvas id="stretch-ring-left" width="60" height="60"></canvas><label>Left</label></div>
-            <div class="stretch-ring"><canvas id="stretch-ring-right" width="60" height="60"></canvas><label>Right</label></div>
+            <div class="stretch-ring"><canvas id="stretch-ring-left" width="400" height="400"></canvas><label>Left</label></div>
+            <div class="stretch-ring"><canvas id="stretch-ring-right" width="400" height="400"></canvas><label>Right</label></div>
+        </div>
+        <div class="stretch-guide-box" id="stretch-guide-box">
+            <img id="stretch-hint-left" class="stretch-hint stretch-hint-left" alt="" hidden>
+            <img id="stretch-hint-right" class="stretch-hint stretch-hint-right" alt="" hidden>
+            <img id="stretch-sunflower-stem" class="stretch-guide-stem" alt="">
+            <img id="stretch-sunflower" class="stretch-guide-head" alt="">
+            <img id="stretch-guide-full" class="stretch-guide-fallback" alt="" hidden>
         </div>
     </div>
 

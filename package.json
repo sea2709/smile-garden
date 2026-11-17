@@ -16,7 +16,8 @@
     "test": "node --test test/logic.test.js test/care-needs.test.js test/visit.test.js test/harvest.test.js test/critters.test.js test/plant-meta.test.js test/day.test.js test/clock-layout.test.js test/hud-layout.test.js test/season-particles.test.js test/stretch.test.js test/assets.test.js",
     "check": "node scripts/check-syntax.js",
     "screenshots": "node scripts/capture-screenshots.js",
-    "screenshots:time": "SMILE_GARDEN_TIME_SHOTS=1 node scripts/capture-screenshots.js"
+    "screenshots:time": "SMILE_GARDEN_TIME_SHOTS=1 node scripts/capture-screenshots.js",
+    "screenshots:stake": "SMILE_GARDEN_STAKE_SHOTS=1 node scripts/capture-screenshots.js"
   },
   "dependencies": {
     "@smartspectra/node-sdk": "^3.5.0",

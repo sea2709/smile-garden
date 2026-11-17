@@ -16,11 +16,11 @@
         },
         plots: [{"x":347,"y":369,"w":169,"h":58,"row":0,"scale":0.5,"box":[266,338,435,396]},{"x":554,"y":369,"w":151,"h":58,"row":0,"scale":0.5,"box":[478,340,629,398]},{"x":761,"y":369,"w":154,"h":59,"row":0,"scale":0.5,"box":[684,340,838,399]},{"x":968,"y":369,"w":171,"h":55,"row":0,"scale":0.5,"box":[883,342,1054,397]},{"x":283,"y":494,"w":215,"h":93,"row":1,"scale":0.62,"box":[173,446,388,539]},{"x":528,"y":504,"w":186,"h":99,"row":1,"scale":0.62,"box":[430,452,616,551]},{"x":771,"y":504,"w":188,"h":100,"row":1,"scale":0.62,"box":[687,452,875,552]},{"x":1027,"y":506,"w":226,"h":101,"row":1,"scale":0.62,"box":[921,450,1147,551]}],
         plants: {"lettuce":{"dir":"lettuce","stages":[{"w":314,"h":362,"base":330,"top":214},{"w":314,"h":362,"base":250,"top":122},{"w":314,"h":362,"base":253,"top":126},{"w":314,"h":362,"base":258,"top":51},{"w":314,"h":362,"base":260,"top":26}]},"mint":{"dir":"mint","stages":[{"w":312,"h":488,"base":456,"top":335},{"w":312,"h":488,"base":380,"top":267},{"w":312,"h":488,"base":375,"top":205},{"w":312,"h":488,"base":397,"top":92},{"w":312,"h":488,"base":394,"top":35}]},"cucumber":{"dir":"cucumber","stages":[{"w":314,"h":487,"base":456,"top":335},{"w":314,"h":487,"base":373,"top":261},{"w":314,"h":487,"base":372,"top":157},{"w":314,"h":487,"base":371,"top":54},{"w":314,"h":487,"base":383,"top":19}]},"tomato":{"dir":"tomato","stages":[{"w":312,"h":484,"base":452,"top":380},{"w":312,"h":484,"base":376,"top":254},{"w":312,"h":484,"base":386,"top":197},{"w":312,"h":484,"base":367,"top":37},{"w":312,"h":484,"base":381,"top":27}]},"sunflower":{"dir":"sunflower","stages":[{"w":296,"h":520,"base":493,"top":395},{"w":296,"h":520,"base":423,"top":296},{"w":296,"h":520,"base":419,"top":214},{"w":296,"h":520,"base":417,"top":83},{"w":296,"h":520,"base":416,"top":26}]},"apple":{"dir":"apple-tree","stages":[{"w":356,"h":538,"base":509,"top":387},{"w":356,"h":538,"base":439,"top":319},{"w":356,"h":538,"base":408,"top":208},{"w":356,"h":538,"base":405,"top":92},{"w":356,"h":538,"base":405,"top":28}]}},
-        meters: {"sun": {"w": 437, "h": 286, "dots": [[74.5, 210.0, 18.5], [124.0, 210.2, 18.5], [173.0, 210.2, 18.5], [221.8, 210.5, 18.2], [270.2, 210.2, 18.2], [317.8, 210.8, 18.2], [365.2, 210.2, 18.2]]}, "water": {"w": 441, "h": 280, "dots": [[76.5, 201.8, 19.0], [126.0, 201.8, 19.0], [174.8, 201.5, 18.8], [223.8, 201.8, 18.8], [271.8, 202.0, 18.8], [319.5, 202.0, 18.5], [367.2, 202.0, 18.2]]}, "fertilizer": {"w": 444, "h": 283, "dots": [[73.8, 195.8, 19.2], [124.2, 195.8, 19.2], [173.8, 196.2, 19.2], [222.8, 196.0, 18.8], [271.5, 196.2, 18.5], [320.2, 196.2, 18.8], [369.2, 196.2, 18.8]]}},
+        meters: {"sun": {"w": 437, "h": 286, "dots": [[74.5, 210.0, 18.5], [124.0, 210.2, 18.5], [173.0, 210.2, 18.5], [221.8, 210.5, 18.2], [270.2, 210.2, 18.2], [317.8, 210.8, 18.2], [365.2, 210.2, 18.2]]}, "water": {"w": 441, "h": 280, "dots": [[76.5, 201.8, 19.0], [126.0, 201.8, 19.0], [174.8, 201.5, 18.8], [223.8, 201.8, 18.8], [271.8, 202.0, 18.8], [319.5, 202.0, 18.5], [367.2, 202.0, 18.2]]}, "fertilizer": {"w": 444, "h": 283, "dots": [[73.8, 195.8, 19.2], [124.2, 195.8, 19.2], [173.8, 196.2, 19.2], [222.8, 196.0, 18.8], [271.5, 196.2, 18.5], [320.2, 196.2, 18.8], [369.2, 196.2, 18.8]]}, "stake": {"w": 444, "h": 283, "dots": [[73.8, 195.8, 19.2], [124.2, 195.8, 19.2], [173.8, 196.2, 19.2], [222.8, 196.0, 18.8], [271.5, 196.2, 18.5], [320.2, 196.2, 18.8], [369.2, 196.2, 18.8]]}},
         card: '../assets/ui/card-blank.png',
         // Heily's effect strips: 12 frames of 200x320, bottom-centre anchored, soil line y=282.
         effects: { frameW: 200, frameH: 320, soilY: 282, count: 12, fps: 12,
-            names: ['sun-day-loop', 'sun-day-absorb', 'sun-night-loop', 'sun-night-absorb', 'water-day-loop', 'water-day-absorb', 'water-night-loop', 'water-night-absorb', 'fertilizer-day-loop', 'fertilizer-day-absorb', 'fertilizer-night-loop', 'fertilizer-night-absorb'] },
+            names: ['sun-day-loop', 'sun-day-absorb', 'sun-night-loop', 'sun-night-absorb', 'water-day-loop', 'water-day-absorb', 'water-night-loop', 'water-night-absorb', 'fertilizer-day-loop', 'fertilizer-day-absorb', 'fertilizer-night-loop', 'fertilizer-night-absorb', 'stake-day-loop', 'stake-day-absorb', 'stake-night-loop', 'stake-night-absorb'] },
         effectSrc(name) { return '../assets/effects/' + name + '-strip.png'; },
         plantSrc(id, stage) { return '../assets/plants/' + this.plants[id].dir + '/stage-' + stage + '.png'; },
         selection: {
@@ -206,7 +206,8 @@
             iconSun: '../assets/ui/needs/icon-sun.png',
             iconWater: '../assets/ui/needs/icon-water.png',
             iconFertilizer: '../assets/ui/needs/icon-fertilizer.png',
-            iconStake: '../assets/ui/needs/icon-stake.png',
+            iconStake: '../assets/ui/care/stake-icon.png',
+            iconStakeNight: '../assets/ui/care/stake-icon-night.png',
             dotEmpty: '../assets/ui/needs/dot-empty.png',
             dotFullSun: '../assets/ui/needs/dot-full-sun.png',
             dotFullWater: '../assets/ui/needs/dot-full-water.png',
@@ -222,42 +223,65 @@
             restingDisplay: 28,
             tagOffset: Object.freeze([0, -42]),
         }),
+        /** Authoritative: assets/stake-manifest.json */
         stretch: Object.freeze({
             scale2x: true,
-            /** Combined guide (fallback); Heily ships head + stem separately. */
-            guideSunflower: '../assets/ui/stretch/guide-sunflower.png',
-            guideSunflowerHead: '../assets/ui/stretch/guide-sunflower-head.png',
-            guideSunflowerStem: '../assets/ui/stretch/guide-sunflower-stem.png',
-            /** Normalized pivot on guide frame (stem base); head rotates around this. */
-            guidePivot: Object.freeze({ x: 0.5, y: 0.75 }),
-            guidePixels: Object.freeze([192, 192]),
-            guideDisplay: 96,
-            vineRingEmpty: '../assets/ui/stretch/vine-ring-empty.png',
-            vineRingFull: '../assets/ui/stretch/vine-ring-full.png',
-            vinePixels: Object.freeze([120, 120]),
-            vineDisplay: 60,
-            stake: '../assets/plants/stake-day.png',
-            stakeDay: '../assets/plants/stake-day.png',
-            stakeNight: '../assets/plants/stake-night.png',
-            /** Soil anchor on stake sprite (normalized from bottom-left of frame). */
-            stakeAnchor: Object.freeze({ x: 0.5, y: 1 }),
-            stakePixels: Object.freeze([80, 200]),
-            stakeDisplay: Object.freeze({ w: 20, h: 50 }),
-            stakeOffset: Object.freeze([14, -8]),
-            stakeAbsorbStripDay: '../assets/effects/stake-absorb-day-strip.png',
-            stakeAbsorbStripNight: '../assets/effects/stake-absorb-night-strip.png',
-            stakeLoopStripDay: '../assets/effects/stake-loop-day-strip.png',
-            stakeLoopStripNight: '../assets/effects/stake-loop-night-strip.png',
+            guideFull: '../assets/ui/stretch/guide-full.png',
+            guideStem: '../assets/ui/stretch/guide-stem.png',
+            guideStemNight: '../assets/ui/stretch/guide-stem-night.png',
+            guideHead: '../assets/ui/stretch/guide-head.png',
+            guideHeadNight: '../assets/ui/stretch/guide-head-night.png',
+            guideBoxDisplay: Object.freeze([160, 220]),
+            stemDisplay: Object.freeze([124.5, 153]),
+            headDisplay: Object.freeze([80, 80]),
+            stemPlaceInBox: Object.freeze([16, 64]),
+            stemPivotInBox: Object.freeze([80, 216]),
+            stemPivotInStem: Object.freeze([64, 152]),
+            headArmLength: 143,
+            headRollClamp: 28,
+            headRollGain: 1.15,
+            hintLeft: '../assets/ui/stretch/hint-left.png',
+            hintRight: '../assets/ui/stretch/hint-right.png',
+            hintLeftNight: '../assets/ui/stretch/hint-left-night.png',
+            hintRightNight: '../assets/ui/stretch/hint-right-night.png',
+            hintDisplay: Object.freeze([75, 33.5]),
+            ringTrack: '../assets/ui/stretch/ring-track.png',
+            ringTrackNight: '../assets/ui/stretch/ring-track-night.png',
+            ringFull: '../assets/ui/stretch/ring-full.png',
+            ringFullNight: '../assets/ui/stretch/ring-full-night.png',
+            ringStripDay: '../assets/ui/stretch/ring-day-strip.png',
+            ringStripNight: '../assets/ui/stretch/ring-night-strip.png',
+            ringFrames: 12,
+            ringFrameDisplay: Object.freeze([200, 200]),
+            ringOffsetInGuide: Object.freeze([-20, 12]),
+            stakeShortDay: '../assets/plants/stake/stake-short-day.png',
+            stakeShortNight: '../assets/plants/stake/stake-short-night.png',
+            stakeTallDay: '../assets/plants/stake/stake-tall-day.png',
+            stakeTallNight: '../assets/plants/stake/stake-tall-night.png',
+            stakeOffsetX: 56,
+            stakeSprites: Object.freeze({
+                tall: Object.freeze({ w: 50, h: 304, base: 293, top: 4 }),
+                short: Object.freeze({ w: 52, h: 225, base: 214, top: 4 }),
+            }),
+            stakeLeftPlants: Object.freeze(['tomato', 'cucumber']),
+            stakeTallPlants: Object.freeze(['sunflower', 'tomato', 'cucumber', 'apple']),
         }),
-        plantStakeSrc(lighting) {
-            const kind = lighting === 'night' ? 'night' : 'day';
-            return kind === 'night' ? this.stretch.stakeNight : this.stretch.stakeDay;
+        stakeSpriteKind(plantId, stage) {
+            const s = this.stretch;
+            const tall = s.stakeTallPlants.includes(plantId) || (Number(stage) || 0) >= 4;
+            return tall ? 'tall' : 'short';
         },
-        plantStakeAbsorbSrc(lighting) {
-            return lighting === 'night' ? this.stretch.stakeAbsorbStripNight : this.stretch.stakeAbsorbStripDay;
+        stakeOffsetXForPlant(plantId) {
+            return this.stretch.stakeLeftPlants.includes(plantId)
+                ? -this.stretch.stakeOffsetX
+                : this.stretch.stakeOffsetX;
         },
-        plantStakeLoopSrc(lighting) {
-            return lighting === 'night' ? this.stretch.stakeLoopStripNight : this.stretch.stakeLoopStripDay;
+        plantStakeSrc(plantId, stage) {
+            const kind = this.stakeSpriteKind(plantId, stage);
+            return kind === 'tall' ? this.stretch.stakeTallDay : this.stretch.stakeShortDay;
+        },
+        needsStakeIconSrc(lighting) {
+            return lighting === 'night' ? this.needs.iconStakeNight : this.needs.iconStake;
         },
     });
 })();

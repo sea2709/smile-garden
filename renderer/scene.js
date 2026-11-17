@@ -83,10 +83,10 @@
         const genericHarvest = { day: null, night: null };
         const produceImgs = {};
         const basketImg = (ART.produce && ART.produce.basket) ? loadImage(ART.produce.basket) : null;
-        const stakeImgs = { day: null, night: null };
+        const stakeImgs = { tall: null, short: null };
         if (ART.stretch) {
-            stakeImgs.day = loadImage(resolveArt(ART.plantStakeSrc('day')));
-            stakeImgs.night = loadImage(resolveArt(ART.plantStakeSrc('night')));
+            stakeImgs.tall = loadImage(resolveArt(ART.stretch.stakeTallDay));
+            stakeImgs.short = loadImage(resolveArt(ART.stretch.stakeShortDay));
         }
         const logoDayImg = (ART.ui && ART.ui.logoDay) ? loadImage(resolveArt(ART.ui.logoDay)) : null;
         const logoNightImg = (ART.ui && ART.ui.logoNight) ? loadImage(resolveArt(ART.ui.logoNight)) : null;
@@ -138,9 +138,9 @@
         }
         // one-shot absorb plays per plot: { kind, t0, i }
         const absorbs = [];
-        const SPRITE_KINDS = { sun: 'sun', water: 'water', fert: 'fertilizer' };
-        const fxWasOn = { sun: false, water: false, fert: false };
-        const FX_GAIN = { sun: 1.35, water: 1, fert: 1 }; // sunbeams boosted on the busy backdrop
+        const SPRITE_KINDS = { sun: 'sun', water: 'water', fert: 'fertilizer', stake: 'stake' };
+        const fxWasOn = { sun: false, water: false, fert: false, stake: false };
+        const FX_GAIN = { sun: 1.35, water: 1, fert: 1, stake: 1 };
 
         let rnd = mulberry(42);
         const view = { s: 1, ox: 0, oy: 0, cssW: 1, cssH: 1, dpr: 1 };
@@ -176,7 +176,7 @@
         let tendPlot = null;    // selected bed during a visit
         let tendRingPulse = false;
         let effectPlot = null;  // bed receiving sun/water/fert FX
-        const fx = { sun: 0, sunTarget: 0, water: 0, waterTarget: 0, fert: 0, fertTarget: 0, breath: 0 };
+        const fx = { sun: 0, sunTarget: 0, water: 0, waterTarget: 0, fert: 0, fertTarget: 0, breath: 0, stake: 0, stakeTarget: 0 };
 
         const motes = [];
         const fireflies = [];
@@ -385,7 +385,7 @@
         }
         function setEffects(e) {
             if ('plot' in e) effectPlot = e.plot === null || e.plot === undefined ? null : e.plot;
-            for (const k of ['sun', 'water', 'fert']) {
+            for (const k of ['sun', 'water', 'fert', 'stake']) {
                 if (!(k in e)) continue;
                 const on = clamp(e[k]) > 0.05;
                 if (fxWasOn[k] && !on) playAbsorb(k, effectPlot);
@@ -394,6 +394,7 @@
             if ('sun' in e) fx.sunTarget = clamp(e.sun);
             if ('water' in e) fx.waterTarget = clamp(e.water);
             if ('fert' in e) fx.fertTarget = clamp(e.fert);
+            if ('stake' in e) fx.stakeTarget = clamp(e.stake);
             if ('breath' in e) fx.breath = clamp(e.breath);
         }
         const clamp = (x) => (x > 1 ? 1 : x < 0 || !Number.isFinite(x) ? 0 : x);
@@ -432,6 +433,7 @@
             fx.sun += (fx.sunTarget - fx.sun) * k;
             fx.water += (fx.waterTarget - fx.water) * k;
             fx.fert += (fx.fertTarget - fx.fert) * k;
+            fx.stake += (fx.stakeTarget - fx.stake) * k;
 
             const night = lighting === 'night';
             for (let i = 0; i < motes.length; i++) {
@@ -1190,34 +1192,30 @@
             ctx.restore();
         }
 
-        function drawStake(i) {
-            const pl = plots[i];
-            if (!pl || !pl.staked || !ART.stretch) return;
-            if (L.plantNeedsStake && !L.plantNeedsStake(pl.plantId)) return;
+        function drawStake(i, pl) {
+            const plot = pl || plots[i];
+            if (!plot || !plot.staked || !ART.stretch) return;
+            if (L.plantNeedsStake && !L.plantNeedsStake(plot.plantId)) return;
             const bed = ART.plots[i];
-            const off = ART.stretch.stakeOffset || [14, -8];
-            const disp = ART.stretch.stakeDisplay || { w: 20, h: 50 };
-            const x = bed.x + off[0];
-            const y = bed.y + off[1];
-            const stakeImg = stakeImgs[lighting === 'night' ? 'night' : 'day'] || stakeImgs.day;
+            const kind = ART.stakeSpriteKind(plot.plantId, plot.stage);
+            const meta = ART.stretch.stakeSprites[kind] || ART.stretch.stakeSprites.short;
+            const offsetX = ART.stakeOffsetXForPlant(plot.plantId);
+            const stakeImg = stakeImgs[kind] || stakeImgs.short;
+            const sc = bed.scale || 0.5;
             if (ready(stakeImg)) {
-                const sp = ART.stretch.stakePixels || [80, 200];
-                const ax = (ART.stretch.stakeAnchor && ART.stretch.stakeAnchor.x) || 0.5;
-                const ay = (ART.stretch.stakeAnchor && ART.stretch.stakeAnchor.y) || 1;
-                const dx = x - disp.w * ax;
-                const dy = y - disp.h * ay;
-                ctx.drawImage(stakeImg, 0, 0, sp[0], sp[1], dx, dy, disp.w, disp.h);
+                ctx.save();
+                ctx.translate(bed.x + offsetX * sc, bed.y);
+                ctx.scale(sc, sc);
+                ctx.drawImage(stakeImg, -meta.w / 2, -meta.base, meta.w, meta.h);
+                ctx.restore();
             } else {
                 ctx.save();
-                ctx.fillStyle = '#c4a574';
+                ctx.translate(bed.x + offsetX * sc, bed.y);
                 ctx.strokeStyle = '#8a6b40';
-                ctx.lineWidth = 1.2;
-                ctx.fillRect(x - 3, y - disp.h, 6, disp.h);
-                ctx.strokeRect(x - 3, y - disp.h, 6, disp.h);
-                ctx.strokeStyle = '#d8c4a0';
+                ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.moveTo(x - 5, y - disp.h + 18);
-                ctx.lineTo(x + 5, y - disp.h + 22);
+                ctx.moveTo(0, 0);
+                ctx.lineTo(0, -meta.h * sc * 0.35);
                 ctx.stroke();
                 ctx.restore();
             }
@@ -1295,9 +1293,9 @@
                     }
                     continue;
                 }
+                if (pl.staked) drawStake(i, pl);
                 const st = plantSpriteStage(pl, i);
                 if (st != null) drawSprite(pl.plantId, st, i, t, 1, 1);
-                if (pl.staked) drawStake(i);
             }
             ctx.filter = 'none';
         }
@@ -1440,11 +1438,11 @@
             const E = ART.effects;
             if (!E) return;
             const loopFrame = Math.floor(t * E.fps) % E.count;
-            const levels = { sun: fx.sun, water: fx.water, fert: fx.fert };
+            const levels = { sun: fx.sun, water: fx.water, fert: fx.fert, stake: fx.stake };
             const fxI = effectPlot;
             if (fxI !== null && plots[fxI]) {
-                for (const k of ['water', 'fert', 'sun']) {
-                    if (levels[k] > 0.03) drawFxFrame(k, 'loop', fxI, (loopFrame + fxI * 3) % E.count, levels[k] * FX_GAIN[k]);
+                for (const k of ['water', 'fert', 'sun', 'stake']) {
+                    if (levels[k] > 0.03) drawFxFrame(k, 'loop', fxI, (loopFrame + fxI * 3) % E.count, levels[k] * (FX_GAIN[k] || 1));
                 }
             }
             const now = performance.now() / 1000;

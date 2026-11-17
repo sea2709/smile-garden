@@ -149,7 +149,53 @@ async function runTimeArt(win, outDir) {
     if (fs.existsSync(legacyDawn)) fs.copyFileSync(legacyDawn, legacyAlias);
 }
 
+async function runStakeArt(win, outDir) {
+    fs.mkdirSync(outDir, { recursive: true });
+    const wc = win.webContents;
+    const js = (code) => wc.executeJavaScript(code, true);
+    const G = (expr) => js(`(() => { const g = window.__smileGarden; return ${expr}; })()`);
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const shot = async (name) => {
+        await sleep(350);
+        const img = await wc.capturePage();
+        fs.writeFileSync(path.join(outDir, name), img.toPNG());
+        console.log('[capture] wrote', name, img.getSize());
+    };
+    const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(1400); };
+    const t0 = Date.now();
+    while (Date.now() - t0 < 60000) {
+        const ready = await js("document.body.dataset.ready === '1'");
+        if (ready) break;
+        await sleep(120);
+    }
+    await G('g.reset()');
+    await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
+    await sleep(700);
+    await lightingTo('midday');
+    await G(`g.setStretchHudDemo('left-hold')`);
+    await sleep(500);
+    await shot('stake-guide-tilted.png');
+    await shot('stake-ring-midfill.png');
+    await G('g.clearStretchHudDemo()');
+    await G(`g.show('idle')`);
+    await G(`g.plant('tomato', 2)`);
+    await G('g.simulateDays(5)');
+    await G('g.setStakedBed(2, true)');
+    await sleep(900);
+    await shot('garden-staked-tomato.png');
+    await G(`g.plant('sunflower', 0)`);
+    await G('g.simulateDays(14)');
+    await G('g.setStakedBed(0, true)');
+    await sleep(900);
+    await shot('garden-staked-sunflower.png');
+}
+
 async function run(win, outDir) {
+    if (process.env.SMILE_GARDEN_STAKE_SHOTS === '1') {
+        await runStakeArt(win, outDir);
+        app.quit();
+        return;
+    }
     if (process.env.SMILE_GARDEN_TIME_SHOTS === '1') {
         await runTimeArt(win, outDir);
         app.quit();
@@ -236,15 +282,17 @@ async function run(win, outDir) {
     await sleep(800);
     await shot('03b-selection-ring-visit.png');
     await G(`g.startCare('sun')`);
-    await waitFor('care sun', (d) => d.step === 'care-sun' && d.smiling === '1', 20000);
+    await waitFor('care sun', (d) => d.step === 'care-sun', 20000);
     await sleep(1200);
     await shot('04-care-sun-midday.png');
-    await waitFor('back to hub sun', (d) => d.step === 'care-hub', 25000);
+    await G(`g.completeCareNeedForCapture('sun')`);
+    await waitFor('back to hub sun', (d) => d.step === 'care-hub', 8000);
     await G(`g.startCare('water')`);
     await waitFor('care water', (d) => d.step === 'care-water', 8000);
     await sleep(800);
     await shot('05-care-water.png');
-    await waitFor('hub after water', (d) => d.step === 'care-hub', 30000);
+    await G(`g.completeCareNeedForCapture('water')`);
+    await waitFor('hub after water', (d) => d.step === 'care-hub', 8000);
     await sleep(500);
     await shot('06-needs-card-partial.png');
     await G('g.setSelectedPlot(1)');
@@ -257,6 +305,8 @@ async function run(win, outDir) {
     await G(`g.setStretchHudDemo('left-hold')`);
     await sleep(450);
     await shot('07e-stretch-left-hold.png');
+    await shot('stake-guide-tilted.png');
+    await shot('stake-ring-midfill.png');
     await G(`g.setStretchHudDemo('right-hold')`);
     await sleep(450);
     await shot('07f-stretch-right-hold.png');
@@ -275,7 +325,8 @@ async function run(win, outDir) {
     await G('g.clearBreathHudDemo()');
     await sleep(4000);
     await shot('07-care-breathe.png');
-    await waitFor('hub after fert', (d) => d.step === 'care-hub', 30000);
+    await G(`g.completeCareNeedForCapture('fertilizer')`);
+    await waitFor('hub after fert', (d) => d.step === 'care-hub', 8000);
     await G('g.finishVisitForCapture()');
     await waitFor('visit end', (d) => d.screen === 'idle' || d.screen === 'summary', 25000);
     await sleep(600);
@@ -302,6 +353,12 @@ async function run(win, outDir) {
     await G('g.setStakedBed(2, true)');
     await sleep(800);
     await shot('09b-staked-plant-bed.png');
+    await shot('garden-staked-tomato.png');
+    await G(`g.plant('sunflower', 0)`);
+    await G('g.simulateDays(12)');
+  await G('g.setStakedBed(0, true)');
+    await sleep(900);
+    await shot('garden-staked-sunflower.png');
     await G('g.setStakedBed(4, false)');
 
     await lightingTo('midday');

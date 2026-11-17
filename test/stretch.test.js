@@ -17,6 +17,18 @@ test('head roll from eye landmarks matches tilt sign (mirrored camera)', () => {
     assert.ok(S.radToDeg(raw) < -10, 'unmirrored flips sign');
 });
 
+test('display progress eases back when player relaxes mid-hold', () => {
+    const flow = S.createStretchFlow({ holdSeconds: 2, tiltDeg: 12, displayEaseTau: 0.4 });
+    const feed = (deg, dt) => flow.update(dt, { points: pts(deg), faceVisible: true, mirrored: true });
+    for (let i = 0; i < 8; i++) feed(-18, 0.2);
+    const mid = flow.snapshot().leftProgress;
+    assert.ok(mid > 0.35);
+    for (let i = 0; i < 12; i++) flow.update(0.1, { points: pts(0), faceVisible: true, mirrored: true });
+    const relaxed = flow.snapshot().leftProgress;
+    assert.ok(relaxed < mid * 0.6);
+    assert.ok(flow.snapshot().leftDone === false);
+});
+
 test('hold timers require both shoulders; same season idempotent on flow', () => {
     const flow = S.createStretchFlow({ holdSeconds: 1, tiltDeg: 12, smoothWindowSec: 0.2, dropoutGraceSec: 0.5 });
     const feed = (deg, dt) => flow.update(dt, { points: pts(deg), faceVisible: true, mirrored: true });

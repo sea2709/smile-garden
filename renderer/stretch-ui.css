@@ -1,67 +1,117 @@
-/* Neck-stretch step — guide sunflower + vine hold rings */
+/* Neck-stretch / stake care — Heily guide + vine rings (stake-manifest.json) */
+
 .stretch-guide {
     position: absolute;
-  left: 50%;
-  top: 42%;
-  transform: translate(-50%, -50%);
-    width: 96px;
-    height: 96px;
+    left: 50%;
+    top: 40%;
+    transform: translate(-50%, -50%);
+    width: 200px;
     pointer-events: none;
     z-index: 28;
 }
-.stretch-flower-pivot {
+
+.stretch-guide-box {
     position: relative;
-    width: 96px;
-    height: 96px;
+    width: 160px;
+    height: 220px;
+    margin: 0 auto;
 }
-.stretch-sunflower-stem {
+
+.stretch-guide-stem {
     position: absolute;
-    left: 0;
-    top: 0;
+    left: 16px;
+    top: 64px;
+    width: 124.5px;
+    height: 153px;
+    transform-origin: 64px 152px;
+    transition: transform 0.08s ease-out;
     pointer-events: none;
 }
-.stretch-guide img,
-.stretch-guide .stretch-flower-fallback {
-    width: 96px;
-    height: 96px;
-    display: block;
-    transform-origin: 50% 75%;
-    transition: transform 0.08s ease-out;
+
+.stretch-guide-head {
+    position: absolute;
+    width: 80px;
+    height: 80px;
+    left: 80px;
+    top: 146px;
+    transform: translate(-50%, -50%);
+    transition: left 0.08s ease-out, top 0.08s ease-out, transform 0.08s ease-out;
+    pointer-events: none;
 }
+
+.stretch-guide-fallback,
+.stretch-flower-fallback {
+    width: 160px;
+    height: 220px;
+    display: block;
+    margin: 0 auto;
+    object-fit: contain;
+}
+
 .stretch-flower-fallback {
     font-size: 72px;
-    line-height: 96px;
+    line-height: 220px;
     text-align: center;
     filter: drop-shadow(0 4px 8px rgba(70, 48, 20, 0.2));
 }
+
+.stretch-hint {
+    position: absolute;
+    width: 75px;
+    height: 33.5px;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+}
+
+.stretch-hint-left {
+    left: -24px;
+    top: 72px;
+}
+
+.stretch-hint-right {
+    right: -24px;
+    top: 72px;
+}
+
 .stretch-rings {
     display: flex;
-    gap: 28px;
+    gap: 20px;
     justify-content: center;
-    margin-top: 12px;
+    margin-bottom: 8px;
 }
+
 .stretch-ring {
     position: relative;
-    width: 60px;
-    height: 60px;
+    width: 100px;
+    height: 118px;
+    text-align: center;
 }
+
 .stretch-ring canvas {
-    width: 60px;
-    height: 60px;
+    width: 100px;
+    height: 100px;
     display: block;
+    margin: 0 auto;
 }
+
 .stretch-ring label {
     display: block;
     font-size: 11px;
     font-weight: 700;
-    text-align: center;
     color: var(--ink-soft);
     margin-top: 4px;
 }
+
 body[data-step="stretch"] .ring-wrap { display: none; }
 body[data-step="stretch-offer"] .ring-wrap { display: none; }
 body[data-step="stretch"] #stretch-guide { display: block; }
 body[data-step="stretch-offer"] #stretch-guide { display: none; }
+
+#meter-stake-wrap { display: none; }
+body[data-step="stretch"] #meter-stake-wrap,
+body[data-step="stretch-offer"] #meter-stake-wrap { display: block; }
 
 .stretch-care-panel {
     position: absolute;

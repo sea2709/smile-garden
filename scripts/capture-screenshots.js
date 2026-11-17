@@ -15,8 +15,9 @@ const root = path.join(__dirname, '..');
 const outDir = path.join(root, 'docs');
 fs.mkdirSync(outDir, { recursive: true });
 const timeOnly = process.env.SMILE_GARDEN_TIME_SHOTS === '1';
+const stakeOnly = process.env.SMILE_GARDEN_STAKE_SHOTS === '1';
 const keepPng = new Set(['breath-mockup.png']);
-if (!timeOnly) {
+if (!timeOnly && !stakeOnly) {
     for (const f of fs.readdirSync(outDir)) {
         if (f.endsWith('.png') && !keepPng.has(f)) fs.unlinkSync(path.join(outDir, f));
     }
@@ -27,6 +28,7 @@ const env = Object.assign({}, process.env, {
     SMILE_GARDEN_FAST: '1',
     SMILE_GARDEN_CAPTURE_DIR: outDir,
     SMILE_GARDEN_TIME_SHOTS: timeOnly ? '1' : (process.env.SMILE_GARDEN_TIME_SHOTS || ''),
+    SMILE_GARDEN_STAKE_SHOTS: stakeOnly ? '1' : (process.env.SMILE_GARDEN_STAKE_SHOTS || ''),
 });
 const child = spawn(electron, ['.', '--mock', '--fast', '--no-sandbox'], { cwd: root, env, stdio: 'inherit' });
 child.on('exit', (code) => process.exit(code || 0));
