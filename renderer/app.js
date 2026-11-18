@@ -37,8 +37,11 @@
     let config = { mock: true, fast: false };
     let state = V.loadState(safeGet(), new Date());
     const clock = new V.GameClock({ offsetDays: state.settings.offsetDays });
+    // Prefer the current default so older saves (1000 ms) pick up the faster clock.
+    const gardenMinuteMs = D.DEFAULT_DAY_CONFIG.realMsPerGardenMinute;
+    state.settings.realMsPerGardenMinute = gardenMinuteMs;
     const gardenClock = new D.GardenDayClock(state, {
-        realMsPerGardenMinute: state.settings.realMsPerGardenMinute || D.DEFAULT_DAY_CONFIG.realMsPerGardenMinute,
+        realMsPerGardenMinute: gardenMinuteMs,
     });
     let saveAcc = 0;
     function safeGet() { try { return localStorage.getItem(STORE_KEY); } catch { return null; } }
