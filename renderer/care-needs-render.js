@@ -27,8 +27,16 @@
 
     function slotIsActive(needKey, activeChannel, nowMs) {
         const ch = CHANNEL_SLOT[activeChannel];
-        if (ch === needKey) lastActiveAt[needKey] = nowMs;
+        if (ch === needKey) {
+            lastActiveAt[needKey] = nowMs;
+            return true;
+        }
         return nowMs - (lastActiveAt[needKey] || 0) < HOLD_MS;
+    }
+
+    function rowGlowSrc(needKey, lighting) {
+        const night = lighting === 'night' ? '-night' : '';
+        return `../assets/ui/tend/tend-glow-${needKey}-row${night}.png`;
     }
 
     function sunGlowLevel(prog, needs, lighting) {
@@ -72,7 +80,8 @@
         const kind = L.plantById(pl.plantId);
         const allMet = C.allNeedsMet(prog, needs, pl.staked);
         const showResting = !!pl.tagResting && !allMet;
-        const activeCh = session.activeCareChannel;
+        const demoCh = typeof document !== 'undefined' ? document.body.dataset.demoCareChannel : '';
+        const activeCh = demoCh || session.activeCareChannel || null;
         const harvestReady = session.canCareHarvest && session.canCareHarvest(plot);
         const cardLight = lighting === 'night' ? 'night' : 'midday';
 
@@ -119,6 +128,14 @@
         if (harvestReady) {
             const harvestActive = slotIsActive('harvest', activeCh, nowMs);
             harvestIconEl.classList.toggle('is-active', harvestActive);
+            let harvestGlow = harvestIconEl.querySelector('.tend-harvest-glow');
+            if (!harvestGlow) {
+                harvestGlow = document.createElement('img');
+                harvestGlow.className = 'tend-harvest-glow';
+                harvestGlow.alt = '';
+                harvestIconEl.insertBefore(harvestGlow, harvestImgEl);
+            }
+            bindImg(harvestGlow, rowGlowSrc('harvest', cardLight), artUrl, null);
             bindImg(harvestImgEl, ART.needsIconSrc('harvest', 'midday'), artUrl, '🧺');
         } else if (harvestIconEl) {
             harvestIconEl.classList.remove('is-active');
@@ -133,13 +150,17 @@
         for (const spec of careSlots) {
             const stat = disp('filledAndLeft', C, prog, needs, spec.key, pl.staked);
             if (stat.req <= 0) continue;
-            const captureGlow = typeof document !== 'undefined' && document.body.dataset.captureStripGlow === '1';
-            const active = captureGlow && activeCh === spec.channel
-                ? true
-                : slotIsActive(spec.channel, activeCh, nowMs);
+            const channel = activeCh || demoCh;
+            const active = channel === spec.channel || slotIsActive(spec.channel, channel, nowMs);
             const row = document.createElement('div');
             row.className = 'tend-care' + (stat.done ? ' tend-care--done' : '') + (active ? ' is-active' : '');
             row.dataset.need = spec.key;
+
+            const glow = document.createElement('img');
+            glow.className = 'tend-row-glow';
+            glow.alt = '';
+            bindImg(glow, rowGlowSrc(spec.key, cardLight), artUrl, null);
+            row.appendChild(glow);
 
             const slots = document.createElement('span');
             slots.className = 'tend-slots';

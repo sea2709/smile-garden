@@ -55,6 +55,7 @@ body[data-lighting='night'] .tend-strip {
     gap: 10px;
     min-height: 32px;
     padding: 0 0 0 2px;
+    overflow: visible;
 }
 .tend-slots {
     display: flex;
@@ -79,38 +80,47 @@ body[data-lighting='night'] .tend-strip {
 .tend-care--done .tend-remain { color: #6B4F36; font-weight: 700; }
 .tend-check { width: 20px; height: 20px; object-fit: contain; position: relative; z-index: 1; flex: 0 0 auto; }
 
-/* ACTIVE: camera sees this action. Add .is-active to .tend-care (or .tend-harvest-icon);
-   remove it ~400ms after the signal drops. */
-.tend-care::before, .tend-harvest-icon::before {
-    content: '';
+/* ACTIVE: camera sees this action. Glow art is loaded via <img> (artUrl), not CSS url(),
+   so it works under file:// in Electron like the slot icons. */
+.tend-row-glow {
     position: absolute;
-    left: -12px; top: -10px;
-    width: 140px; height: 52px;
+    left: -14px;
+    top: -12px;
+    width: 152px;
+    height: 56px;
+    object-fit: fill;
     z-index: 0;
-    background: center / contain no-repeat;
+    pointer-events: none;
     opacity: 0;
     transform: scale(0.92);
     transition: opacity 0.35s ease, transform 0.35s ease;
-    pointer-events: none;
 }
-.tend-harvest-icon::before { left: -10px; top: -10px; width: 72px; height: 72px; }
-.tend-care.is-active::before, .tend-harvest-icon.is-active::before {
-    opacity: 1; transform: scale(1);
+.tend-harvest-glow {
+    position: absolute;
+    left: -10px;
+    top: -10px;
+    width: 72px;
+    height: 72px;
+    object-fit: fill;
+    z-index: 0;
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.92);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.tend-care.is-active .tend-row-glow,
+.tend-harvest-icon.is-active .tend-harvest-glow {
+    opacity: 1;
+    transform: scale(1);
+    filter: saturate(1.12) brightness(1.06);
     animation: tend-breathe 2.4s ease-in-out 0.35s infinite;
 }
 .tend-care.is-active .tend-slot-pip { transform: translateY(-1px); }
 .tend-care.is-active .tend-remain { color: #3E2A1A; }
-.tend-care[data-need='water']::before      { background-image: url('../assets/ui/tend/tend-glow-water-row.png'); }
-.tend-care[data-need='fertilizer']::before { background-image: url('../assets/ui/tend/tend-glow-fertilizer-row.png'); }
-.tend-care[data-need='stake']::before      { background-image: url('../assets/ui/tend/tend-glow-stake-row.png'); }
-.tend-harvest-icon::before                 { background-image: url('../assets/ui/tend/tend-glow-harvest-row.png'); }
-body[data-lighting='night'] .tend-care[data-need='water']::before      { background-image: url('../assets/ui/tend/tend-glow-water-row-night.png'); }
-body[data-lighting='night'] .tend-care[data-need='fertilizer']::before { background-image: url('../assets/ui/tend/tend-glow-fertilizer-row-night.png'); }
-body[data-lighting='night'] .tend-care[data-need='stake']::before      { background-image: url('../assets/ui/tend/tend-glow-stake-row-night.png'); }
-body[data-lighting='night'] .tend-harvest-icon::before                 { background-image: url('../assets/ui/tend/tend-glow-harvest-row-night.png'); }
 @keyframes tend-breathe { 50% { opacity: 0.6; transform: scale(0.96); } }
 @media (prefers-reduced-motion: reduce) {
-    .tend-care.is-active::before, .tend-harvest-icon.is-active::before { animation: none; }
+    .tend-care.is-active .tend-row-glow,
+    .tend-harvest-icon.is-active .tend-harvest-glow { animation: none; }
 }
 
 .tend-harvest { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 2px 0 4px; }
@@ -126,14 +136,10 @@ body[data-tend-strip='1'] #hint,
 body[data-tend-strip='1'] #toast { visibility: hidden !important; pointer-events: none; }
 
 /* Doc captures: keep row glow visible without waiting on CSS transition / reduced motion */
-body[data-capture-strip-glow='1'] .tend-care.is-active::before,
-body[data-capture-strip-glow='1'] .tend-harvest-icon.is-active::before {
+body[data-capture-strip-glow='1'] .tend-care.is-active .tend-row-glow,
+body[data-capture-strip-glow='1'] .tend-harvest-icon.is-active .tend-harvest-glow {
     opacity: 1 !important;
     transform: scale(1) !important;
     transition: none !important;
     animation: none !important;
-    z-index: 0 !important;
-}
-body[data-capture-strip-glow='1'] .tend-care.is-active {
-    overflow: visible;
 }

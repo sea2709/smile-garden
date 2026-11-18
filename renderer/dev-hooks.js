@@ -176,10 +176,12 @@
             show('visit');
             onStep('care-hub');
             if (els.tendStrip) els.tendStrip.hidden = false;
+            syncToApp();
             renderNeedsCard();
             refreshLighting();
             renderHud();
             plotsForScene({ instant: true });
+            syncToApp();
             return i;
         },
         clearCaptureVisit() {
@@ -234,18 +236,27 @@
                 signal.breathing = null;
             }
             if (session) {
+                session.smiling = m === 'smile';
+                session.talking = m === 'talk';
                 if (m === 'smile') session.activeCareChannel = 'water';
                 else if (m === 'talk') session.activeCareChannel = 'fertilizer';
                 else if (m === 'stretch') session.activeCareChannel = 'stake';
                 else if (m === 'breathe') session.activeCareChannel = 'harvest';
                 else session.activeCareChannel = null;
-                renderNeedsCard();
             }
+            document.body.dataset.demoCareChannel = m === 'smile' ? 'water'
+                : m === 'talk' ? 'fertilizer'
+                    : m === 'stretch' ? 'stake'
+                        : m === 'breathe' ? 'harvest'
+                            : '';
+            syncToApp();
+            if (session) renderNeedsCard();
             return m;
         },
         primeSignalTraceForCapture,
         clearSignalPanelDemoForCapture() {
             signalPanelDemoLock = null;
+            delete document.body.dataset.demoCareChannel;
             stretchDemoSnap = null;
             if (session) session.activeCareChannel = null;
             if (signalSwitcher && signalSwitcher.reset) signalSwitcher.reset();
@@ -313,6 +324,7 @@
             show('visit');
             onStep('care-hub');
             if (els.tendStrip) els.tendStrip.hidden = false;
+            syncToApp();
             renderNeedsCard();
             plotsForScene({ instant: true });
             return session.careProgressFor(i);
@@ -327,6 +339,7 @@
                     window.SmileTendStrip.resetActiveHold();
                 }
             }
+            syncToApp();
             renderNeedsCard();
             return channel;
         },

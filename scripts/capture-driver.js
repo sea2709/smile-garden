@@ -551,6 +551,55 @@ async function run(win, outDir) {
     }
     const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(2000); };
 
+    if (process.env.SMILE_GARDEN_STRIP_GLOW_ONLY === '1') {
+        await waitFor('ready', (d) => d.ready === '1');
+        await G('g.reset()');
+        await lightingTo('midday');
+        await G('g.ackWellness()');
+        await sleep(300);
+        if ((await ds()).screen !== 'camera-check') await G('g.openCameraCheck()');
+        await waitFor('camera check', (d) => d.screen === 'camera-check', 25000);
+        await G('g.markAllCameraChecksPassed()');
+        await sleep(400);
+        await G('g.finishCameraCheck()');
+        await sleep(400);
+        await G('g.prepCaptureGarden()');
+        await G('g.show("idle")');
+        await sleep(300);
+        const daySmileProgress = { sun: 2, water: 1, fertilizer: 0, stake: false };
+        await G(`g.setNeedsCardDemo(4, ${JSON.stringify(daySmileProgress)})`);
+        await G('g.setChartForCapture(true)');
+        await G(`g.setSignalPanelDemoForCapture('smile')`);
+        await G(`g.setTendStripActiveForCapture('water')`);
+        await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-smile'); return true; })()`);
+        await G('g.setCaptureStripGlow(true)');
+        await G(`g.setSignalPanelDemoForCapture('smile')`);
+        await G(`g.setTendStripActiveForCapture('water')`);
+        await sleep(200);
+        await G('g.captureRedraw()');
+        await sleep(80);
+        await js(`(() => new Promise((resolve, reject) => {
+            const row = document.querySelector('.tend-care[data-need="water"]');
+            if (!row) return reject(new Error('no water row'));
+            if (!row.classList.contains('is-active')) {
+                return reject(new Error('water row not active demo=' + document.body.dataset.demoCareChannel + ' class=' + row.className));
+            }
+            const glow = row.querySelector('.tend-row-glow');
+            if (!glow) return reject(new Error('no tend-row-glow img'));
+            const done = () => {
+                if (glow.naturalWidth > 0) resolve(true);
+                else reject(new Error('glow image has zero size'));
+            };
+            if (glow.complete) done();
+            else { glow.onload = () => done(); glow.onerror = () => reject(new Error('glow image failed to load')); }
+        }))()`);
+        await G('g.captureRedraw()');
+        await sleep(120);
+        await shot('tend-strip-active-glow.png');
+        app.quit();
+        return;
+    }
+
     await waitFor('ready', (d) => d.ready === '1');
     await G('g.reset()');
     await lightingTo('dawn');
@@ -653,9 +702,29 @@ async function run(win, outDir) {
         mockPhase: 'care-hub-smile',
     });
     await G('g.setCaptureStripGlow(true)');
+    await G(`g.setSignalPanelDemoForCapture('smile')`);
     await G(`g.setTendStripActiveForCapture('water')`);
     await sleep(200);
-    await G(`g.setTendStripActiveForCapture('water')`);
+    await G('g.captureRedraw()');
+    await sleep(80);
+    await js(`(() => new Promise((resolve, reject) => {
+        const row = document.querySelector('.tend-care[data-need="water"]');
+        if (!row) return reject(new Error('no water row'));
+        if (!row.classList.contains('is-active')) {
+            return reject(new Error('water row not active (demo=' + document.body.dataset.demoCareChannel + ')'));
+        }
+        const glow = row.querySelector('.tend-row-glow');
+        if (!glow) return reject(new Error('no tend-row-glow img'));
+        const done = () => {
+            if (glow.naturalWidth > 0) resolve(true);
+            else reject(new Error('glow image has zero size'));
+        };
+        if (glow.complete) done();
+        else {
+            glow.onload = () => done();
+            glow.onerror = () => reject(new Error('glow image failed to load'));
+        }
+    }))()`);
     await G('g.captureRedraw()');
     await sleep(120);
     await shot('tend-strip-active-glow.png');
