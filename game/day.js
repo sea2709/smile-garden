@@ -10,7 +10,7 @@ const DEFAULT_DAY_CONFIG = Object.freeze({
     startMinutes: 360,       // 6:00
     endMinutes: 1440,        // 24:00
     lateNightStop: 1380,     // 23:00 — clock pauses here until bed
-    realMsPerGardenMinute: 1000, // 1 real minute = 60 garden minutes (1 garden hour)
+    realMsPerGardenMinute: 500, // 1 real minute = 120 garden minutes (2 garden hours)
 });
 
 /** @type {Record<string, string[]>} */
