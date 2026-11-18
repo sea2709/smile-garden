@@ -1041,6 +1041,10 @@
                 face: !!face,
                 talking: !!s.talking,
                 smiling: !!s.smiling,
+                breathRate: Number.isFinite(s.breathRate) ? s.breathRate : null,
+                breathPhase: Number.isFinite(s.breathPhase) ? s.breathPhase : null,
+                rollDeg: Number.isFinite(s.rollDeg) ? s.rollDeg : null,
+                panelMode: typeof s.panelMode === 'string' ? s.panelMode : null,
             };
             this.buf[this.head] = rec;
             this.head = (this.head + 1) % this.capacity;

@@ -9,13 +9,14 @@
     const V = window.SmileVisit;
     const D = window.SmileDay;
     const C = window.SmileCareNeeds;
+    const SP = window.SmileSignalPanel;
     const CC = window.SmileCameraCheck;
     const CCUI = window.SmileCameraCheckUI;
     const ART = window.SmileArt;
     const STORE_KEY = 'smile-garden.v3';
     const $ = (id) => document.getElementById(id);
     const els = {};
-    for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-live',
+    for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-title', 'chart-live',
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
@@ -65,6 +66,8 @@
         if (els.brandLogoDay.complete) markBrand();
     }
     const trace = new L.SmileTrace({ windowSec: 10, capacity: 480 });
+    const signalSwitcher = SP ? SP.createSignalPanelSwitcher() : null;
+    let signalPanelDemoLock = null;
     let screen = 'loading';
     let session = null;
     let source = null;
@@ -161,6 +164,25 @@
                 soilTended: !!(careAll || tendedAllMet),
                 tagResting: !!p.tagResting && !careAll && !tendedAllMet,
                 tagProgress,
+                harvestReadyBadge: (() => {
+                    if (!p || p.stage < V.MAX_STAGE) return false;
+                    if (!V.isPlotReady(p, today)) return false;
+                    const met = session
+                        ? (session.canCareHarvest ? session.canCareHarvest(i) : careAllMet)
+                        : careAll;
+                    if (!met) return false;
+                    if (session && session.step === 'care-harvest' && session.selectedPlot === i) return false;
+                    return true;
+                })(),
+                harvestTagPrompt: (() => {
+                    if (!p || p.stage < V.MAX_STAGE) return false;
+                    if (!V.isPlotReady(p, today)) return false;
+                    const met = session
+                        ? (session.canCareHarvest ? session.canCareHarvest(i) : careAllMet)
+                        : careAll;
+                    return !!met;
+                })(),
+                isDaylight: currentInput().isDaylight,
             };
         });
         scene.setPlots(view, instant ? { instant: true } : undefined);
@@ -177,9 +199,18 @@
         const step = session.step;
         const plot = session.selectedPlot;
         const harvestPick = step === 'pick-harvest' || step === 'harvest-hold';
-        const careHub = step === 'care-hub' || step === 'care-sun' || step === 'care-water' || step === 'care-breathe';
+        const careHub = step === 'care-hub' || step === 'care-smile' || step === 'care-talk' || step === 'care-harvest';
+        const ch = session.activeCareChannel;
         scene.setTendSelection(plot, { pulse: step === 'pick' || step === 'pick-harvest' || step === 'care-hub' });
-        if (step === 'pick' || harvestPick || careHub) scene.setEffects({ plot: plot, sun: 0, water: 0, fert: 0 });
+        if (step === 'pick' || harvestPick || careHub) {
+            scene.setEffects({
+                plot,
+                sun: 0,
+                water: ch === 'water' ? 1 : 0,
+                fert: ch === 'fertilizer' ? 1 : 0,
+                stake: ch === 'stake' ? 0.85 : 0,
+            });
+        }
     }
 
     function refreshBasketChip(visitCount) {
@@ -630,7 +661,7 @@
                     sun: C.fillFraction(prog, needs, 'sun', pl.staked),
                     water: C.fillFraction(prog, needs, 'water', pl.staked),
                     fert: C.fillFraction(prog, needs, 'fertilizer', pl.staked),
-                    fertUsed: session.step === 'care-breathe',
+                    fertUsed: session.step === 'care-harvest',
                 };
             }
         }
@@ -668,11 +699,12 @@
             els.meterWaterVal.textContent = `${Math.round(m.water * 100)}%`;
             els.meterFertVal.textContent = m.fertUsed ? `${Math.round(m.fert * 100)}%` : 'optional';
         }
-        els.meterSunWrap.classList.toggle('active', step === 'smile' || step === 'care-sun');
-        els.meterWaterWrap.classList.toggle('active', step === 'talk' || step === 'care-water');
-        els.meterFertWrap.classList.toggle('active', step === 'breathe' || step === 'breathe-offer' || step === 'care-breathe');
+        els.meterSunWrap.classList.toggle('active', (step === 'care-hub' || step === 'care-smile') && lighting !== 'night');
+        const ch = session ? session.activeCareChannel : null;
+        els.meterWaterWrap.classList.toggle('active', step === 'smile' || step === 'care-smile' || ch === 'water');
+        els.meterFertWrap.classList.toggle('active', step === 'talk' || step === 'care-talk' || step === 'breathe' || step === 'breathe-offer' || step === 'care-harvest' || ch === 'fertilizer');
         if (els.meterStakeWrap) {
-            els.meterStakeWrap.classList.toggle('active', step === 'stretch' || step === 'stretch-offer');
+            els.meterStakeWrap.classList.toggle('active', step === 'stretch' || step === 'stretch-offer' || ch === 'stake');
             const stakeVal = stakeMeterFrac();
             if (els.meterStakeVal) {
                 els.meterStakeVal.textContent = step === 'stretch' || step === 'stretch-offer'
@@ -821,13 +853,13 @@
         breathe: { title: 'Breathe with the light', text: 'Follow the glow: in as it grows, out as it fades. No holding, no straining.' },
         'stretch-offer': { title: 'Stake this plant', text: 'Optional neck stretch — tip each ear toward a shoulder and hold briefly, like setting a gentle stake. Skip anytime.' },
         stretch: { title: 'Neck stretch', text: 'Tilt toward one shoulder (~15°) and hold about 3 seconds, then the other. Order does not matter.' },
-        'care-hub': { title: 'Today\'s needs', text: 'Tap a need icon in any order. Dots fill as you go — you can pause and come back the same day.' },
-        'care-sun': { title: 'Sun dot', text: 'Smile while the dot fills (~10 s per dot).' },
-        'care-water': { title: 'Water dot', text: 'Talk to your plant while the dot fills (~10 s per dot).' },
-        'care-breathe': { title: 'Fertilizer dot', text: 'Follow the breath guide (~15 s per dot). Gentle nose breathing only.' },
+        'care-hub': { title: 'Tend with your camera', text: 'Select a bed once. Sunlight fills by day; smile to water, talk to fertilize, breathe to harvest when mature, and stretch to stake climbers. The needs card shows status only.' },
+        'care-smile': { title: 'Water', text: 'Smile at your plant while the water dot fills (~10 s per dot).' },
+        'care-talk': { title: 'Fertilize', text: 'Talk to your plant while the fertilizer dot fills (~10 s per dot).' },
+        'care-harvest': { title: 'Harvest', text: 'Breathe with the guide to harvest this mature crop. Gentle nose breathing only.' },
     };
-    const NEED_LABELS = { sun: 'Sun', water: 'Water', fertilizer: 'Fertilizer', stake: 'Stake' };
-    const NEED_EMOJI = { sun: '☀', water: '💧', fertilizer: '🍃', stake: '🌻' };
+    const NEED_LABELS = { sun: 'Sunlight', water: 'Water', fertilizer: 'Fertilizer', harvest: 'Harvest', stake: 'Stake' };
+    const NEED_EMOJI = { sun: '☀', water: '💧', fertilizer: '🍃', harvest: '🧺', stake: '🌻' };
 
     function bindNeedsArt(img, src, fallbackEl) {
         if (!img) return;
@@ -839,7 +871,7 @@
     function renderNeedsCard() {
         if (!session || !els.needsCard || !C) return;
         const plot = session.selectedPlot;
-        const careSteps = ['care-hub', 'care-sun', 'care-water', 'care-breathe', 'stretch-offer', 'stretch'];
+        const careSteps = ['care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
         const show = careSteps.includes(session.step);
         els.needsCard.hidden = !show || plot == null;
         if (!show || plot == null) return;
@@ -862,6 +894,14 @@
             els.needsRestingStamp.hidden = !showResting;
             if (els.needsRestingFallback) els.needsRestingFallback.hidden = !showResting || !els.needsRestingStamp.hidden;
         }
+        function sunCardGlowLevel(prog, needs) {
+            if (lighting === 'night') return 'rest';
+            const req = C.dotsForNeed(needs, 'sun');
+            if (req <= 0) return 3;
+            const got = Math.max(0, Number(prog.sun) || 0);
+            if (got + 1e-6 >= req) return 3;
+            return Math.min(3, Math.ceil(3 * (got / req)));
+        }
         const rowsEl = els.needsRows;
         if (rowsEl) {
             rowsEl.textContent = '';
@@ -872,19 +912,30 @@
                 const req = C.dotsForNeed(needs, key);
                 if (req <= 0) continue;
                 const done = C.fillFraction(prog, needs, key, pl.staked) >= 1;
-                const btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'need-row' + (done ? ' need-row--done' : '');
+                const activeCh = session.activeCareChannel;
+                const detecting = (activeCh === 'water' && key === 'water')
+                    || (activeCh === 'fertilizer' && key === 'fertilizer')
+                    || (activeCh === 'stake' && key === 'stake');
+                const row = document.createElement('div');
+                row.className = 'need-row' + (done ? ' need-row--done' : '') + (detecting ? ' need-row--detecting' : '');
+                row.setAttribute('role', 'group');
+                row.setAttribute('aria-label', (NEED_LABELS[key] || key) + (detecting ? ' · detecting' : ''));
                 const [rx0, ry0, rx1, ry1] = rowSpec.row;
                 const rowAbsTop = half(ry0);
                 const rowTop = rowAbsTop - rowsOriginY;
-                btn.style.top = `${rowTop}px`;
-                btn.style.height = `${half(ry1 - ry0)}px`;
+                row.style.top = `${rowTop}px`;
+                row.style.height = `${half(ry1 - ry0)}px`;
                 const [ix0, iy0, ix1, iy1] = rowSpec.icon;
                 const icon = document.createElement('img');
                 icon.className = 'need-row-icon';
                 icon.alt = '';
-                icon.src = artUrl(ART.needsIconSrc(key, cardCareLight));
+                if (key === 'sun') {
+                    const lvl = sunCardGlowLevel(prog, needs);
+                    if (lvl === 'rest') icon.src = artUrl(ART.sunRestingSrc('night', true));
+                    else icon.src = artUrl(ART.sunGlowSrc(lvl, cardCareLight));
+                } else {
+                    icon.src = artUrl(ART.needsIconSrc(key, cardCareLight));
+                }
                 icon.style.left = `${half(ix0)}px`;
                 icon.style.top = `${half(iy0) - rowAbsTop}px`;
                 icon.style.width = `${half(ix1 - ix0)}px`;
@@ -896,7 +947,21 @@
                     ? (C.stakeNeedMet(prog, pl.staked) ? 1 : 0)
                     : Math.min(req, Math.floor((Number(prog[key]) || 0) + 1e-6));
                 const dotSz = half(rowSpec.dotSize);
-                rowSpec.dots.slice(0, req).forEach((cent, d) => {
+                if (key === 'sun') {
+                    const [cx, cy] = ART.needs.badgeByDaylightCardCenter;
+                    const [bw, bh] = ART.needs.badgeByDaylightDisplay;
+                    const badge = document.createElement('img');
+                    badge.className = 'need-row-sun-badge';
+                    badge.alt = '';
+                    badge.src = artUrl(ART.badgeByDaylightSrc(lighting, true));
+                    badge.style.width = `${half(bw)}px`;
+                    badge.style.height = `${half(bh)}px`;
+                    badge.style.left = `${half(cx) - half(bw) / 2}px`;
+                    badge.style.top = `${half(cy) - rowAbsTop - half(bh) / 2}px`;
+                    badge.style.position = 'absolute';
+                    dotsWrap.appendChild(badge);
+                }
+                rowSpec.dots.slice(0, key === 'sun' ? 0 : req).forEach((cent, d) => {
                     const dot = document.createElement('img');
                     dot.className = 'need-row-dot';
                     dot.alt = '';
@@ -924,14 +989,38 @@
                     check.style.top = `${half(sy0) - rowAbsTop}px`;
                     check.style.width = `${half(sx1 - sx0)}px`;
                     check.style.height = `${half(sy1 - sy0)}px`;
-                    btn.append(check);
+                    row.append(check);
                 }
-                btn.append(icon, dotsWrap);
-                btn.addEventListener('click', () => {
-                    if (key === 'stake' && needs.stake) onStep(session.launchStretchCare('care-hub'));
-                    else onStep(session.startCare(key));
-                });
-                rowsEl.appendChild(btn);
+                row.append(icon, dotsWrap);
+                if (key === 'sun') {
+                    row.classList.add('need-row--auto');
+                    const auto = document.createElement('span');
+                    auto.className = 'need-row-auto-label';
+                    auto.textContent = lighting === 'night' ? 'Pauses at night' : 'Fills by daylight';
+                    row.append(auto);
+                }
+                rowsEl.appendChild(row);
+            }
+            if (session.canCareHarvest && session.canCareHarvest(plot)) {
+                const rowSpec = ART.needs.cardRows[2];
+                const harvestActive = session.activeCareChannel === 'harvest';
+                const row = document.createElement('div');
+                row.className = 'need-row need-row--harvest' + (harvestActive ? ' need-row--detecting' : '');
+                row.setAttribute('role', 'group');
+                const rowAbsTop = half(rowSpec.row[1]);
+                const rowsOriginY = half(ART.needs.cardRows[0].row[1]);
+                row.style.top = `${rowAbsTop - rowsOriginY + half(rowSpec.row[3] - rowSpec.row[1]) + 4}px`;
+                row.style.height = `${half(52)}px`;
+                const icon = document.createElement('img');
+                icon.className = 'need-row-icon';
+                icon.alt = '';
+                icon.src = artUrl(ART.needsIconSrc('harvest', cardCareLight));
+                icon.onerror = () => { icon.replaceWith(document.createTextNode(NEED_EMOJI.harvest)); };
+                const label = document.createElement('span');
+                label.className = 'need-row-harvest-label';
+                label.textContent = 'Breathe to harvest';
+                row.append(icon, label);
+                rowsEl.appendChild(row);
             }
         }
         plotsForScene();
@@ -993,6 +1082,8 @@
 
     async function beginVisitAtPlot(plotIndex) {
         if (!(await ensureSource())) return;
+        if (signalSwitcher) signalSwitcher.reset();
+        trace.clear();
         session = newVisitSession();
         refreshBasketChip(0);
         els.basketChip.hidden = session.harvestQueue.length === 0;
@@ -1016,6 +1107,9 @@
     }
 
     async function beginVisit() {
+        if (signalSwitcher) signalSwitcher.reset();
+        trace.clear();
+        signalPanelDemoLock = null;
         if (!(await ensureSource())) return;
         session = newVisitSession();
         refreshBasketChip(0);
@@ -1067,15 +1161,18 @@
         document.body.dataset.stretchCare = stretchCare ? '1' : '0';
         els.stretchCarePanel.hidden = !stretchCare;
         if (stretchCare) renderStretchCarePanel(step);
-        const careMode = step === 'care-hub' || step === 'care-sun' || step === 'care-water' || step === 'care-breathe';
+        const careMode = step === 'care-hub' || step === 'care-smile' || step === 'care-talk' || step === 'care-harvest';
         els.needsCard && (els.needsCard.hidden = !careMode && step !== 'stretch-offer' && step !== 'stretch');
         if (careMode || step === 'stretch-offer' || step === 'stretch') renderNeedsCard();
         const copy = STEP_COPY[step] || STEP_COPY.smile;
         const who = selectedPlantLabel();
         els.stepTitle.textContent = step === 'pick' ? copy.title : (who ? `${copy.title} · ${who}` : copy.title);
         els.stepText.textContent = copy.text;
-        els.breathGuide.hidden = step !== 'breathe' && step !== 'care-breathe';
-        els.stretchGuide.hidden = step !== 'stretch';
+        const harvestBreath = step === 'care-hub' && session && session.activeCareChannel === 'harvest';
+        const stakeStretch = step === 'care-hub' && session && session.activeCareChannel === 'stake';
+        els.breathGuide.hidden = step !== 'breathe' && step !== 'care-harvest' && !harvestBreath;
+        els.stretchGuide.hidden = step !== 'stretch' && !stakeStretch;
+        if (stakeStretch) renderStretchHud();
         els.stepPanel.hidden = careMode || step === 'stretch-offer' || step === 'stretch';
         renderStepActions(step);
         if (step !== 'breathe') {
@@ -1115,10 +1212,10 @@
             const done = mkBtn('Finish visit', 'btn btn-ghost', () => { onStep(session.finishCareHub()); });
             done.id = 'btn-skip';
             box.append(done);
-        } else if (step === 'care-sun' || step === 'care-water' || step === 'care-breathe') {
+        } else if (step === 'care-smile' || step === 'care-talk' || step === 'care-harvest') {
             const back = mkBtn('Back to needs', 'btn btn-ghost', () => { onStep(session.go('care-hub')); });
             back.id = 'btn-skip';
-            if (step === 'care-breathe') {
+            if (step === 'care-harvest') {
                 const skip = mkBtn('Skip breathing', 'btn btn-soft', () => { onStep(session.go('care-hub')); });
                 box.append(back, skip);
             } else box.append(back);
@@ -1238,6 +1335,7 @@
             happiness: faceVisible ? signal.h : null,
             talking: faceVisible && now - signal.talkAt < 700 ? signal.talking : false,
             faceVisible,
+            isDaylight: lighting !== 'night',
         };
     }
 
@@ -1409,11 +1507,53 @@
         renderStretchCarePanel('stretch');
     }
 
+    function stretchEngagedForHub() {
+        if (!session || session.step !== 'care-hub' || session.selectedPlot == null) return false;
+        const pl = state.plots[session.selectedPlot];
+        if (!pl) return false;
+        const needs = L.plantNeeds(pl.plantId);
+        if (!needs.stake || C.stakeNeedMet(session.careProgressFor(session.selectedPlot), pl.staked)) return false;
+        const snap = session.stretchSnap || {};
+        return !!(snap.activeSide
+            || Math.abs(Number(snap.rollDeg) || 0) >= 8
+            || (snap.leftProgress || 0) > 0.05
+            || (snap.rightProgress || 0) > 0.05);
+    }
+
     function updateVisit(dt, t) {
         const input = currentInput();
-        if (session && session.step === 'stretch') input.stretch = stretchSample();
+        if (session && (session.step === 'stretch' || session.step === 'care-hub')) input.stretch = stretchSample();
         const events = session.update(dt, input);
-        trace.push({ t, happiness: input.happiness, faceVisible: input.faceVisible, talking: input.talking, smiling: session.smiling });
+        let breathPhase = null;
+        if (session.activeCareChannel === 'harvest' && session.pacer && session.pacer.total > 0) {
+            breathPhase = Math.sin((session.breathT / session.pacer.total) * Math.PI * 2);
+        } else if (input.breathing && Number.isFinite(input.breathing.rate)) {
+            breathPhase = Math.sin(t * (input.breathing.rate / 60) * Math.PI * 2);
+        }
+        let panelMode = 'idle';
+        if (signalPanelDemoLock) {
+            panelMode = signalPanelDemoLock;
+            if (signalSwitcher) signalSwitcher.step(t, panelMode);
+        } else if (signalSwitcher && session.step === 'care-hub') {
+            panelMode = SP.rawPanelModeFromSignals({
+                smiling: input.faceVisible && session.smiling,
+                talking: input.faceVisible && session.talking,
+                breathing: !!(input.breathing && input.breathing.fresh) || session.activeCareChannel === 'harvest',
+                stretchEngaged: stretchEngagedForHub(),
+            });
+            panelMode = signalSwitcher.step(t, panelMode);
+        }
+        trace.push({
+            t,
+            happiness: input.happiness,
+            faceVisible: input.faceVisible,
+            talking: input.talking,
+            smiling: session.smiling,
+            breathRate: input.breathing && Number.isFinite(input.breathing.rate) ? input.breathing.rate : null,
+            breathPhase,
+            rollDeg: session.stretchSnap && Number.isFinite(session.stretchSnap.rollDeg) ? session.stretchSnap.rollDeg : null,
+            panelMode,
+        });
         for (const ev of events) {
             if (ev.type === 'care-progress') renderNeedsCard();
             if (ev.type === 'step' && ev.step !== lastStep) onStep(ev.step);
@@ -1436,7 +1576,7 @@
         const rem = session.stepRemaining();
         const frac = dur > 0 ? 1 - rem / dur : 0;
         els.ringFg.style.strokeDashoffset = String(276.46 * frac);
-        const careStep = step === 'care-sun' || step === 'care-water' || step === 'care-breathe';
+        const careStep = step === 'care-smile' || step === 'care-talk' || step === 'care-harvest';
         els.ringText.textContent = step === 'breathe-offer' ? '🍃' : (step === 'pick' || step === 'pick-harvest') ? '❀' : step === 'harvest-hold' ? '🧺'
             : step === 'care-hub' ? '❀' : careStep ? String(Math.max(1, Math.ceil(rem))) : String(Math.ceil(rem));
         if (step === 'pick-harvest') {
@@ -1453,13 +1593,13 @@
             const pl = state.plots[session.selectedPlot];
             const all = pl && C.allNeedsMet(session.careProgressFor(session.selectedPlot), L.plantNeeds(pl.plantId), pl.staked);
             els.stepLive.textContent = all ? 'All needs met — bloom stamp on the tag. Finish when you like.' : 'Pick any need icon. Switch beds with arrow keys.';
-        } else if (step === 'care-sun') {
+        } else if (step === 'care-smile') {
             els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
-                : session.smiling ? '☀ Smiling…' : 'Smile gently to fill the sun dot';
-        } else if (step === 'care-water') {
+                : session.smiling ? '💧 Watering…' : 'Smile gently to fill the water dot';
+        } else if (step === 'care-talk') {
             els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
-                : session.talking ? '💧 Talking…' : 'Talk to your plant to fill the water dot';
-        } else if (step === 'care-breathe') {
+                : session.talking ? '🍃 Fertilizing…' : 'Talk to your plant to fill the fertilizer dot';
+        } else if (step === 'care-harvest') {
             if (session.pacer) {
                 const b = session.pacer.at(session.breathT);
                 els.breathGuide.hidden = false;
@@ -1468,8 +1608,9 @@
                 els.breathWord.textContent = b.phase === 'in' ? 'Breathe in' : 'And slowly out';
                 renderBreathCount(session.breathsDone);
                 renderBreathRate();
+                scene.setEffects({ breath: b.size });
             }
-            els.stepLive.textContent = '🍃 Guided breath for fertilizer dots';
+            els.stepLive.textContent = '🧺 Breathe with the guide to harvest this crop';
         } else if (step === 'smile') {
             els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
                 : session.smiling ? `☀ Sunlight pouring: ${session.sunHours.toFixed(1)} h` : `${session.sunHours.toFixed(1)} h of sun so far. Smile when you're ready`;
@@ -1501,17 +1642,22 @@
 
         // scene effects
         const on = L.DEFAULTS.smileOn;
-        const smileAmt = (step === 'smile' || step === 'care-sun' || step === 'harvest-hold') && session.smiling
+        const smileAmt = (step === 'smile' || step === 'care-smile' || step === 'harvest-hold') && session.smiling
             ? 0.45 + 0.55 * L.clamp01((session.h - on) / (1 - on)) : 0;
         const stretchSnap = session.stretchSnap || {};
         const stakeAmt = step === 'stretch'
             ? Math.max(stretchSnap.leftProgress || 0, stretchSnap.rightProgress || 0)
             : 0;
+        const waterFx = ((step === 'care-smile' || step === 'smile') && session.smiling)
+            || (step === 'talk' && session.talking) ? 1 : 0;
+        const fertFx = (step === 'care-talk' && session.talking) ? 1
+            : (step === 'breathe' || step === 'care-harvest') ? 0.9 : 0;
+        const sunFx = step === 'care-hub' && lighting !== 'night' ? 0.22 : smileAmt;
         scene.setEffects({
             plot: session.selectedPlot,
-            sun: smileAmt,
-            water: (step === 'talk' || step === 'care-water') && session.talking ? 1 : 0,
-            fert: (step === 'breathe' || step === 'care-breathe') ? 0.9 : 0,
+            sun: sunFx,
+            water: waterFx,
+            fert: fertFx,
             stake: stakeAmt,
         });
         renderNeedsCard();
@@ -1523,7 +1669,7 @@
     }
 
     function updateHint(step, input) {
-        const active = step === 'smile' || step === 'talk' || step === 'care-sun' || step === 'care-water';
+        const active = step === 'smile' || step === 'talk' || step === 'care-smile' || step === 'care-talk';
         const poor = active && session.poorReading;
         const dark = active && (signal.validation === 'TooDark' || signal.validation === 'TooDarkOrBacklit');
         let title = '', sub = '';
@@ -2328,7 +2474,21 @@
         renderMeters();
         const chartOn = state.settings.chart && screen === 'visit';
         if (els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;
-        if (chartOn) window.SmileChart.drawSmileChart(els.smileChart, trace, t, els.chartLive);
+        if (chartOn && window.SmileChart.drawSignalPanel) {
+            const mode = signalSwitcher ? signalSwitcher.mode : 'smile';
+            const title = (window.SmileChart.PANEL_LABELS && window.SmileChart.PANEL_LABELS[mode]) || 'Signal';
+            if (els.chartTitle) els.chartTitle.textContent = title;
+            window.SmileChart.drawSignalPanel(els.smileChart, trace, t, els.chartLive, {
+                mode,
+                prevMode: signalSwitcher ? signalSwitcher.prevMode : mode,
+                blend: signalSwitcher ? signalSwitcher.blendAlpha(t) : 1,
+                breathPacerFrac: session && session.pacer && session.pacer.total > 0
+                    ? session.breathT / session.pacer.total
+                    : null,
+            });
+        } else if (chartOn) {
+            window.SmileChart.drawSmileChart(els.smileChart, trace, t, els.chartLive);
+        }
         hudAcc += dt;
         if (hudAcc > 0.35) {
             hudAcc = 0;
@@ -2566,6 +2726,26 @@
             }
             return document.body.dataset.planted;
         },
+        setChartForCapture(on) {
+            state.settings.chart = !!on;
+            if (els.chartPanel) els.chartPanel.hidden = !on;
+            save();
+            return state.settings.chart;
+        },
+        setSignalPanelDemoForCapture(mode) {
+            const m = ['idle', 'smile', 'talk', 'breathe', 'stretch'].includes(mode) ? mode : 'idle';
+            signalPanelDemoLock = m;
+            state.settings.chart = true;
+            if (els.chartPanel) els.chartPanel.hidden = false;
+            if (signalSwitcher) {
+                signalSwitcher.reset();
+                signalSwitcher.step(performance.now() / 1000, m);
+            }
+            return m;
+        },
+        clearSignalPanelDemoForCapture() {
+            signalPanelDemoLock = null;
+        },
         /** Mock capture: garden tag/soil states without a live visit session. */
         unlockSeedsForCapture() {
             if (!state.pantry) state.pantry = V.emptyPantry();
@@ -2680,11 +2860,50 @@
             if (needKey === 'sun') prog.sun = needs.sun;
             else if (needKey === 'water') prog.water = needs.water;
             else if (needKey === 'fertilizer') prog.fertilizer = needs.fertilizer;
-            else return null;
+            else if (needKey === 'harvest') {
+                if (session.step === 'care-harvest' && session.pacer) {
+                    session.breathT = session.pacer.total;
+                    session.breathsDone = session.pacer.breaths;
+                    const step = session._completeCareHarvest();
+                    onStep(step);
+                    plotsForScene({ instant: true });
+                    renderHud();
+                    return step;
+                }
+                return session.step;
+            } else return null;
             session.setCareProgress(plot, prog);
-            const step = session.skip();
+            let step = session.step;
+            if (step === 'care-smile' || step === 'care-talk' || step === 'care-harvest') {
+                step = session.go('care-hub');
+            }
             onStep(step);
+            plotsForScene({ instant: true });
+            renderNeedsCard();
             return step;
+        },
+        primeCareHarvestForCapture(plot) {
+            const i = Number(plot);
+            const p = state.plots[i];
+            if (!p || !p.plantId) return false;
+            p.stage = V.MAX_STAGE;
+            p.picked = false;
+            p.pickDay = null;
+            p.matureDay = p.matureDay || V.calendarKey(state, clock.now());
+            p.matureWater = 1;
+            p.matureFert = 1;
+            if (!session) return false;
+            const needs = L.plantNeeds(p.plantId);
+            session.setCareProgress(i, {
+                sun: needs.sun,
+                water: needs.water,
+                fertilizer: needs.fertilizer,
+                stake: needs.stake ? !!p.staked : false,
+            });
+            session.selectedPlot = i;
+            plotsForScene({ instant: true });
+            renderHud();
+            return true;
         },
         startBreathing: (o) => session && session.startBreathing(o || {}),
         launchStretchCare(returnStep) {

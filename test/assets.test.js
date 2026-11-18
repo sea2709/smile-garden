@@ -246,6 +246,18 @@ test('tags art matches assets/tags-manifest.json', () => {
     for (const key of ['sun', 'water', 'fertilizer', 'stake']) {
         assert.ok(fs.existsSync(path.join(root, 'assets', manifest.icons[key].file)), key);
     }
+    if (manifest.passiveSun) {
+        for (const k of Object.keys(manifest.passiveSun.levels)) {
+            const e = manifest.passiveSun.levels[k];
+            assert.ok(fs.existsSync(path.join(root, 'assets', e.file)), e.file);
+            assert.ok(fs.existsSync(path.join(root, 'assets', e.night)), e.night);
+        }
+        assert.ok(fs.existsSync(path.join(root, 'assets', manifest.passiveSun.resting.file)));
+        assert.ok(fs.existsSync(path.join(root, 'assets', manifest.passiveSun.badge.file)));
+        assert.ok(fromRenderer(ART.needs.harvestReadyBadge).includes('harvest-badge'));
+        assert.ok(fs.existsSync(fromRenderer(ART.needs.harvestReadyBadgeGlow)));
+        assert.ok(fs.existsSync(fromRenderer(ART.harvestPrompt64Src('day'))));
+    }
     assert.ok(fs.existsSync(path.join(root, 'assets', manifest.icons.bloom.file)));
     assert.ok(fs.existsSync(path.join(root, 'assets', manifest.icons.resting.file)));
 });

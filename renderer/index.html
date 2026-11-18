@@ -41,7 +41,7 @@
 
     <!-- Live smile chart (G) -->
     <section id="chart-panel" class="chart-panel parchment-soft" hidden>
-        <div class="chart-head"><span>Smile signal</span><span id="chart-live" class="chart-live">–</span><span class="kbd">G</span></div>
+        <div class="chart-head"><span id="chart-title">Signal</span><span id="chart-live" class="chart-live">–</span><span class="kbd">G</span></div>
         <canvas id="smile-chart" width="250" height="84"></canvas>
     </section>
 
@@ -72,7 +72,7 @@
     <!-- Step panel (during a visit) -------------------------------------- -->
     <section id="step-panel" class="step-panel parchment" hidden>
         <div class="step-track" id="step-track">
-            <span data-step="harvest">🧺 Pick</span><span data-step="smile">☀ Smile</span><span data-step="talk">💧 Talk</span><span data-step="breathe">🍃 Breathe</span><span data-step="stretch">🌻 Stretch</span><span data-step="summary">❀ Done</span>
+            <span data-step="harvest">🧺 Harvest</span><span data-step="smile">💧 Water</span><span data-step="talk">🍃 Fertilize</span><span data-step="breathe">🧺 Harvest</span><span data-step="stretch">🌻 Stake</span><span data-step="summary">❀ Done</span>
         </div>
         <div class="step-body">
             <div class="ring-wrap">
@@ -202,10 +202,11 @@
             <h1 id="greet-title">Good morning, gardener</h1>
             <p id="greet-status" class="lead"></p>
             <ol class="visit-plan">
-                <li><span class="dot dot-sun"></span><b>Sun dots</b> — smile (~10 s each)</li>
-                <li><span class="dot dot-water"></span><b>Water dots</b> — talk (~10 s each)</li>
-                <li><span class="dot dot-fert"></span><b>Fertilizer dots</b> — guided breath (~15 s each)</li>
-                <li><span class="dot dot-stretch"></span><b>Stake</b> — one neck stretch on tall climbers (once until harvest)</li>
+                <li><span class="dot dot-sun"></span><b>Sun</b> — fills by itself in daylight (pauses at night)</li>
+                <li><span class="dot dot-water"></span><b>Water</b> — smile at your plant</li>
+                <li><span class="dot dot-fert"></span><b>Fertilizer</b> — talk to your plant</li>
+                <li><span class="dot dot-harvest"></span><b>Harvest</b> — breathe when the plant is fully grown</li>
+                <li><span class="dot dot-stretch"></span><b>Stake</b> — neck stretch on tall climbers (once until harvest)</li>
             </ol>
             <p id="greet-note" class="note"></p>
             <div class="actions">
@@ -314,6 +315,7 @@
 <script src="../game/clock-layout.js"></script>
 <script src="../game/hud-layout.js"></script>
 <script src="../game/care-needs.js"></script>
+<script src="../game/signal-panel.js"></script>
 <script src="../game/visit.js"></script>
 <script src="../game/critters.js"></script>
 <script src="../game/season-particles.js"></script>

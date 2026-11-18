@@ -95,7 +95,22 @@
                 } else if (phase === 'camera-check-stretch') {
                     target = 0.22;
                     setValidation('Ok');
-                } else if (phase === 'smile' || phase === 'care-sun') {
+                } else if (phase === 'care-hub-smile' || phase === 'care-hub-talk' || phase === 'care-hub-breathe' || phase === 'care-hub-stretch') {
+                    face = true;
+                    setValidation('Ok');
+                    talking = phase === 'care-hub-talk' || (phase === 'care-hub-breathe' && Math.sin(phaseT) > 0);
+                    target = phase === 'care-hub-smile' ? smileLevel(phaseT)
+                        : phase === 'care-hub-stretch' ? 0.22
+                            : 0.28 + (talking ? 0.12 : 0);
+                    if (Stretch && phase === 'care-hub-stretch') {
+                        const rollDeg = 20 * Math.sin(phaseT * 0.55);
+                        em.emit('landmarks', { points: Stretch.syntheticLandmarks(rollDeg), stable: true, space: 'normalized' });
+                    }
+                    if (phase === 'care-hub-breathe' && visitT > 20) {
+                        const rate = 5.8 + Math.sin(phaseT * 0.4) * 0.3;
+                        em.emit('breathing', { rate, confidence: 72, stable: true, t: nowS() });
+                    }
+                } else if (phase === 'smile' || phase === 'care-smile') {
                     target = smileLevel(phaseT);
                     if (night && !darkDone && phaseT > 4 && phaseT < 7.5) {
                         face = false;
@@ -104,7 +119,7 @@
                         if (night && phaseT >= 7.5) darkDone = true;
                         setValidation('Ok');
                     }
-                } else if (phase === 'talk' || phase === 'care-water') {
+                } else if (phase === 'talk' || phase === 'care-talk') {
                     talking = talkingAt(phaseT);
                     target = 0.32 + (talking ? 0.1 : 0) + Math.sin(phaseT * 0.9) * 0.05;
                     setValidation('Ok');
@@ -145,7 +160,7 @@
             // Synthetic breathing rate: appears after ~25 s of visit time, settles
             // near ~6 breaths/min (matches the guided standard pace).
             visitT += dt;
-            const breathPhase = phase === 'breathe' || phase === 'care-breathe' || phase === 'camera-check-breath';
+            const breathPhase = phase === 'breathe' || phase === 'care-harvest' || phase === 'care-hub-breathe' || phase === 'camera-check-breath';
             if (visitT > 25 || breathPhase) {
                 const settling = visitT < 35 && !breathPhase;
                 const rate = 5.6 + Math.sin(visitT * 0.35) * 0.35 + (noise() - 0.5) * 0.15;

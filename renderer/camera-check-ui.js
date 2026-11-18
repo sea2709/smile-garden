@@ -11,6 +11,14 @@
         stretch: 'Neck stretch',
     });
 
+    /** Care action each camera check packet trains (Heily repaints packet art to match). */
+    const PACKET_CARE = Object.freeze({
+        smile: 'Water',
+        talk: 'Fertilize',
+        breath: 'Harvest',
+        stretch: 'Stake',
+    });
+
     const FALLBACK_ICON = Object.freeze({ smile: '☀', talk: '💬', breath: '🍃', stretch: '🌻' });
 
     function firstOpenCheck(snap) {
@@ -94,9 +102,12 @@
         const name = document.createElement('strong');
         name.className = 'cc-packet-name';
         name.textContent = title;
+        const care = document.createElement('span');
+        care.className = 'cc-packet-care';
+        care.textContent = PACKET_CARE[key] || '';
         const line = document.createElement('small');
         line.className = 'cc-packet-status';
-        lab.append(name, line);
+        lab.append(name, care, line);
         if (active === key && !denied && !(snap.passed && snap.passed[key]) && (key === 'smile' || key === 'talk')) {
             line.textContent = 'listening…';
             const frac = key === 'smile' ? snap.smileMeter : snap.talkMeter;

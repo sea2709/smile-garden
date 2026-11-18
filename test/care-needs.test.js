@@ -50,9 +50,20 @@ test('free-order care session stores progress per bed', () => {
     const session = new V.VisitSession({ plots, plantedBeds: [0], gardenDay: 3 });
     session.selectedPlot = 0;
     session.startCare('water');
-    assert.equal(session.step, 'care-water');
+    assert.equal(session.step, 'care-smile');
     session.startCare('sun');
-    assert.equal(session.step, 'care-sun');
+    assert.equal(session.step, 'care-smile');
+    session.startCare('fertilizer');
+    assert.equal(session.step, 'care-talk');
+});
+
+test('auto sun fills only in daylight', () => {
+    const needs = L.plantNeeds('mint');
+    let p = C.emptyProgress();
+    p = C.addAutoSun(p, needs, 20, false);
+    assert.equal(p.sun, 0);
+    p = C.addAutoSun(p, needs, 10, true);
+    assert.ok(p.sun >= 0.99 && p.sun <= 1.01);
 });
 
 test('grows one stage overnight only when allMet', () => {

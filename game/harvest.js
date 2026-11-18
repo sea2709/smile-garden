@@ -8,6 +8,8 @@
 
     const MAX_STAGE = 5;
     const HARVEST_HOLD_SECONDS = 2;
+    /** After breathe-harvest in care: `empty` clears the bed; swap to `replant` later if Dang wants auto-reseed. */
+    const CARE_HARVEST_BED_RESET = 'empty';
     const WATER_FULL = 1 - 1e-6;
 
     /** Per-plant harvest behaviour. */
@@ -274,6 +276,17 @@
         };
     }
 
+    /** Breathe-harvest from the care card (may differ from pull/regrow `harvestPlot` later). */
+    function completeCareHarvest(state, plotIndex, now, plantById) {
+        const r = harvestPlot(state, plotIndex, now, plantById);
+        if (!r.ok) return r;
+        if (CARE_HARVEST_BED_RESET === 'empty' && r.mode === 'regrow') {
+            const i = Number(plotIndex);
+            if (state.plots[i]) state.plots[i] = null;
+        }
+        return r;
+    }
+
     function placeDecor(state, spotId, decorId) {
         if (!state.decor) state.decor = emptyDecor();
         syncDecorUnlocks(state);
@@ -317,6 +330,8 @@
         sanitizeSpareSeeds,
         extendPlotSanitize,
         isPlotReady,
+        CARE_HARVEST_BED_RESET,
+        completeCareHarvest,
         isPlotRegrowing,
         computeYield,
         readyPlotIndices,

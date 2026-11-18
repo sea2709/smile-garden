@@ -71,6 +71,7 @@ const smile = { happiness: 0.85, talking: false, faceVisible: true };
 const talk = { happiness: 0.3, talking: true, faceVisible: true };
 const neutral = { happiness: 0.1, talking: false, faceVisible: true };
 const noFace = { happiness: null, talking: null, faceVisible: false };
+const withDaylight = (input, isDaylight) => Object.assign({}, input, { isDaylight });
 
 // ---------- time of day ----------
 test('lighting follows local time: dawn 5–9, midday 9–16, golden hour 16–19, night otherwise', () => {
@@ -377,21 +378,22 @@ test('a full visit with every bed planted stays near 2–3 minutes of smile+talk
     assert.ok(smileTalk + breathe <= 180);
 });
 
-test('care sun/water steps count dot time only while smiling or talking', () => {
+test('care sun auto-fills in daylight; smile waters; talk fertilizes', () => {
     const plots = mkPlots([[2, 'mint']]);
     const s = new V.VisitSession({ plots, plantedBeds: [2], gardenDay: 1 });
     s.begin();
     s.selectedPlot = 2;
-    s.startCare('sun');
-    run(s, 20, neutral);
+    run(s, 20, withDaylight(neutral, false));
     assert.equal(s.careProgressFor(2).sun, 0);
-    run(s, 10, smile);
+    run(s, 10, withDaylight(neutral, true));
     assert.ok(s.careProgressFor(2).sun >= 0.9 && s.careProgressFor(2).sun <= 1.1);
-    s.startCare('water');
-    run(s, 10, smile);
+    run(s, 10, withDaylight(neutral, true));
     assert.equal(s.careProgressFor(2).water, 0);
-    run(s, 10, talk);
+    run(s, 10, withDaylight(smile, true));
     assert.ok(s.careProgressFor(2).water >= 0.9);
+    run(s, 16, withDaylight(talk, true));
+    assert.ok(s.careProgressFor(2).fertilizer >= 0.9);
+    assert.equal(s.step, 'care-hub');
 });
 
 test('face missing pauses care steps and flags a poor reading', () => {
@@ -399,13 +401,12 @@ test('face missing pauses care steps and flags a poor reading', () => {
     const s = new V.VisitSession({ plots, plantedBeds: [0], gardenDay: 1 });
     s.begin();
     s.selectedPlot = 0;
-    s.startCare('sun');
-    run(s, 2, smile);
-    const before = s.careProgressFor(0).sun;
-    run(s, 5, noFace);
+    run(s, 2, withDaylight(smile, true));
+    const before = s.careProgressFor(0).water;
+    run(s, 5, withDaylight(noFace, true));
     assert.equal(s.poorReading, true);
-    assert.equal(s.careProgressFor(0).sun, before);
-    run(s, 0.5, smile);
+    assert.equal(s.careProgressFor(0).water, before);
+    run(s, 0.5, withDaylight(smile, true));
     assert.equal(s.poorReading, false);
 });
 
@@ -414,14 +415,13 @@ test('partial care is saved in the session result; summary ends visit', () => {
     const s = new V.VisitSession({ plots, plantedBeds: [0], gardenDay: 1 });
     s.begin();
     s.selectedPlot = 0;
-    s.startCare('sun');
-    run(s, 10, smile);
+    run(s, 5, withDaylight(smile, true));
     s.go('care-hub');
     s.finishCareHub();
     assert.equal(s.step, 'summary');
     const r = s.result();
     assert.equal(r.careBeds[0].allMet, false);
-    assert.ok(r.careBeds[0].progress.sun >= 0.9);
+    assert.ok(r.careBeds[0].progress.water >= 0.4 && r.careBeds[0].progress.water < 1);
 });
 
 test('fast demo completes lettuce needs in one short visit', () => {
