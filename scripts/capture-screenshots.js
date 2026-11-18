@@ -18,7 +18,22 @@ const timeOnly = process.env.SMILE_GARDEN_TIME_SHOTS === '1';
 const cameraOnly = process.env.SMILE_GARDEN_CAPTURE_CAMERA_ONLY === '1';
 const stakeOnly = process.env.SMILE_GARDEN_STAKE_SHOTS === '1';
 const tagsOnly = process.env.SMILE_GARDEN_TAGS_SHOTS === '1';
-const keepPng = new Set(['breath-mockup.png', 'camera-check-mockup.png']);
+const keepPng = new Set([
+    'breath-mockup.png', 'camera-check-mockup.png',
+    '02-greeting-dawn.png', '08-summary-growth.png', '10-greeting-night.png', '11-night-light-hint.png',
+    '12-night-garden-fireflies.png', '13-journal-diary.png', '14-journal-my-plants.png', '15-journal-seed-library.png',
+    '16-full-garden-midday.png', '17-full-garden-dawn.png', '18-full-garden-golden-hour.png', '19-full-garden-night.png',
+    '20-demo-tools.png', 'bedtime-window-glow.png', 'morning-card.png', 'stake-ring-midfill.png',
+    'clock-dawn.png', 'clock-dawn-6am.png', 'clock-dusk.png', 'clock-night.png', 'clock-noon.png', 'clock-sunset-6pm.png',
+    'logo-day-full.png', 'logo-night-full.png', 'logo-night-garden.png',
+    'topbar-dawn-6am-2x.png', 'topbar-dusk-6pm-2x.png', 'topbar-logo-day-2x.png', 'topbar-logo-night-2x.png', 'topbar-night-2x.png', 'topbar-noon-2x.png',
+    'season-spring.png', 'season-summer.png', 'season-autumn.png', 'season-winter.png',
+    'plant-center-before.png', 'plant-center-after.png', 'plant-center-night.png',
+    '07a-breath-rate-warming.png', '07b-breath-rate-settling.png', '07c-breath-rate-stable.png', '07d-stretch-offer.png',
+    '07f-stretch-right-hold.png', '07g-stretch-complete.png', '07-breath-pill-count-2x.png',
+    'needs-tag-complete-soil-day.png', 'needs-tag-resting-morning-day.png', 'needs-tag-night.png', 'needs-garden-tags-midday.png',
+    'plants-clean-mature-garden.png', 'plants-clean-picked-garden.png',
+]);
 if (!timeOnly && !cameraOnly && !stakeOnly && !tagsOnly) {
     for (const f of fs.readdirSync(outDir)) {
         if (f.endsWith('.png') && !keepPng.has(f)) fs.unlinkSync(path.join(outDir, f));
