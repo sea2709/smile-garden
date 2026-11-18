@@ -300,6 +300,17 @@ test('signal panel art (Heily manifest)', () => {
     assert.ok(fs.existsSync(path.join(root, 'renderer', 'signal-panel-ui.css')));
 });
 
+test('summary card art (Heily manifest)', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'ui', 'summary', 'summary-manifest.json'), 'utf8'));
+    assert.equal(manifest.layout_css_px.card.width, 480);
+    assert.equal(manifest.type.eyebrow.split(' ').includes('18px') || manifest.type.eyebrow.includes('18'), true);
+    for (const f of ['summary-card-9s.png', 'summary-card-9s-night.png', 'stat-tile-9s.png', 'sun-strip-9s.png', 'summary-divider.png', 'morning-hero.png']) {
+        assert.ok(fs.existsSync(path.join(root, 'assets', 'ui', 'summary', f)), f);
+    }
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'summary-ui.css')));
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'summary-render.js')));
+});
+
 test('selection ring art: 8 day/night sprites and backdrop offsets', () => {
     assert.ok(ART.selection);
     for (let b = 1; b <= 8; b++) {

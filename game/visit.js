@@ -35,6 +35,9 @@
     const C = (typeof require === 'function')
         ? require('./care-needs.js')
         : (typeof self !== 'undefined' ? self.SmileCareNeeds : null);
+    const Summary = (typeof require === 'function')
+        ? require('./summary-data.js')
+        : (typeof self !== 'undefined' ? self.SmileSummaryData : null);
 
     const STATE_VERSION = 6;
     const PLOTS = 8;
@@ -646,7 +649,10 @@
         const out = applyOvernightGrowth(state, d);
         const completedDay = state.dayNumber;
         const completedKey = D.gardenDayKey(completedDay);
-        state.morningPending = Object.assign({ day: completedDay + 1 }, out);
+        const careStats = (Summary && C)
+            ? Summary.aggregateCareFromDailyTends(state, completedDay, (id) => L.plantNeeds(id))
+            : null;
+        state.morningPending = Object.assign({ day: completedDay + 1 }, out, { careStats });
         state.daysCompleted = completedDay;
         state.dayNumber += 1;
         state.season = D.seasonForDayNumber(state.dayNumber);
@@ -663,7 +669,7 @@
             day, ts: d.getTime(), kind: 'bedtime',
             text: out.grew.length ? `Overnight: ${out.grew.length} plant(s) grew.` : 'A quiet night in the garden.',
         });
-        return out;
+        return Object.assign({}, out, { careStats });
     }
 
     /**
@@ -737,12 +743,24 @@
             addJournal(state, { day, ts: d.getTime(), kind: 'unlock', plantId: id, text: `New seeds: ${L.plantById(id).name}.` });
         }
         const legacy = bedResults[0] || { sunHours: 0, water: 0, fertilizer: 0 };
+        let careStats = null;
+        if (result && result.careMode && C && Summary && state.version >= 6) {
+            careStats = Summary.aggregateCareFromBeds(
+                result.careBeds,
+                (result.harvestPlots || []).length,
+                state,
+                (id) => L.plantNeeds(id),
+            );
+        }
         return {
             day, sunHours: sumSun, water: sumWater, fertilizer: sumFert,
             tended, grew, waiting, unlocked, firstVisitToday,
             weekly: weeklyVisits(state, d), visits: visitCount(state),
             banked: legacy.sunHours * (1 + TUNING.fertilizerBoost * legacy.fertilizer),
             watered: legacy.water >= TUNING.waterToGrow,
+            careMode: !!(result && result.careMode),
+            careStats,
+            harvestPlots: (result && result.harvestPlots) || [],
         };
     }
 

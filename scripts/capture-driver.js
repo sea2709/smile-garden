@@ -612,14 +612,18 @@ async function run(win, outDir) {
     await sleep(600);
     if ((await ds()).screen === 'summary') {
         await waitFor('revealed', (d) => d.revealed === '1', 15000);
-        await shot('08-summary-growth.png');
+        await shot('08-summary-growth-day.png');
         await js(`document.getElementById('btn-sum-done').click()`);
     } else {
-        await G('g.previewMorningCard()');
+        await G('g.previewSummaryDay()');
         await sleep(1200);
-        await shot('08-summary-growth.png');
+        await shot('08-summary-growth-day.png');
         await G(`g.show('idle')`);
     }
+    await G('g.previewSummaryNightQuiet()');
+    await sleep(1200);
+    await shot('08b-summary-quiet-night.png');
+    await G(`g.show('idle')`);
 
     // --- a few days later, golden hour ---
     await G('g.simulateDays(2)');

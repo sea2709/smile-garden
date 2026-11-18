@@ -9,6 +9,7 @@
     const V = window.SmileVisit;
     const D = window.SmileDay;
     const C = window.SmileCareNeeds;
+    const SD = window.SmileSummaryData;
     const SP = window.SmileSignalPanel;
     const CC = window.SmileCameraCheck;
     const CCUI = window.SmileCameraCheckUI;
@@ -24,8 +25,7 @@
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-prompt', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
-        'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
-        'btn-sum-done', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
+        'screen-summary', 'sum-card', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
         'dev-ready', 'dev-fill', 'dev-reset', 'basket-chip', 'basket-count', 'screen-unlock', 'unlock-title', 'unlock-body', 'unlock-art', 'btn-unlock-ok',
         'brand-logo-day', 'brand-logo-night', 'brand-fallback',
         'error-banner', 'error-title', 'error-message', 'btn-error-keyboard', 'btn-error-dismiss']) {
@@ -1701,6 +1701,12 @@
     async function finishVisit() {
         if (state.version >= 5) {
             await endTendSession();
+            if (state.version >= 6 && lastResult) {
+                document.body.dataset.step = 'summary';
+                renderSummary(lastResult, { night: false });
+                show('summary');
+                document.body.dataset.revealed = '1';
+            }
             return;
         }
         const result = session.result();
@@ -1738,73 +1744,49 @@
         if (out.seedUnlocks.length || out.decorUnlocks.length) showUnlockReveal(out.seedUnlocks, out.decorUnlocks);
     }
 
-    function mountMorningCard(title, body) {
-        const host = els.sumCardArt;
-        if (!host) return;
-        host.hidden = false;
-        host.textContent = '';
-        const cardSrc = (ART.bedtime && ART.bedtime.morningCard) || (ART.ui && ART.ui.morningCard);
-        const img = new Image();
-        img.alt = '';
-        img.className = 'morning-card-img';
-        img.src = cardSrc || ART.card;
-        const copy = document.createElement('div');
-        copy.className = 'morning-card-copy';
-        const h = document.createElement('h1');
-        h.textContent = title;
-        const p = document.createElement('p');
-        p.className = 'lead';
-        p.textContent = body;
-        copy.append(h, p);
-        img.onerror = () => { els.sumTitle.hidden = false; els.sumDate.hidden = false; };
-        img.onload = () => { els.sumTitle.hidden = true; els.sumDate.hidden = true; };
-        host.append(img, copy);
-        if (cardSrc) {
-            els.sumCard.classList.add('summary-painted');
-        }
+    function summaryBuildCtx(out, opts) {
+        const o = opts || {};
+        const now = o.now || clock.now();
+        return {
+            out,
+            state,
+            night: !!o.night,
+            fmtDate,
+            now,
+            lightingLabel: V.LIGHTING_LABELS[lighting],
+            weeklyVisits: V.weeklyVisits,
+            STAGES: V.STAGES,
+            plantById: L.plantById,
+            plantSrc: (id, stage) => ART.plantSrc(id, stage),
+            readyPlotIndices: V.readyPlotIndices,
+            gardenTodayKey,
+            waitingText: V.waitingText,
+            seasonDay: state.seasonDay,
+            daysPerSeason: D.DAYS_PER_SEASON,
+            decorLabel: (id) => (V.DECOR_UNLOCKS.find((x) => x.id === id) || { label: id }).label,
+        };
+    }
+
+    function bindSummaryButtons(journalBtn, doneBtn) {
+        journalBtn.addEventListener('click', () => openJournal('diary'));
+        doneBtn.addEventListener('click', () => show('idle'));
+    }
+
+    function paintSummaryCard(out, opts) {
+        const night = !!(opts && opts.night);
+        els.screenSummary.classList.toggle('is-night', night);
+        const data = SD.buildSummaryData(summaryBuildCtx(out, opts));
+        const hooks = renderSummaryCard(els.sumCard, data, {
+            night,
+            art: '../assets/ui/care/',
+            sumArt: '../assets/ui/summary/',
+        });
+        bindSummaryButtons(hooks.journal, hooks.done);
     }
 
     function renderMorningSummary(night) {
-        const out = night || { grew: [], waiting: [], tended: [] };
-        const title = out.grew.length ? 'Your garden grew overnight' : 'A quiet night in the garden';
-        const body = `Day ${state.dayNumber} · ${D.SEASON_LABELS[state.season]} · ${D.formatGardenTime(state.gardenMinutes)}`;
-        els.sumDate.textContent = body;
-        els.sumTitle.textContent = title;
-        els.sumTitle.hidden = false;
-        els.sumDate.hidden = false;
-        if (els.sumCardArt) {
-            els.sumCardArt.hidden = true;
-            els.sumCardArt.textContent = '';
-            els.sumCard.classList.remove('summary-painted');
-        }
-        if (state.version >= 5) mountMorningCard(title, body);
-        els.sumSun.textContent = '—';
-        els.sumWater.textContent = '—';
-        els.sumFert.textContent = '—';
-        els.sumGrew.textContent = '';
-        for (const g of out.grew) {
-            const li = document.createElement('li');
-            li.textContent = g.mature ? `${g.name} in bed ${g.plot + 1} is fully grown.` : `${g.name} in bed ${g.plot + 1} grew to ${V.STAGES[g.to].label}.`;
-            els.sumGrew.appendChild(li);
-        }
-        const readyN = V.readyPlotIndices(state.plots, gardenTodayKey()).length;
-        if (readyN) {
-            const li = document.createElement('li');
-            li.textContent = `${readyN} crop${readyN === 1 ? '' : 's'} ready to harvest today.`;
-            els.sumGrew.appendChild(li);
-        }
-        if (!out.grew.length && !readyN) {
-            const li = document.createElement('li');
-            li.textContent = 'Plants are resting — tend them today and they will grow after bed.';
-            els.sumGrew.appendChild(li);
-        }
-        els.sumWait.textContent = '';
-        for (const w of (out.waiting || []).slice(0, 4)) {
-            const li = document.createElement('li');
-            li.textContent = V.waitingText(w);
-            els.sumWait.appendChild(li);
-        }
-        els.sumWeek.textContent = `Season day ${state.seasonDay} of ${D.DAYS_PER_SEASON}. Growth happens when you go to bed, not on a timer.`;
+        const out = Object.assign({ grew: [], waiting: [], tended: [] }, night || {});
+        paintSummaryCard(out, { night: true });
     }
 
     async function showMorningReveal(night) {
@@ -1883,59 +1865,8 @@
         els.screenUnlock.hidden = false;
     }
 
-    function renderSummary(out) {
-        const now = clock.now();
-        els.sumDate.textContent = `${fmtDate(now)} · ${V.LIGHTING_LABELS[lighting]}`;
-        els.sumTitle.textContent = out.grew.length ? (out.grew.some((g) => g.mature) ? 'Something grew all the way!' : 'Your garden grew today') : 'A lovely, quiet visit';
-        els.sumSun.textContent = `${out.sunHours.toFixed(1)} h total`;
-        els.sumWater.textContent = out.tended && out.tended.length
-            ? out.tended.map((t) => `bed ${t.plot + 1}: ${Math.round(t.water * 100)}%`).join(' · ')
-            : `${Math.round(out.water * 100)}%`;
-        els.sumFert.textContent = out.tended && out.tended.some((t) => t.fertilizer > 0)
-            ? out.tended.filter((t) => t.fertilizer > 0).map((t) => `bed ${t.plot + 1}: ${Math.round(t.fertilizer * 100)}%`).join(' · ')
-            : (out.fertilizer > 0 ? `${Math.round(out.fertilizer * 100)}%` : 'skipped');
-        els.sumGrew.textContent = '';
-        if (out.tended && out.tended.length) {
-            const li = document.createElement('li');
-            li.textContent = 'Today you tended: ' + out.tended.map((t) => `${t.name} (${t.sunHours.toFixed(1)} h sun, ${Math.round(t.water * 100)}% water` +
-                (t.fertilizer > 0 ? `, ${Math.round(t.fertilizer * 100)}% fertilizer` : '') + ')').join('; ') + '.';
-            els.sumGrew.appendChild(li);
-        }
-        for (const g of out.grew) {
-            const li = document.createElement('li');
-            li.textContent = g.mature ? `${g.name} in bed ${g.plot + 1} is fully grown.` : `${g.name} in bed ${g.plot + 1} grew: ${V.STAGES[g.from].label} → ${V.STAGES[g.to].label}.`;
-            els.sumGrew.appendChild(li);
-        }
-        if (!out.grew.length && !V.plantedCount(state)) {
-            const li = document.createElement('li');
-            li.textContent = 'Plant a seed next time and today\'s kind of sunlight will make it sprout.';
-            els.sumGrew.appendChild(li);
-        }
-        els.sumWait.textContent = '';
-        for (const w of out.waiting.slice(0, 4)) {
-            const li = document.createElement('li');
-            li.textContent = V.waitingText(w);
-            els.sumWait.appendChild(li);
-        }
-        for (const h of out.harvested || []) {
-            const li = document.createElement('li');
-            li.textContent = `Harvested ${h.yield}× ${h.name} from bed ${h.plot + 1}` + (h.mode === 'pull' ? ' (bed cleared; 1 seed returned).' : ' (will regrow soon).');
-            els.sumGrew.appendChild(li);
-        }
-        for (const id of out.seedUnlocks || out.unlocked || []) {
-            const li = document.createElement('li');
-            li.textContent = `New seeds unlocked: ${L.plantById(id).name}!`;
-            els.sumGrew.appendChild(li);
-        }
-        for (const id of out.decorUnlocks || []) {
-            const d = V.DECOR_UNLOCKS.find((x) => x.id === id);
-            const li = document.createElement('li');
-            li.textContent = `Decoration unlocked: ${d ? d.label : id} — place it from the Decorate journal tab.`;
-            els.sumGrew.appendChild(li);
-        }
-        els.sumWeek.textContent = `${out.weekly} ${out.weekly === 1 ? 'visit' : 'visits'} this week. ` +
-            (out.fertilizer > 0 ? 'Thanks for breathing with the garden.' : 'Breathing is always optional.') +
-            ' Plants grow at most one stage a day.';
+    function renderSummary(out, opts) {
+        paintSummaryCard(out, Object.assign({ night: false }, opts || {}));
     }
 
     // ------------------------------------------------------------------
@@ -2284,8 +2215,6 @@
     els.btnGreetPlant.addEventListener('click', () => openPicker());
     els.btnBegin.addEventListener('click', beginVisit);
     els.btnPickerClose.addEventListener('click', closePicker);
-    els.btnSumDone.addEventListener('click', () => show('idle'));
-    els.btnSumJournal.addEventListener('click', () => openJournal('diary'));
     els.btnJournal.addEventListener('click', () => (screen === 'journal' ? closeJournal() : openJournal('diary')));
     els.btnJournalClose.addEventListener('click', closeJournal);
     els.screenJournal.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => renderJournal(b.dataset.tab)));
@@ -3123,8 +3052,28 @@
             }
         },
         clearBedtimeLayers() { scene.setBedtimeGlow(0); scene.setBedtimeDark(0); refreshLighting(); },
+        previewSummaryDay(sample) {
+            const out = sample || {
+                grew: [{ plot: 0, plantId: 'lettuce', name: 'Lettuce', from: 2, to: 3, mature: false }],
+                careStats: { sunDots: 2.5, waterDots: 3, fertilizerDots: 1, stakes: 1, harvests: 0 },
+                weekly: 3,
+                harvested: [],
+            };
+            renderSummary(out, { night: false });
+            show('summary');
+        },
+        previewSummaryNightQuiet() {
+            renderMorningSummary({
+                grew: [],
+                careStats: { sunDots: 0, waterDots: 0, fertilizerDots: 0, stakes: 0, harvests: 0 },
+            });
+            show('summary');
+        },
         async previewMorningCard() {
-            renderMorningSummary({ grew: [{ plot: 0, name: 'Lettuce', from: 1, to: 2, mature: false }] });
+            renderMorningSummary({
+                grew: [{ plot: 0, plantId: 'lettuce', name: 'Lettuce', from: 1, to: 2, mature: false }],
+                careStats: { sunDots: 1.5, waterDots: 2, fertilizerDots: 0, stakes: 0, harvests: 0 },
+            });
             show('summary');
         },
     };

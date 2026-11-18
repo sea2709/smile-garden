@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="./tend-strip-ui.css">
     <link rel="stylesheet" href="./signal-panel-ui.css">
     <link rel="stylesheet" href="./camera-check-ui.css">
+    <link rel="stylesheet" href="./summary-ui.css">
 </head>
 <body data-screen="loading" data-ready="0">
 <div id="app" class="app">
@@ -277,23 +278,7 @@
 
     <!-- Summary ----------------------------------------------------------- -->
     <section id="screen-summary" class="overlay overlay-right" hidden>
-        <div class="card parchment summary" id="sum-card">
-            <div id="sum-card-art" class="sum-card-art" hidden></div>
-            <div class="eyebrow" id="sum-date"></div>
-            <h1 id="sum-title">Your garden grew overnight</h1>
-            <div class="sum-stats">
-                <div><span class="dot dot-sun"></span><b id="sum-sun">0 h</b><small>sunlight</small></div>
-                <div><span class="dot dot-water"></span><b id="sum-water">0%</b><small>water</small></div>
-                <div><span class="dot dot-fert"></span><b id="sum-fert">–</b><small>fertilizer</small></div>
-            </div>
-            <ul id="sum-grew" class="sum-list"></ul>
-            <ul id="sum-wait" class="sum-list sum-wait"></ul>
-            <p id="sum-week" class="note"></p>
-            <div class="actions">
-                <button id="btn-sum-journal" class="btn btn-soft" type="button">📖 Journal</button>
-                <button id="btn-sum-done" class="btn btn-primary" type="button">Back to the garden</button>
-            </div>
-        </div>
+        <div id="sum-card"></div>
     </section>
 
     <!-- Journal ----------------------------------------------------------- -->
@@ -367,7 +352,9 @@
 <script src="../game/season-particles.js"></script>
 <script src="../game/stretch.js"></script>
 <script src="../game/camera-check.js"></script>
+<script src="../game/summary-data.js"></script>
 <script src="./art.js"></script>
+<script src="./summary-render.js"></script>
 <script src="./camera-check-ui.js"></script>
 <script src="./mock-source.js"></script>
 <script src="./scene.js"></script>
