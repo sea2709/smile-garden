@@ -1444,8 +1444,10 @@
         function drawPlantBed(i, t) {
             const now = performance.now() / 1000;
             const pl = plots[i];
-            if (i === highlight && !pl && tendPlot === null) drawPlotGlow(i, t, true);
-            else if (i === hover && !pl && highlight !== null) drawPlotGlow(i, t, false);
+            if (tendPlot === null) {
+                if (i === highlight) drawPlotGlow(i, t, true);
+                else if (i === hover) drawPlotGlow(i, t, !!pl);
+            }
             if (!pl) {
                 if (tendPlot === i) drawSelectionRing(i, t);
                 return;

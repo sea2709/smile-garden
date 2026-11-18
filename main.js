@@ -40,10 +40,10 @@ const SESSION_SECONDS = (() => {
 const CAPTURE_DIR = MOCK && process.env.SMILE_GARDEN_CAPTURE_DIR
     ? path.resolve(process.env.SMILE_GARDEN_CAPTURE_DIR) : null;
 
-// Scripted capture uses a throwaway profile so it never touches (or is
+// Scripted capture / probe use a throwaway profile so they never touch (or are
 // affected by) your real saved garden in localStorage.
-if (CAPTURE_DIR) {
-    app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'smile-garden-capture-')));
+if (CAPTURE_DIR || (MOCK && process.env.SMILE_GARDEN_PROBE === '1')) {
+    app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'smile-garden-probe-')));
 }
 
 // Telemetry is ON by default in the SDK (`enableTelemetry` defaults to true,
@@ -131,6 +131,13 @@ function createWindow() {
         win.webContents.once('did-finish-load', () => {
             require('./scripts/capture-driver').run(win, CAPTURE_DIR).catch((e) => {
                 console.error('[capture] failed:', e);
+                app.exit(1);
+            });
+        });
+    } else if (MOCK && process.env.SMILE_GARDEN_PROBE === '1') {
+        win.webContents.once('did-finish-load', () => {
+            require('./scripts/probe-startup').run(win).catch((e) => {
+                console.error('[probe] failed:', e && e.stack || e);
                 app.exit(1);
             });
         });

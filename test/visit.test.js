@@ -432,3 +432,77 @@ test('fast demo completes lettuce needs in one short visit', () => {
     const r = s.result();
     assert.equal(r.careBeds[0].allMet, true);
 });
+
+test('mature ready beds stay selectable on care-hub for breathe harvest', () => {
+    const plots = new Array(8).fill(null);
+    plots[0] = { plantId: 'lettuce', stage: 5, sunBank: 0, picked: false, staked: false };
+    const s = new V.VisitSession({
+        plots,
+        gardenDay: 1,
+        today: 'garden-1',
+        tendBeds: [],
+        harvestQueue: [0],
+    });
+    assert.deepEqual(s.plantedBeds, [0]);
+    assert.equal(s.begin(), 'care-hub');
+    assert.equal(s.selectedPlot, 0);
+    assert.ok(s.setSelectedPlot(0));
+    assert.equal(s.canCareHarvest(0), true);
+    assert.equal(s.confirmCareHarvest(), 'care-hub');
+    assert.ok(s.pendingHarvests.includes(0));
+    assert.equal(s.canCareHarvest(0), false);
+    assert.deepEqual(s.selectablePlots(), []);
+});
+
+test('breathe harvest advances when mature bed is selected', () => {
+    const plots = new Array(8).fill(null);
+    plots[0] = { plantId: 'tomato', stage: 5, sunBank: 0, picked: false, staked: true };
+    const s = new V.VisitSession({
+        plots,
+        gardenDay: 2,
+        today: 'garden-2',
+        tendBeds: [],
+        harvestQueue: [0],
+    });
+    s.begin();
+    assert.equal(s.canCareHarvest(0), true);
+    const breathe = { happiness: 0.2, talking: false, faceVisible: true, isDaylight: true, breathing: { fresh: true } };
+    run(s, 32, breathe);
+    assert.ok(s.pendingHarvests.includes(0));
+});
+
+test('care session unions tendable and ready beds', () => {
+    const plots = new Array(8).fill(null);
+    plots[1] = { plantId: 'mint', stage: 2, sunBank: 0, picked: false };
+    plots[4] = { plantId: 'tomato', stage: 5, sunBank: 0, picked: false, staked: true };
+    const s = new V.VisitSession({
+        plots,
+        gardenDay: 2,
+        today: 'garden-2',
+        tendBeds: [1],
+        harvestQueue: [4],
+    });
+    assert.deepEqual(s.plantedBeds, [1, 4]);
+    s.begin();
+    assert.equal(s.step, 'care-hub');
+    assert.ok(s.setSelectedPlot(4));
+    assert.equal(s.selectedPlot, 4);
+});
+
+test('explicit plantedBeds keeps mature beds selectable even when tendBeds empty', () => {
+    const plots = new Array(8).fill(null);
+    plots[3] = { plantId: 'lettuce', stage: 5, sunBank: 0, picked: false };
+    const s = new V.VisitSession({
+        plots,
+        gardenDay: 4,
+        today: 'garden-4',
+        tendBeds: [],
+        harvestQueue: [3],
+        plantedBeds: [3],
+    });
+    assert.equal(s.begin(), 'care-hub');
+    assert.equal(s.selectedPlot, 3);
+    assert.equal(s.canCareHarvest(3), true);
+    assert.equal(s.confirmCareHarvest(), 'care-hub');
+    assert.deepEqual(s.pendingHarvests, [3]);
+});

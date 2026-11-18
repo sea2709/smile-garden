@@ -881,7 +881,14 @@
             this.harvestQueue = Array.isArray(o.harvestQueue)
                 ? o.harvestQueue.slice()
                 : H.readyPlotIndices(this.plots, this.today);
-            this.plantedBeds = this.tendBeds;
+            // Care remap: mature ready beds stay selectable so the player can
+            // finish today's needs, then breathe to harvest on care-hub.
+            if (Array.isArray(o.plantedBeds)) {
+                this.plantedBeds = o.plantedBeds.slice();
+            } else {
+                const careSet = new Set([...this.tendBeds, ...this.harvestQueue]);
+                this.plantedBeds = [...careSet].sort((a, b) => a - b);
+            }
             const n = Math.max(1, this.plantedBeds.length || this.harvestQueue.length || 1);
             this.smileSeconds = perBedStepSeconds(baseSmile, n, TUNING.minSmilePerBed);
             this.talkSeconds = perBedStepSeconds(baseTalk, n, TUNING.minTalkPerBed);
@@ -997,18 +1004,26 @@
         canCareHarvest(plot) {
             const p = this.plots[plot];
             if (!p || !H) return false;
+            if (this.pendingHarvests.includes(plot)) return false;
             if (p.stage < MAX_STAGE) return false;
             const today = this.careGardenDayKey();
-            if (!today || !H.isPlotReady(p, today)) return false;
-            const needs = L.plantNeeds(p.plantId);
-            return C.allNeedsMet(this.careProgressFor(plot), needs, p.staked);
+            // Mature + ready is enough — matching “breathe when fully grown”.
+            // Daily need dots are for growth, not a second gate on picking.
+            return !!(today && H.isPlotReady(p, today));
+        }
+
+        /** Instant pick from care-hub (Enter / accessibility); breath still works too. */
+        confirmCareHarvest() {
+            if (this.step !== 'care-hub' && this.step !== 'care-harvest') return this.step;
+            if (this.selectedPlot == null || !this.canCareHarvest(this.selectedPlot)) return this.step;
+            return this._completeCareHarvest();
         }
 
         _tickAutoSunForAll(dt, isDaylight) {
             if (!C || !isDaylight) return;
             for (const plot of this.plantedBeds) {
                 const p = this.plots[plot];
-                if (!p || H.isPlotReady(p, this.careGardenDayKey())) continue;
+                if (!p || this.pendingHarvests.includes(plot)) continue;
                 const needs = L.plantNeeds(p.plantId);
                 if (needs.sun <= 0) continue;
                 const prog = C.addAutoSun(this.careProgressFor(plot), needs, dt, isDaylight);
@@ -1018,8 +1033,19 @@
 
         _completeCareHarvest() {
             if (this.selectedPlot == null) return this.go('care-hub');
-            this.pendingHarvests.push(this.selectedPlot);
-            this.events.push({ type: 'harvest-ready', plot: this.selectedPlot });
+            const done = this.selectedPlot;
+            this.pendingHarvests.push(done);
+            this.events.push({ type: 'harvest-ready', plot: done });
+            this.pacer = null;
+            this.breathT = 0;
+            this.breathsDone = 0;
+            this.activeCareChannel = null;
+            const next = this.plantedBeds.find((i) => !this.pendingHarvests.includes(i));
+            if (next != null) {
+                this.selectedPlot = next;
+                this._loadCareProgress(next);
+                this._syncLiveFromTally();
+            }
             return this.go('care-hub');
         }
 
@@ -1142,7 +1168,7 @@
             if (this.step === 'pick' || this.step === 'care-hub'
                 || this.step === 'care-smile' || this.step === 'care-talk' || this.step === 'care-harvest'
                 || this.step === 'stretch-offer' || this.step === 'stretch') {
-                return this.plantedBeds;
+                return this.plantedBeds.filter((i) => !this.pendingHarvests.includes(i));
             }
             return [];
         }

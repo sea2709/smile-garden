@@ -293,12 +293,19 @@
 
     let journalReturn = 'idle';
     function openJournal(tab) {
-        if (screen === 'visit') return;
         journalReturn = screen === 'journal' ? journalReturn : screen;
         renderJournal(tab || 'diary');
         show('journal');
     }
-    function closeJournal() { show(journalReturn === 'journal' || journalReturn === 'loading' ? 'idle' : journalReturn); }
+    function closeJournal() {
+        const dest = journalReturn === 'journal' || journalReturn === 'loading' ? 'idle' : journalReturn;
+        show(dest);
+        // show() clears visit chrome (tend strip, step copy, basket); restore if we came from a visit.
+        if (dest === 'visit' && session) {
+            onStep(session.step);
+            refreshBasketChip(session.pendingHarvests ? session.pendingHarvests.length : 0);
+        }
+    }
 
     // ------------------------------------------------------------------
     // Camera check (pre-garden setup + reopen from garden)
@@ -392,9 +399,8 @@
             CCUI.renderPrompt(els.ccPrompt, snap, active, {
                 denied: cameraDeniedDemo || !!snap.cameraDenied || !!snap.noCamera,
             });
-            if (els.btnCcRetry) {
-                els.btnCcRetry.hidden = !(cameraDeniedDemo || snap.cameraDenied || snap.noCamera);
-            }
+            // Always offer a restart — frozen streams are not "denied" / "no camera".
+            if (els.btnCcRetry) els.btnCcRetry.hidden = false;
         }
         if (els.ccFaceOutline) {
             els.ccFaceOutline.classList.toggle('found', !!snap.faceFound);
@@ -412,8 +418,20 @@
     function pipShouldShow() {
         if (mockPipCapture) return true;
         if (screen === 'camera-check') return true;
-        if (screen === 'visit' && sourceReady) return true;
+        // Show the PiP shell for the whole visit (stream may arrive a moment later).
+        if (screen === 'visit') return true;
         return false;
+    }
+
+    function resumePipPreview() {
+        if (!els.preview) return;
+        els.preview.removeAttribute('hidden');
+        els.preview.style.removeProperty('visibility');
+        // Idle hides the PiP with pause(); visits must play() again or the frame freezes.
+        if (els.preview.srcObject) {
+            const play = els.preview.play();
+            if (play && typeof play.catch === 'function') play.catch(() => {});
+        }
     }
 
     function syncPipVisibility() {
@@ -421,9 +439,8 @@
         const show = pipShouldShow();
         els.pip.hidden = !show;
         if (els.preview) {
-            if (show) {
-                els.preview.style.removeProperty('visibility');
-            } else {
+            if (show) resumePipPreview();
+            else {
                 els.preview.pause();
                 els.preview.style.visibility = 'hidden';
             }
@@ -456,9 +473,14 @@
     async function startCamera() {
         return enqueueCamera(async () => {
             if (!(await ensureSource())) throw new Error('Camera source unavailable');
-            if (sourceReady) return;
+            if (sourceReady) {
+                // Warm-up → visit keeps the same session; just un-pause the PiP.
+                resumePipPreview();
+                return;
+            }
             await source.start();
             sourceReady = true;
+            resumePipPreview();
         });
     }
 
@@ -487,14 +509,48 @@
         }
     }
 
+    /** Drop an in-progress visit without applying tends so warm-up can reclaim the camera. */
+    async function leaveVisitForCameraCheck() {
+        if (screen !== 'visit') return;
+        session = null;
+        signalPanelDemoLock = null;
+        scene.setEffects({ sun: 0, water: 0, fert: 0 });
+        scene.setTendSelection(null);
+        if (els.tendStrip) els.tendStrip.hidden = true;
+        document.body.dataset.tendStrip = '0';
+        if (els.stretchCarePanel) els.stretchCarePanel.hidden = true;
+        document.body.dataset.stretchCare = '0';
+        document.body.dataset.step = '';
+        document.body.dataset.hint = '';
+        document.body.dataset.validation = '';
+        els.hint.hidden = true;
+        els.breathGuide.hidden = true;
+        if (els.stretchGuide) els.stretchGuide.hidden = true;
+        els.basketChip.hidden = true;
+        els.stepPanel.hidden = true;
+        await stopCamera();
+        if (els.preview) els.preview.srcObject = null;
+        toast('Left the visit to check the camera.');
+    }
+
     async function openCameraCheck(opts) {
-        if (screen === 'visit' || screen === 'camera-check') return;
+        // Wellness / startup may still be on data-screen=loading; allow that so the
+        // warm-up is not skipped and the garden is not left stuck unable to click beds.
+        if (screen === 'camera-check') return;
         const options = opts || {};
-        const fromScreen = screen === 'journal' ? journalReturn : screen;
+        const fromStartup = screen === 'loading' || options.fromStartup === true;
+        const fromVisit = screen === 'visit';
+        if (fromVisit) await leaveVisitForCameraCheck();
+        const fromScreen = fromStartup
+            ? (state.version >= 5 ? 'idle' : 'greeting')
+            : (screen === 'journal' ? journalReturn : (fromVisit ? 'idle' : screen));
         cameraCheckReturn = gardenDestFrom(fromScreen);
-        // Reopen from garden/settings once setup is done (vs first-launch warm-up).
-        cameraCheckReturnToGarden = options.reopen === true
-            || (options.reopen !== false && !!state.setupDone && screen !== 'wellness' && screen !== 'loading');
+        // First-launch / every-startup warm-up vs reopen from garden (Camera button).
+        cameraCheckReturnToGarden = !fromStartup && (
+            options.reopen === true
+            || fromVisit
+            || (options.reopen !== false && !!state.setupDone && screen !== 'wellness')
+        );
         syncCameraCheckCtas();
         mountCameraCheckGrid();
         cameraCheckDemoLock = false;
@@ -505,6 +561,12 @@
         placePipForCameraCheck();
         show('camera-check');
         try {
+            // Reopen (and leave-visit) must stop→start so a frozen stream recovers;
+            // startCamera alone is a no-op while sourceReady is still true.
+            if (cameraCheckReturnToGarden || sourceReady) {
+                await stopCamera();
+                if (els.preview) els.preview.srcObject = null;
+            }
             await startCamera();
             state.cameraCheckNote = null;
         } catch (e) {
@@ -600,7 +662,7 @@
             show(state.version >= 5 ? 'idle' : 'greeting');
             return;
         }
-        if (CC.shouldShowCameraCheck(state)) void openCameraCheck();
+        if (CC.shouldShowCameraCheck(state)) void openCameraCheck({ fromStartup: true });
         else show(state.version >= 5 ? 'idle' : 'greeting');
     }
 
@@ -903,9 +965,11 @@
             else if (!tendable.length && !ready) msg = 'Every plant is tended for today. Rest, harvest, or go to bed when ready.';
         }
         els.idleText.textContent = msg;
-        els.btnVisit.hidden = state.version >= 6 || document.body.dataset.captureTags === '1';
+        // v6 prefers click-a-bed, but keep a clear harvest entry when crops are ready.
+        els.btnVisit.hidden = (state.version >= 6 && !ready) || document.body.dataset.captureTags === '1';
         if (!els.btnVisit.hidden) {
-            els.btnVisit.textContent = tendable.length ? 'Tend your plants' : (ready ? 'Tend (harvest)' : 'Tend your plants');
+            els.btnVisit.textContent = ready && !tendable.length ? 'Pick ready crops'
+                : (tendable.length ? 'Tend your plants' : (ready ? 'Tend (harvest)' : 'Tend your plants'));
         }
         els.btnPlantIdle.hidden = !V.emptyPlots(state).length;
         els.btnBed.hidden = state.version < 5;
@@ -1141,10 +1205,7 @@
                 return;
             }
             els.preview.srcObject = stream || null;
-            if (stream && els.preview) {
-                els.preview.removeAttribute('hidden');
-                if (els.preview.style) els.preview.style.removeProperty('visibility');
-            }
+            if (stream) resumePipPreview();
             els.pip.classList.toggle('pip-mock-capture', false);
             syncPipVisibility();
         });
@@ -1158,39 +1219,95 @@
         return true;
     }
 
+    /** Every planted bed that is not mid-regrow — mature ready crops included. */
+    function careBedsForState() {
+        const today = gardenTodayKey();
+        const out = [];
+        state.plots.forEach((p, i) => {
+            if (!p) return;
+            if (V.isPlotRegrowing(p, today)) return;
+            out.push(i);
+        });
+        return out;
+    }
+
     function newVisitSession() {
+        const today = gardenTodayKey();
         return new V.VisitSession({
             fast: config.fast,
             pace: state.settings.pace,
             breaths: state.settings.breaths,
             plots: state.plots,
-            today: gardenTodayKey(),
+            today,
             gardenDay: state.dayNumber,
             dailyTends: state.dailyTends,
             tendBeds: V.tendableForState(state, clock.now()),
+            harvestQueue: V.readyPlotIndices(state.plots, today),
+            plantedBeds: careBedsForState(),
         });
     }
 
+    function canStartVisitFromScreen() {
+        return screen === 'idle' || screen === 'greeting' || screen === 'summary';
+    }
+
+    /** Prefer real camera; if it cannot start, fall back to keyboard/mock so tending still works. */
+    async function ensurePlayableSource() {
+        if (await ensureSource()) return true;
+        if (config.mock || config.keyboard) return false;
+        config.keyboard = true;
+        els.mockBadge.hidden = false;
+        els.mockMode.textContent = 'Keyboard player';
+        source = null;
+        sourceReady = false;
+        if (!(await ensureSource())) return false;
+        toast('Camera unavailable — using keyboard (S smile, T talk).');
+        return true;
+    }
+
     async function beginVisitAtPlot(plotIndex) {
-        if (!(await ensureSource())) return;
+        const p = state.plots[plotIndex];
+        if (!p) return;
+        const today = gardenTodayKey();
+        if (V.isPlotRegrowing(p, today)) {
+            toast('That bed is regrowing. Give it another garden day or two.');
+            return;
+        }
+        // Open the visit immediately — never wait on camera before acknowledging the click.
+        scene.setTendSelection(plotIndex, { pulse: true });
         if (signalSwitcher) signalSwitcher.reset();
         trace.clear();
         session = newVisitSession();
+        if (!session.plantedBeds.includes(plotIndex)) {
+            session.plantedBeds = session.plantedBeds.concat([plotIndex]).sort((a, b) => a - b);
+        }
+        if (V.isPlotReady(p, today) && !session.harvestQueue.includes(plotIndex)) {
+            session.harvestQueue = session.harvestQueue.concat([plotIndex]);
+        }
         refreshBasketChip(0);
         els.basketChip.hidden = session.harvestQueue.length === 0;
-        trace.clear();
         signal.breathing = null;
         talkPromptIdx = Math.floor(Math.random() * TALK_PROMPTS.length);
-        const step = session.begin();
-        if (session.step === 'care-hub' || session.step === 'pick') {
-            session.setSelectedPlot(plotIndex);
-        } else if (session.step === 'pick-harvest') {
-            session.setSelectedPlot(plotIndex);
+        let step = session.begin();
+        if (step === 'summary') {
+            session.plantedBeds = [plotIndex];
+            session.selectedPlot = plotIndex;
+            session.phase = 'tend';
+            session.plantRound = 0;
+            step = session.go('care-hub');
         }
+        session.setSelectedPlot(plotIndex);
         show('visit');
         onStep(session.step);
+        syncTendRing();
+        syncPipVisibility();
         try {
+            if (!(await ensurePlayableSource())) {
+                showError('Camera could not start', 'Use Demo tools → keyboard mode, or open Camera to retry.', true);
+                return;
+            }
             await startCamera();
+            syncPipVisibility();
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
         }
@@ -1200,18 +1317,32 @@
         if (signalSwitcher) signalSwitcher.reset();
         trace.clear();
         signalPanelDemoLock = null;
-        if (!(await ensureSource())) return;
         session = newVisitSession();
+        if (!session.plantedBeds.length) {
+            toast('No beds to tend right now. Plant a seed, or wait for regrowth.');
+            session = null;
+            return;
+        }
         refreshBasketChip(0);
         els.basketChip.hidden = session.harvestQueue.length === 0;
-        trace.clear();
         signal.breathing = null;
         talkPromptIdx = Math.floor(Math.random() * TALK_PROMPTS.length);
         show('visit');
         session.begin();
+        if (session.step === 'summary') {
+            session.selectedPlot = session.plantedBeds[0];
+            session.go('care-hub');
+        }
         onStep(session.step);
+        syncTendRing();
+        syncPipVisibility();
         try {
+            if (!(await ensurePlayableSource())) {
+                showError('Camera could not start', 'Use Demo tools → keyboard mode, or open Camera to retry.', true);
+                return;
+            }
             await startCamera();
+            syncPipVisibility();
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
             CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
@@ -1221,10 +1352,25 @@
 
     let talkPromptIdx = 0;
     let lastStep = null;
+    let lastSourcePhase = '';
+    function careHubMockPhase() {
+        if (!session || session.step !== 'care-hub') return 'care-hub';
+        if (session.activeCareChannel === 'harvest' || session.canCareHarvest(session.selectedPlot)) {
+            return 'care-hub-breathe';
+        }
+        if (session.activeCareChannel === 'stake') return 'stretch';
+        return 'care-hub';
+    }
+    function setSourcePhase(phase) {
+        if (!source || !source.setPhase || phase === lastSourcePhase) return;
+        lastSourcePhase = phase;
+        source.setPhase(phase);
+    }
+
     function onStep(step) {
         lastStep = step;
         document.body.dataset.step = step;
-        if (source && source.setPhase) source.setPhase(step);
+        setSourcePhase(step === 'care-hub' ? careHubMockPhase() : step);
         const order = ['harvest', 'smile', 'talk', 'breathe', 'stretch', 'summary'];
         let idx = order.indexOf(
             step === 'pick-harvest' || step === 'harvest-hold' ? 'harvest'
@@ -1257,7 +1403,8 @@
         const who = selectedPlantLabel();
         els.stepTitle.textContent = step === 'pick' ? copy.title : (who ? `${copy.title} · ${who}` : copy.title);
         els.stepText.textContent = copy.text;
-        const harvestBreath = step === 'care-hub' && session && session.activeCareChannel === 'harvest';
+        const harvestReady = step === 'care-hub' && session && session.canCareHarvest(session.selectedPlot);
+        const harvestBreath = step === 'care-hub' && session && (session.activeCareChannel === 'harvest' || harvestReady);
         const stakeStretch = step === 'care-hub' && session && session.activeCareChannel === 'stake';
         els.breathGuide.hidden = step !== 'breathe' && step !== 'care-harvest' && !harvestBreath;
         els.stretchGuide.hidden = step !== 'stretch' && !stakeStretch;
@@ -1653,10 +1800,12 @@
                     scene.playHarvestAnim(ev.plot, pl.plantId, { pull: mode === 'pull' });
                 }
                 refreshBasketChip(session.pendingHarvests.length);
+                toast('Picked! Finish the visit to store it in your pantry.');
             }
         }
         if (!session) return;
         const step = session.step;
+        if (step === 'care-hub') setSourcePhase(careHubMockPhase());
         document.body.dataset.smiling = session.smiling ? '1' : '0';
         document.body.dataset.talking = session.talking ? '1' : '0';
 
@@ -1680,8 +1829,14 @@
             els.stepLive.textContent = `${selectedPlantLabel()} · plant ${round} of ${total}. Enter or Space to tend.`;
         } else if (step === 'care-hub') {
             const pl = state.plots[session.selectedPlot];
-            const all = pl && C.allNeedsMet(session.careProgressFor(session.selectedPlot), L.plantNeeds(pl.plantId), pl.staked);
-            els.stepLive.textContent = all ? 'All needs met — bloom stamp on the tag. Finish when you like.' : 'Pick any need icon. Switch beds with arrow keys.';
+            if (pl && session.canCareHarvest(session.selectedPlot)) {
+                els.stepLive.textContent = 'Fully grown — breathe calmly to pick, or press Enter. Esc ends the visit.';
+            } else {
+                const all = pl && C.allNeedsMet(session.careProgressFor(session.selectedPlot), L.plantNeeds(pl.plantId), pl.staked);
+                els.stepLive.textContent = all
+                    ? 'All needs met — bloom stamp on the tag. Finish when you like.'
+                    : 'Smile to water, talk to fertilize, stretch to stake. Switch beds with a click or arrow keys.';
+            }
         } else if (step === 'care-smile') {
             els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
                 : session.smiling ? '💧 Watering…' : 'Smile gently to fill the water dot';
@@ -2276,16 +2431,23 @@
         }
         if (i === null) { els.plotTip.hidden = true; els.garden.style.cursor = ''; return; }
         const p = state.plots[i];
-        els.garden.style.cursor = (!p && V.emptyPlots(state).length) ? 'pointer' : '';
+        const canPlantEmpty = !p && V.emptyPlots(state).length && canStartVisitFromScreen();
+        const canTendPlant = !!p && state.version >= 6 && canStartVisitFromScreen()
+            && !V.isPlotRegrowing(p, gardenTodayKey());
+        els.garden.style.cursor = (canPlantEmpty || canTendPlant) ? 'pointer' : '';
         if (!p) {
             els.plotTip.textContent = screen === 'picker' ? `Plant in bed ${i + 1}` : `Bed ${i + 1}: empty. Click to plant`;
         } else {
             const kind = L.plantById(p.plantId);
             els.plotTip.textContent = '';
             const b = document.createElement('b'); b.textContent = kind.name;
-            let extra = V.isPlotReady(p, clock.today()) ? ' · ready to pick'
-                : V.isPlotRegrowing(p, clock.today()) ? ' · regrowing'
+            const todayKey = gardenTodayKey();
+            let extra = V.isPlotReady(p, todayKey) ? ' · ready to pick — click to tend'
+                : V.isPlotRegrowing(p, todayKey) ? ' · regrowing'
                     : (p.stage < 5 ? ` · ${p.sunBank.toFixed(1)}/${kind.cost} sun-hours saved` : ' · fully grown');
+            if (canTendPlant && !V.isPlotReady(p, todayKey) && !V.isPlotRegrowing(p, todayKey)) {
+                extra += ' — click to tend';
+            }
             els.plotTip.append(b, document.createTextNode(` · ${V.STAGES[p.stage].label}${extra}`));
         }
         const c = scene.plotClient(i);
@@ -2294,9 +2456,28 @@
         els.plotTip.hidden = false;
     });
     els.garden.addEventListener('mouseleave', () => { els.plotTip.hidden = true; scene.setHover(null); });
-    els.garden.addEventListener('click', (e) => {
+    function isUiChromeTarget(el) {
+        if (!el || !el.closest) return false;
+        return !!el.closest([
+            'button', 'a', 'input', 'select', 'textarea', 'label',
+            '.top-actions', '.dev-drawer', '.error-banner', '.signal-panel',
+            '.step-panel', '.stretch-care-panel', '.idle-bar', '.picker',
+            '.journal', '.card', '.sg-summary', '#sum-card', '.wellness',
+            '.camera-check', '.cc-howto', '.cc-packets',
+            '#btn-cc-start', '#btn-cc-skip-now', '#btn-cc-retry',
+        ].join(','));
+    }
+
+    let lastGardenPickAt = 0;
+    function onGardenPointer(e) {
+        if (e.button != null && e.button !== 0) return;
+        // Capture-phase on #app: beds stay clickable even if a translucent overlay sits above the canvas.
+        if (isUiChromeTarget(e.target)) return;
+        const now = performance.now();
+        if (now - lastGardenPickAt < 350) return;
         const i = scene.plotAt(e.clientX, e.clientY);
         if (i === null) return;
+        lastGardenPickAt = now;
         if (screen === 'visit' && session && (session.step === 'pick' || session.step === 'pick-harvest' || session.step === 'care-hub')) {
             if (session.setSelectedPlot(i)) {
                 syncTendRing();
@@ -2311,14 +2492,19 @@
             return;
         }
         if (state.plots[i]) {
-            if (state.version >= 6 && screen === 'idle') {
-                beginVisitAtPlot(i);
+            if (state.version >= 6 && canStartVisitFromScreen()) {
+                void beginVisitAtPlot(i);
+            } else if (state.version < 6 && canStartVisitFromScreen()) {
+                toast('Open Begin visit from the greeting card to tend beds.');
             }
             return;
         }
         if (screen === 'picker') { pickerTarget = i; scene.setHighlight(i); els.pickerTarget.textContent = `for bed ${i + 1}`; }
-        else if (screen === 'idle' || screen === 'greeting') openPicker(i);
-    });
+        else if (canStartVisitFromScreen()) openPicker(i);
+    }
+    const appRoot = document.getElementById('app') || document.body;
+    appRoot.addEventListener('pointerdown', onGardenPointer, true);
+    appRoot.addEventListener('click', onGardenPointer, true);
 
     // ------------------------------------------------------------------
     // Buttons + keys
@@ -2331,7 +2517,7 @@
     if (els.btnCcRetry) els.btnCcRetry.addEventListener('click', () => { void retryCameraCheck(); });
     if (els.btnCameraCheck) {
         els.btnCameraCheck.addEventListener('click', () => {
-            if (screen === 'visit' || screen === 'camera-check' || screen === 'wellness') return;
+            if (screen === 'camera-check' || screen === 'wellness' || screen === 'loading') return;
             state.cameraCheckNote = null;
             void openCameraCheck({ reopen: true });
         });
@@ -2440,7 +2626,7 @@
         const k = e.key.toLowerCase();
         if (k === 'g') { state.settings.chart = !state.settings.chart; save(); toast(state.settings.chart ? 'Smile chart on (shows during visits)' : 'Smile chart hidden'); return; }
         if (k === 'j') { screen === 'journal' ? closeJournal() : openJournal('diary'); return; }
-        if (k === 'c' && screen !== 'visit' && screen !== 'camera-check' && screen !== 'wellness') {
+        if (k === 'c' && screen !== 'camera-check' && screen !== 'wellness' && screen !== 'loading') {
             state.cameraCheckNote = null;
             void openCameraCheck({ reopen: true });
             return;
@@ -2460,6 +2646,14 @@
                 if (session.step === 'pick-harvest') { onStep(session.confirmPick()); return; }
                 if (session.step === 'harvest-hold') { onStep(session.confirmHarvestInstant()); return; }
                 if (session.step === 'pick') { onStep(session.confirmPick()); return; }
+                if (session.step === 'care-hub' && session.canCareHarvest(session.selectedPlot)) {
+                    onStep(session.confirmCareHarvest());
+                    return;
+                }
+                if (session.step === 'care-harvest') {
+                    onStep(session.confirmCareHarvest());
+                    return;
+                }
             }
             const nav = { arrowleft: 'left', arrowright: 'right', arrowup: 'up', arrowdown: 'down' };
             if (nav[k] && (session.step === 'pick' || session.step === 'pick-harvest' || session.step === 'care-hub')) {
@@ -2582,7 +2776,8 @@
             await showMorningReveal(pending);
         } else if (state.wellnessAck) {
             mountCameraCheckGrid();
-            if (CC.shouldShowCameraCheck(state)) openCameraCheck();
+            // Always open warm-up from startup (screen is still "loading" here).
+            if (CC.shouldShowCameraCheck(state)) void openCameraCheck({ fromStartup: true });
             else show(state.version >= 5 ? 'idle' : 'greeting');
         } else {
             show('wellness');

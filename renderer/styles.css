@@ -44,7 +44,8 @@ button { font-family: inherit; }
     --hud-logo-gap: 12px;
 }
 .topbar {
-    position: absolute; top: 0; left: 0; right: 0; height: 56px; z-index: 20;
+    /* Above .overlay (40) / .float-layer (36) so Journal / Camera / Demo stay clickable. */
+    position: absolute; top: 0; left: 0; right: 0; height: 56px; z-index: 45;
     display: flex; align-items: center; gap: 16px; padding: 0 18px;
     background: linear-gradient(to bottom, rgba(251, 245, 230, 0.82), rgba(251, 245, 230, 0));
 }
@@ -154,11 +155,14 @@ body[data-painted-clock="1"] .chip-day #day-chip-text { position: absolute; widt
 .week-dots i.on { background: radial-gradient(circle at 35% 35%, #f6d77c, var(--honey)); }
 .week-dots i.today { outline: 1.5px solid rgba(125, 154, 91, 0.8); outline-offset: 1px; }
 .top-actions { display: flex; gap: 8px; }
-/* Warm-up reopen is for garden screens, not during a live visit / overlays that own the camera. */
-body[data-screen="visit"] #btn-camera-check,
+/* Warm-up reopen is available during a visit (leaves the visit to reclaim a stuck camera). */
 body[data-screen="camera-check"] #btn-camera-check,
 body[data-screen="wellness"] #btn-camera-check,
 body[data-screen="loading"] #btn-camera-check { display: none; }
+/* Journal is fine mid-visit; hide only while setup / warm-up owns the screen. */
+body[data-screen="camera-check"] #btn-journal,
+body[data-screen="wellness"] #btn-journal,
+body[data-screen="loading"] #btn-journal { display: none; }
 
 /* ---------- buttons ---------- */
 .btn {
@@ -183,7 +187,8 @@ body[data-screen="loading"] #btn-camera-check { display: none; }
 /* ---------- overlays & cards ---------- */
 .overlay { position: absolute; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center;
     background: radial-gradient(ellipse at center, rgba(40, 28, 12, 0.12), rgba(40, 28, 12, 0.32)); animation: fadein 0.6s ease; }
-.overlay-left { justify-content: flex-start; padding-left: 5vw; background: linear-gradient(to right, rgba(40, 28, 12, 0.25), rgba(40, 28, 12, 0)); }
+.overlay-left { justify-content: flex-start; padding-left: 5vw; background: linear-gradient(to right, rgba(40, 28, 12, 0.25), rgba(40, 28, 12, 0)); pointer-events: none; }
+.overlay-left > * { pointer-events: auto; }
 .overlay-right { justify-content: flex-end; padding-right: 22px; background: linear-gradient(to left, rgba(40, 28, 12, 0.22), rgba(40, 28, 12, 0) 45%); pointer-events: none; }
 .overlay-right > * { pointer-events: auto; }
 .overlay-top { align-items: flex-start; padding-top: 62px; background: linear-gradient(to bottom, rgba(40, 28, 12, 0.18), rgba(40, 28, 12, 0) 45%); pointer-events: none; }
@@ -226,7 +231,7 @@ body[data-screen="visit"][data-step="care-hub"] #meters,
 body[data-screen="visit"][data-step^="care-"] #meters {
     display: none !important;
 }
-body[data-garden-v="6"] #btn-visit { display: none !important; }
+/* Visit button may reappear when mature crops are ready to pick (see renderIdle). */
 .meter { margin: 0; text-align: center; transition: transform 0.4s ease, opacity 0.4s ease; opacity: 0.92; }
 .meter.active { transform: translateY(-6px) scale(1.06); opacity: 1; }
 .meter-canvas { width: 132px; height: 86px; margin: 0 auto; display: block; filter: drop-shadow(0 6px 10px rgba(70, 48, 20, 0.22)); }
@@ -269,7 +274,8 @@ body[data-step="breathe"] .ring-fg, body[data-step="breathe-offer"] .ring-fg { s
 .breath-safety { max-width: 380px; font-size: 13px; font-weight: 700; color: var(--ink); background: rgba(251, 245, 230, 0.8); padding: 6px 12px; border-radius: 12px; }
 
 /* ---------- idle bar, tips, floats ---------- */
-.idle-bar { position: absolute; right: 22px; bottom: 22px; z-index: 30; display: flex; gap: 12px; align-items: center; padding: 12px 14px 12px 20px; animation: rise 0.5s ease; }
+.idle-bar { position: absolute; right: 22px; bottom: 22px; z-index: 30; display: flex; gap: 12px; align-items: center; padding: 12px 14px 12px 20px; animation: rise 0.5s ease; pointer-events: none; }
+.idle-bar .btn { pointer-events: auto; }
 #idle-text { font-size: 14.5px; font-weight: 700; color: var(--ink-soft); max-width: 300px; }
 .plot-tip { position: absolute; z-index: 35; pointer-events: none; transform: translate(-50%, -100%); background: rgba(251, 245, 230, 0.95); border-radius: 12px; padding: 8px 12px; font-size: 13px; box-shadow: var(--shadow); white-space: nowrap; }
 .plot-tip b { font-family: var(--serif); font-size: 14.5px; }
@@ -287,7 +293,7 @@ body[data-lighting="night"] .hint { background: rgba(240, 236, 214, 0.95); borde
 
 /* ---------- chart, pip, badge ---------- */
 /* Left signal panel: renderer/signal-panel-ui.css (Heily adaptive panel). */
-.pip { position: absolute; right: 18px; top: 66px; z-index: 18; width: 200px; height: 150px; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); border: 3px solid rgba(251, 245, 230, 0.9); contain: layout paint; }
+.pip { position: absolute; right: 18px; top: 66px; z-index: 18; width: 200px; height: 150px; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); border: 3px solid rgba(251, 245, 230, 0.9); contain: layout paint; background: #2a2118; }
 .pip .mirror-video,
 #pip video.mirror-video {
     position: absolute;
