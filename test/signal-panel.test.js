@@ -15,13 +15,21 @@ test('rawPanelModeFromSignals prioritizes stretch then breathe then talk over sm
 });
 
 test('signal panel hysteresis holds before switching modes', () => {
-    const sw = SP.createSignalPanelSwitcher({ enterHoldSec: 0.4, exitHoldSec: 0.5 });
+    const sw = SP.createSignalPanelSwitcher({ enterHoldSec: 0.4, exitHoldSec: 1.2 });
     assert.equal(sw.step(0, 'smile'), 'idle');
     assert.equal(sw.step(0.1, 'smile'), 'idle');
     assert.equal(sw.step(0.45, 'smile'), 'smile');
     assert.equal(sw.step(0.5, 'talk'), 'smile');
     assert.equal(sw.step(0.7, 'talk'), 'smile');
     assert.equal(sw.step(0.91, 'talk'), 'talk');
+    assert.equal(sw.step(1.0, 'idle'), 'talk');
+    assert.equal(sw.step(2.21, 'idle'), 'idle');
+});
+
+test('default hysteresis matches signal-manifest (400ms / 1.2s)', () => {
+    const sw = SP.createSignalPanelSwitcher();
+    assert.equal(sw.enterHoldSec, 0.4);
+    assert.equal(sw.exitHoldSec, 1.2);
 });
 
 test('pickAutoCareChannel ignores full needs and immature harvest breath', () => {

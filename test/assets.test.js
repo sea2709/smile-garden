@@ -285,6 +285,21 @@ test('stretch UI art: manifest paths, css, and art spec doc', () => {
     assert.ok(fs.existsSync(path.join(root, 'game', 'stretch.js')));
 });
 
+test('signal panel art (Heily manifest)', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'ui', 'signal', 'signal-manifest.json'), 'utf8'));
+    assert.equal(manifest.panel.css[0], 282);
+    assert.equal(manifest.panel.css[1], 136);
+    for (const st of ['smile', 'talk', 'stretch', 'breathe', 'idle']) {
+        const e = manifest.states[st];
+        assert.ok(e.chartBg.day.startsWith('ui/signal/'), st);
+        assert.ok(fs.existsSync(path.join(root, 'assets', e.chartBg.day)), st);
+        assert.ok(fs.existsSync(path.join(root, 'assets', e.chartBg.night)), `${st} night`);
+        assert.ok(fs.existsSync(path.join(root, 'assets', e.glow.day)), `${st} glow`);
+    }
+    assert.ok(fs.existsSync(path.join(root, 'assets', manifest.gauge.arc.day)));
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'signal-panel-ui.css')));
+});
+
 test('selection ring art: 8 day/night sprites and backdrop offsets', () => {
     assert.ok(ART.selection);
     for (let b = 1; b <= 8; b++) {

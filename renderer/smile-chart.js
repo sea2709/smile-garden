@@ -1,132 +1,222 @@
-// renderer/smile-chart.js — adaptive left signal panel (toggle with G).
-//
-// Modes follow auto-care detection: smile, talk, breathe, stretch, idle.
-// Breathing view uses SmartSpectra breath *rate* (not a raw waveform) to
-// drive a smoothed synthetic wave; harvest uses the visit BreathPacer phase.
-
+// renderer/smile-chart.js — adaptive left signal panel (Heily art + manifest).
 (function () {
     'use strict';
 
-    const LABELS = (window.SmileSignalPanel && window.SmileSignalPanel.PANEL_LABELS) || {
-        idle: 'Calm · waiting',
-        smile: 'Smile · water',
-        talk: 'Talk · fertilize',
-        breathe: 'Breathe · harvest',
-        stretch: 'Neck stretch · stake',
+    const CSS_W = 250;
+    const CSS_H = 84;
+    const GEOM = { x0: 20, y0: 6, plotW: 222, plotH: 60, win: 10, stripH: 0 };
+    const BREATHE_GEOM = { x0: 20, y0: 4, plotW: 222, plotH: 38 };
+    const SWEEP = [-78, 78];
+    const GAUGE = {
+        arc: { x: 39, y: 0, w: 172, h: 82.5 },
+        pivot: { x: 125, y: 82 },
+        needle: { ox: 7, oy: 52.8, w: 14, h: 59 },
     };
 
-    function drawSmileMode(ctx, samples, now, geom, L) {
-        const { x0, y0, plotW, plotH, cssH, stripH } = geom;
+    const COLORS = {
+        smile: {
+            day: { accent: '#6fa3c7', line: '#4f86ad', fill: 'rgba(127, 169, 201, 0.30)', grid: '#8fb3cc', gap: 'rgba(150,140,130,0.18)' },
+            night: { accent: '#a9c8de', line: '#2f5f86', fill: 'rgba(150, 190, 222, 0.34)', grid: '#4e6a86', gap: 'rgba(150,140,130,0.18)' },
+        },
+        talk: {
+            day: { accent: '#b8924e', line: '#8f6d34', fill: 'rgba(201, 166, 98, 0.32)', grid: '#c2a676' },
+            night: { accent: '#d6bd8c', line: '#5e4620', fill: 'rgba(214, 186, 128, 0.34)', grid: '#6e5d44' },
+        },
+        stretch: {
+            day: { line: '#6b8a3e', accent: '#8aa456' },
+            night: { line: '#3f5a22', accent: '#b5c98d' },
+        },
+        breathe: {
+            day: { line: '#66798e', fill: 'rgba(138, 156, 176, 0.28)', accent: '#8a9cb0' },
+            night: { line: '#3c4d61', fill: 'rgba(166, 182, 200, 0.32)', accent: '#b6c3d1' },
+        },
+    };
+
+    const imgCache = {};
+    function assetPath(rel) {
+        return `../assets/${rel}`;
+    }
+    function loadImage(key, rel) {
+        if (imgCache[key]) return imgCache[key];
+        const im = new Image();
+        im.src = assetPath(rel);
+        imgCache[key] = im;
+        return im;
+    }
+    function gaugeArcSrc(night) {
+        return night ? 'ui/signal/gauge-arc-night.png' : 'ui/signal/gauge-arc.png';
+    }
+    function gaugeNeedleSrc(night) {
+        return night ? 'ui/signal/gauge-needle-night.png' : 'ui/signal/gauge-needle.png';
+    }
+
+    function palette(mode, night) {
+        const m = COLORS[mode];
+        if (!m) return COLORS.smile.day;
+        return night ? m.night : m.day;
+    }
+
+    function rollToGaugeDeg(rollDeg) {
+        const maxTilt = 28;
+        const mirrored = -Number(rollDeg);
+        return Math.max(SWEEP[0], Math.min(SWEEP[1], (mirrored / maxTilt) * SWEEP[1]));
+    }
+
+    function drawSmileMode(ctx, samples, now, geom, L, colors) {
+        const { x0, y0, plotW, plotH } = geom;
         const win = geom.win;
         const t0 = now - win;
         const xAt = (tm) => x0 + ((tm - t0) / win) * plotW;
         const yAt = (h) => y0 + plotH * (1 - h);
-        const on = L.DEFAULTS.smileOn, off = L.DEFAULTS.smileOff;
+        const on = L.DEFAULTS.smileOn;
 
-        ctx.fillStyle = 'rgba(255, 251, 238, 0.6)';
-        ctx.fillRect(x0, y0, plotW, plotH);
-
-        ctx.fillStyle = 'rgba(150, 140, 130, 0.22)';
         let gap = null;
         for (const s of samples) {
             if (!s.face && gap === null) gap = s.t;
-            if (s.face && gap !== null) { ctx.fillRect(xAt(gap), y0, Math.max(1, xAt(s.t) - xAt(gap)), plotH); gap = null; }
+            if (s.face && gap !== null) {
+                ctx.fillStyle = colors.gap;
+                ctx.fillRect(xAt(gap), y0, Math.max(1, xAt(s.t) - xAt(gap)), plotH);
+                gap = null;
+            }
         }
         if (gap !== null) ctx.fillRect(xAt(gap), y0, Math.max(1, xAt(now) - xAt(gap)), plotH);
 
-        ctx.setLineDash([3, 4]);
+        ctx.setLineDash([4, 3]);
         ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(196, 140, 40, 0.8)';
-        ctx.beginPath(); ctx.moveTo(x0, yAt(on)); ctx.lineTo(x0 + plotW, yAt(on)); ctx.stroke();
-        ctx.strokeStyle = 'rgba(150, 120, 90, 0.5)';
-        ctx.beginPath(); ctx.moveTo(x0, yAt(off)); ctx.lineTo(x0 + plotW, yAt(off)); ctx.stroke();
+        ctx.strokeStyle = colors.accent;
+        ctx.beginPath();
+        ctx.moveTo(x0, yAt(on));
+        ctx.lineTo(x0 + plotW, yAt(on));
+        ctx.stroke();
+        ctx.strokeStyle = colors.grid;
+        ctx.beginPath();
+        ctx.moveTo(x0, yAt(0));
+        ctx.lineTo(x0 + plotW, yAt(0));
+        ctx.stroke();
         ctx.setLineDash([]);
 
         let run = [];
         const flush = () => {
             if (run.length < 2) { run = []; return; }
-            const smiling = run.some((s) => s.smiling);
+            const watering = run.some((s) => s.smiling);
             ctx.beginPath();
             ctx.moveTo(xAt(run[0].t), yAt(run[0].h));
             for (const s of run) ctx.lineTo(xAt(s.t), yAt(s.h));
-            if (smiling) {
+            if (watering) {
                 ctx.lineTo(xAt(run[run.length - 1].t), y0 + plotH);
                 ctx.lineTo(xAt(run[0].t), y0 + plotH);
                 ctx.closePath();
-                ctx.fillStyle = 'rgba(244, 196, 80, 0.28)';
+                ctx.fillStyle = colors.fill;
                 ctx.fill();
                 ctx.beginPath();
                 ctx.moveTo(xAt(run[0].t), yAt(run[0].h));
                 for (const s of run) ctx.lineTo(xAt(s.t), yAt(s.h));
             }
-            ctx.strokeStyle = smiling ? '#b7791f' : '#8a7a68';
-            ctx.lineWidth = smiling ? 2.2 : 1.6;
+            ctx.strokeStyle = watering ? colors.line : colors.grid;
+            ctx.lineWidth = watering ? 1.8 : 1.4;
             ctx.lineJoin = 'round';
             ctx.stroke();
             run = [];
         };
-        let prevSmile = null;
+        let prev = null;
         for (const s of samples) {
-            if (!s.face || s.h === null) { flush(); prevSmile = null; continue; }
-            if (prevSmile !== null && prevSmile !== s.smiling) { const last = run[run.length - 1]; flush(); if (last) run.push(last); }
+            if (!s.face || s.h === null) { flush(); prev = null; continue; }
+            if (prev !== null && prev !== s.smiling) {
+                const last = run[run.length - 1];
+                flush();
+                if (last) run.push(last);
+            }
             run.push(s);
-            prevSmile = s.smiling;
+            prev = s.smiling;
         }
         flush();
-
-        const sy = y0 + plotH + 3;
-        ctx.fillStyle = 'rgba(220, 210, 190, 0.6)';
-        ctx.fillRect(x0, sy, plotW, stripH);
-        ctx.fillStyle = '#7a6a5c';
-        ctx.font = '600 9px Nunito, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('−10 s', x0, cssH - 1);
-        ctx.textAlign = 'right';
-        ctx.fillText('now', x0 + plotW, cssH - 1);
     }
 
-    function drawTalkMode(ctx, samples, now, geom) {
-        const { x0, y0, plotW, plotH, cssH, stripH } = geom;
-        const win = geom.win;
-        const t0 = now - win;
-        const xAt = (tm) => x0 + ((tm - t0) / win) * plotW;
-
-        ctx.fillStyle = 'rgba(238, 246, 255, 0.75)';
-        ctx.fillRect(x0, y0, plotW, plotH);
-        ctx.fillStyle = '#7fb3d5';
-        let ts = null;
-        for (const s of samples) {
-            if (s.face && s.talking) { if (ts === null) ts = s.t; }
-            else if (ts !== null) {
-                const h = 10 + (plotH - 14) * 0.55;
-                ctx.fillRect(xAt(ts), y0 + plotH - h, Math.max(1, xAt(s.t) - xAt(ts)), h);
-                ts = null;
-            }
-        }
-        if (ts !== null && samples.length) {
-            const h = 10 + (plotH - 14) * 0.55;
-            ctx.fillRect(xAt(ts), y0 + plotH - h, Math.max(1, xAt(samples[samples.length - 1].t) - xAt(ts)), h);
-        }
-        const sy = y0 + plotH + 3;
-        ctx.fillStyle = 'rgba(200, 220, 235, 0.7)';
-        ctx.fillRect(x0, sy, plotW, stripH);
-        ctx.fillStyle = '#5a7a98';
-        ctx.font = '600 9px Nunito, sans-serif';
-        ctx.textAlign = 'right';
-        ctx.fillText('talking', x0 + plotW, sy + stripH - 1);
-        ctx.textAlign = 'left';
-        ctx.fillText('−10 s', x0, cssH - 1);
-    }
-
-    function drawBreatheMode(ctx, samples, now, geom, opts) {
-        const { x0, y0, plotW, plotH, cssH } = geom;
+    function drawTalkMode(ctx, samples, now, geom, colors) {
+        const { x0, y0, plotW, plotH } = geom;
         const win = geom.win;
         const t0 = now - win;
         const xAt = (tm) => x0 + ((tm - t0) / win) * plotW;
         const mid = y0 + plotH / 2;
+        const lo = y0 + plotH * 0.18;
+        const hi = y0 + plotH * 0.82;
 
-        ctx.fillStyle = 'rgba(236, 248, 240, 0.85)';
-        ctx.fillRect(x0, y0, plotW, plotH);
+        let ema = 0;
+        const alpha = 0.38;
+        const points = [];
+        for (const s of samples) {
+            const target = s.face && s.talking ? 0.55 : 0.08;
+            ema += alpha * (target - ema);
+            points.push({ x: xAt(s.t), a: ema });
+        }
+        if (points.length < 2) return;
+
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, mid);
+        for (const p of points) {
+            const amp = p.a * (plotH * 0.38);
+            ctx.lineTo(p.x, mid - amp);
+        }
+        for (let i = points.length - 1; i >= 0; i--) {
+            const p = points[i];
+            const amp = p.a * (plotH * 0.38);
+            ctx.lineTo(p.x, mid + amp);
+        }
+        ctx.closePath();
+        ctx.fillStyle = colors.fill;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, mid - points[0].a * (plotH * 0.38));
+        for (const p of points) ctx.lineTo(p.x, mid - p.a * (plotH * 0.38));
+        ctx.strokeStyle = colors.line;
+        ctx.lineWidth = 1.6;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        ctx.setLineDash([3, 4]);
+        ctx.strokeStyle = colors.grid;
+        ctx.beginPath();
+        ctx.moveTo(x0, lo);
+        ctx.lineTo(x0 + plotW, lo);
+        ctx.moveTo(x0, hi);
+        ctx.lineTo(x0 + plotW, hi);
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
+
+    function drawStretchGauge(ctx, rollDeg, night, holdFrac, colors) {
+        const arc = loadImage('arc', gaugeArcSrc(night));
+        const needle = loadImage('needle', gaugeNeedleSrc(night));
+        const g = GAUGE;
+        if (arc.complete && arc.naturalWidth) {
+            ctx.drawImage(arc, g.arc.x, g.arc.y, g.arc.w, g.arc.h);
+        }
+        const deg = rollToGaugeDeg(rollDeg);
+        if (needle.complete && needle.naturalWidth) {
+            ctx.save();
+            ctx.translate(g.pivot.x, g.pivot.y);
+            ctx.rotate((deg * Math.PI) / 180);
+            ctx.drawImage(needle, -g.needle.ox, -g.needle.oy, g.needle.w, g.needle.h);
+            ctx.restore();
+        }
+        if (holdFrac != null && holdFrac > 0) {
+            const r = 56.2 - 6;
+            const start = (-90 + SWEEP[0]) * (Math.PI / 180);
+            const end = start + (SWEEP[1] - SWEEP[0]) * (Math.PI / 180) * Math.min(1, holdFrac);
+            ctx.strokeStyle = colors.line;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.arc(g.pivot.x, g.pivot.y, r, start, end);
+            ctx.stroke();
+        }
+    }
+
+    function drawBreatheMode(ctx, samples, now, geom, colors, opts) {
+        const { x0, y0, plotW, plotH } = geom;
+        const win = GEOM.win;
+        const t0 = now - win;
+        const xAt = (tm) => x0 + ((tm - t0) / win) * plotW;
+        const mid = y0 + plotH / 2;
 
         ctx.beginPath();
         ctx.moveTo(x0, mid);
@@ -137,134 +227,134 @@
                 phase = Math.sin((s.t - t0) * (s.breathRate / 60) * Math.PI * 2);
             }
             if (phase == null) phase = 0;
-            const y = mid - phase * (plotH * 0.38);
-            ctx.lineTo(xAt(s.t), y);
+            ctx.lineTo(xAt(s.t), mid - phase * (plotH * 0.42));
         }
-        if (samples.length) ctx.lineTo(xAt(samples[samples.length - 1].t), mid);
-        ctx.strokeStyle = '#4a8f62';
+        if (samples.length) {
+            const last = samples[samples.length - 1];
+            ctx.lineTo(xAt(last.t), mid);
+        }
+        ctx.closePath();
+        ctx.fillStyle = colors.fill;
+        ctx.fill();
+        ctx.beginPath();
+        for (let i = 0; i < samples.length; i++) {
+            const s = samples[i];
+            let phase = s.breathPhase;
+            if (phase == null && s.breathRate != null) {
+                phase = Math.sin((s.t - t0) * (s.breathRate / 60) * Math.PI * 2);
+            }
+            if (phase == null) phase = 0;
+            const x = xAt(s.t);
+            const y = mid - phase * (plotH * 0.42);
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = colors.line;
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        if (opts && opts.breathPacerFrac != null) {
-            const f = Math.max(0, Math.min(1, opts.breathPacerFrac));
-            ctx.fillStyle = 'rgba(74, 143, 98, 0.25)';
-            ctx.fillRect(x0, y0 + plotH - 6, plotW * f, 6);
+        const pillState = (opts && opts.breathPillState) || 'warming';
+        const pillMap = {
+            warming: 'ui/breath/pill-warming.png',
+            settling: 'ui/breath/pill-settling.png',
+            stable: 'ui/breath/pill-stable.png',
+        };
+        const pill = loadImage(`pill-${pillState}`, pillMap[pillState] || pillMap.warming);
+        if (pill.complete && pill.naturalWidth) {
+            ctx.drawImage(pill, 20, 48, 92, 32);
         }
-
-        ctx.fillStyle = '#4a6a52';
-        ctx.font = '600 9px Nunito, sans-serif';
+        const words = { warming: 'Warming', settling: 'Settling', stable: 'Steady' };
+        ctx.fillStyle = '#4a3b2c';
+        ctx.font = '800 10px Nunito, sans-serif';
         ctx.textAlign = 'left';
-        ctx.fillText('rate-led wave', x0, cssH - 1);
-    }
+        ctx.fillText(words[pillState] || 'Warming', 30, 67);
 
-    function drawStretchMode(ctx, samples, now, geom) {
-        const { x0, y0, plotW, plotH, cssH } = geom;
-        const win = geom.win;
-        const t0 = now - win;
-        const xAt = (tm) => x0 + ((tm - t0) / win) * plotW;
-        const mid = y0 + plotH / 2;
-
-        ctx.fillStyle = 'rgba(248, 240, 228, 0.85)';
-        ctx.fillRect(x0, y0, plotW, plotH);
-        const maxTilt = 28;
-        ctx.beginPath();
-        ctx.moveTo(x0, mid);
-        for (const s of samples) {
-            const deg = Number(s.rollDeg) || 0;
-            const y = mid - (deg / maxTilt) * (plotH * 0.42);
-            ctx.lineTo(xAt(s.t), y);
+        const dotsDone = (opts && opts.breathDotsDone) || 0;
+        const dotsTotal = Math.min(6, (opts && opts.breathDotsTotal) || 6);
+        const dotOn = loadImage('dot-on', 'ui/breath/dot-on.png');
+        const dotOff = loadImage('dot-off', 'ui/breath/dot-off.png');
+        let dx = 122;
+        for (let i = 0; i < dotsTotal; i++) {
+            const d = i < dotsDone ? dotOn : dotOff;
+            if (d.complete && d.naturalWidth) ctx.drawImage(d, dx, 56, 16, 16);
+            dx += 16 + 5;
         }
-        ctx.strokeStyle = '#8a6b40';
-        ctx.lineWidth = 2.2;
-        ctx.stroke();
-        ctx.setLineDash([2, 3]);
-        ctx.strokeStyle = 'rgba(130, 100, 70, 0.45)';
-        ctx.beginPath(); ctx.moveTo(x0, mid); ctx.lineTo(x0 + plotW, mid); ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.fillStyle = '#6a5840';
-        ctx.font = '600 9px Nunito, sans-serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('head roll °', x0, cssH - 1);
     }
 
-    function drawIdleMode(ctx, geom) {
-        const { x0, y0, plotW, plotH, cssH } = geom;
-        const g = ctx.createLinearGradient(x0, y0, x0, y0 + plotH);
-        g.addColorStop(0, 'rgba(245, 238, 225, 0.5)');
-        g.addColorStop(1, 'rgba(230, 225, 215, 0.35)');
-        ctx.fillStyle = g;
-        ctx.fillRect(x0, y0, plotW, plotH);
-        const cy = y0 + plotH / 2;
-        const breath = Math.sin(performance.now() / 1000 * 0.5) * 0.12;
-        ctx.strokeStyle = 'rgba(140, 130, 118, 0.55)';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(x0 + 8, cy + breath * 6);
-        ctx.quadraticCurveTo(x0 + plotW / 2, cy - 8 + breath * 4, x0 + plotW - 8, cy + breath * 6);
-        ctx.stroke();
-        ctx.fillStyle = '#8a7a68';
-        ctx.font = '600 9px Nunito, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('garden listening', x0 + plotW / 2, cssH - 1);
+    function liveTextForMode(mode, sample, opts) {
+        if (mode === 'idle') return '';
+        const n = sample;
+        if (mode === 'smile' && n && n.face && n.h != null) return `${n.h.toFixed(2)} watering`;
+        if (mode === 'talk') return n && n.talking ? 'talking' : '';
+        if (mode === 'breathe' && n && n.breathRate != null) return `${n.breathRate.toFixed(1)}/min`;
+        if (mode === 'stretch' && n && n.rollDeg != null) {
+            const d = rollToGaugeDeg(n.rollDeg);
+            if (d <= -12) return 'lean left';
+            if (d >= 12) return 'lean right';
+            return '';
+        }
+        return '';
     }
+
+    let lastDrawnMode = 'idle';
 
     function drawSignalPanel(canvas, trace, now, liveEl, opts) {
         if (!canvas) return;
         const L = window.SmileLogic;
         const o = opts || {};
         const mode = o.mode || 'idle';
-        const prev = o.prevMode || mode;
-        const blend = typeof o.blend === 'number' ? Math.max(0, Math.min(1, o.blend)) : 1;
+        const night = !!(o.night || (document.body && document.body.dataset.lighting === 'night'));
 
-        const cssW = 250, cssH = 84;
+        if (mode !== lastDrawnMode && !o.reducedMotion) {
+            canvas.classList.add('is-swapping');
+            setTimeout(() => canvas.classList.remove('is-swapping'), 150);
+        }
+        lastDrawnMode = mode;
+
         const dpr = window.devicePixelRatio || 1;
-        if (canvas.width !== Math.round(cssW * dpr) || canvas.height !== Math.round(cssH * dpr)) {
-            canvas.width = Math.round(cssW * dpr);
-            canvas.height = Math.round(cssH * dpr);
+        if (canvas.width !== Math.round(CSS_W * dpr) || canvas.height !== Math.round(CSS_H * dpr)) {
+            canvas.width = Math.round(CSS_W * dpr);
+            canvas.height = Math.round(CSS_H * dpr);
         }
         const ctx = canvas.getContext('2d');
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, cssW, cssH);
+        ctx.clearRect(0, 0, CSS_W, CSS_H);
 
-        const stripH = 6;
-        const geom = { x0: 20, y0: 6, plotW: cssW - 28, plotH: cssH - 6 - 12 - stripH, cssH, stripH, win: trace.windowSec };
+        if (mode === 'idle') {
+            if (liveEl) liveEl.textContent = '';
+            return;
+        }
+
+        const geom = Object.assign({ cssH: CSS_H }, GEOM);
         const samples = trace.samples(now);
+        const colors = palette(mode, night);
 
-        if (blend < 0.98 && prev !== mode) {
-            ctx.save();
-            ctx.globalAlpha = 1 - blend;
-            drawLayer(ctx, prev, samples, now, geom, L, o);
-            ctx.restore();
-            ctx.save();
-            ctx.globalAlpha = blend;
-            drawLayer(ctx, mode, samples, now, geom, L, o);
-            ctx.restore();
-        } else {
-            drawLayer(ctx, mode, samples, now, geom, L, o);
+        if (mode === 'smile') drawSmileMode(ctx, samples, now, geom, L, colors);
+        else if (mode === 'talk') drawTalkMode(ctx, samples, now, geom, colors);
+        else if (mode === 'stretch') {
+            const last = samples[samples.length - 1];
+            const roll = last && last.rollDeg != null ? last.rollDeg : 0;
+            drawStretchGauge(ctx, roll, night, o.stretchHoldFrac, colors);
+        } else if (mode === 'breathe') {
+            drawBreatheMode(ctx, samples, now, Object.assign({ cssH: CSS_H }, BREATHE_GEOM), palette('breathe', night), o);
         }
 
         if (liveEl) {
-            const n = samples[samples.length - 1];
-            let tail = '';
-            if (mode === 'smile' && n && n.face) tail = ` ${n.h.toFixed(2)}`;
-            else if (mode === 'talk' && n && n.talking) tail = ' on';
-            else if (mode === 'breathe' && n && n.breathRate != null) tail = ` ${n.breathRate.toFixed(1)}/m`;
-            else if (mode === 'stretch' && n && n.rollDeg != null) tail = ` ${n.rollDeg.toFixed(0)}°`;
-            liveEl.textContent = (LABELS[mode] || mode) + tail;
+            liveEl.textContent = liveTextForMode(mode, samples[samples.length - 1], o);
         }
-    }
-
-    function drawLayer(ctx, mode, samples, now, geom, L, opts) {
-        if (mode === 'smile') drawSmileMode(ctx, samples, now, geom, L);
-        else if (mode === 'talk') drawTalkMode(ctx, samples, now, geom);
-        else if (mode === 'breathe') drawBreatheMode(ctx, samples, now, geom, opts);
-        else if (mode === 'stretch') drawStretchMode(ctx, samples, now, geom);
-        else drawIdleMode(ctx, geom);
     }
 
     function drawSmileChart(canvas, trace, now, liveEl) {
         drawSignalPanel(canvas, trace, now, liveEl, { mode: 'smile', prevMode: 'smile', blend: 1 });
     }
+
+    const LABELS = (window.SmileSignalPanel && window.SmileSignalPanel.PANEL_LABELS) || {
+        idle: 'Waiting for you',
+        smile: 'Watering',
+        talk: 'Fertilizing',
+        breathe: 'Harvesting',
+        stretch: 'Staking',
+    };
 
     window.SmileChart = { drawSmileChart, drawSignalPanel, PANEL_LABELS: LABELS };
 })();

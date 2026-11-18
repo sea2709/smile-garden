@@ -9,7 +9,8 @@
     <link rel="stylesheet" href="./styles.css">
     <link rel="stylesheet" href="./breath-ui.css">
     <link rel="stylesheet" href="./stretch-ui.css">
-    <link rel="stylesheet" href="./needs-ui.css">
+    <link rel="stylesheet" href="./tend-strip-ui.css">
+    <link rel="stylesheet" href="./signal-panel-ui.css">
     <link rel="stylesheet" href="./camera-check-ui.css">
 </head>
 <body data-screen="loading" data-ready="0">
@@ -39,10 +40,39 @@
         </div>
     </header>
 
-    <!-- Live smile chart (G) -->
-    <section id="chart-panel" class="chart-panel parchment-soft" hidden>
-        <div class="chart-head"><span id="chart-title">Signal</span><span id="chart-live" class="chart-live">–</span><span class="kbd">G</span></div>
-        <canvas id="smile-chart" width="250" height="84"></canvas>
+    <!-- Adaptive signal panel (G) — see assets/ui/signal/signal-manifest.json -->
+    <section id="chart-panel" class="signal-panel" data-state="idle" hidden>
+        <div class="signal-head">
+            <span class="signal-icon" aria-hidden="true">
+                <i class="signal-glow" data-for="smile"></i>
+                <i class="signal-glow" data-for="talk"></i>
+                <i class="signal-glow" data-for="stretch"></i>
+                <i class="signal-glow" data-for="breathe"></i>
+                <i class="signal-glow" data-for="idle"></i>
+                <i class="signal-ico" data-for="smile"></i>
+                <i class="signal-ico" data-for="talk"></i>
+                <i class="signal-ico" data-for="stretch"></i>
+                <i class="signal-ico" data-for="breathe"></i>
+                <i class="signal-ico" data-for="idle"></i>
+            </span>
+            <span class="signal-labels" aria-live="polite">
+                <span class="signal-label" data-for="smile">Watering</span>
+                <span class="signal-label" data-for="talk">Fertilizing</span>
+                <span class="signal-label" data-for="stretch">Staking</span>
+                <span class="signal-label" data-for="breathe">Harvesting</span>
+                <span class="signal-label" data-for="idle"><span class="day-only">Waiting for you</span><span class="night-only">Resting</span></span>
+            </span>
+            <span id="chart-live" class="signal-live"></span>
+            <span class="kbd">G</span>
+        </div>
+        <div class="signal-chart">
+            <i class="signal-bg" data-for="smile" aria-hidden="true"></i>
+            <i class="signal-bg" data-for="talk" aria-hidden="true"></i>
+            <i class="signal-bg" data-for="stretch" aria-hidden="true"></i>
+            <i class="signal-bg" data-for="breathe" aria-hidden="true"></i>
+            <i class="signal-bg" data-for="idle" aria-hidden="true"></i>
+            <canvas id="smile-chart" width="250" height="84"></canvas>
+        </div>
     </section>
 
     <!-- Camera preview (real mode) / demo badge (mock) -->
@@ -94,17 +124,21 @@
     </section>
 
     <!-- Standalone stretch / stake care (not chained to smile/talk/breath) -->
-    <section id="needs-card" class="needs-card" hidden aria-label="Plant needs">
-        <img id="needs-card-bg" class="needs-card-bg" width="360" height="280" alt="" hidden>
-        <div id="needs-card-fallback" class="needs-card-fallback parchment" aria-hidden="true"></div>
-        <div class="needs-card-body">
-            <span id="needs-plant-name" class="needs-plant-name"></span>
-            <img id="needs-bloom-stamp" class="needs-bloom" width="64" height="64" alt="All needs met today" hidden>
-            <img id="needs-resting-stamp" class="needs-resting" width="32" height="32" alt="Resting until today's needs are met" hidden>
-            <span id="needs-resting-fallback" class="needs-resting-fallback" aria-hidden="true" hidden>🌿</span>
-            <div id="needs-rows" class="needs-rows"></div>
+    <section id="tend-strip" class="tend-strip" role="status" aria-live="polite" aria-label="Tending" hidden>
+        <div class="tend-head">
+            <span id="tend-name" class="tend-name"></span>
+            <img id="tend-stamp" class="tend-stamp" alt="" hidden>
         </div>
-        <button id="btn-needs-done" class="btn btn-primary btn-small needs-done" type="button">Done tending for now</button>
+        <div id="tend-row" class="tend-row"></div>
+        <div id="tend-harvest" class="tend-harvest">
+            <div id="tend-harvest-icon" class="tend-harvest-icon">
+                <img id="tend-harvest-img" alt="">
+            </div>
+            <div>
+                <b>Ready to harvest</b>
+                <span>Breathe slowly to pick it</span>
+            </div>
+        </div>
     </section>
 
     <section id="stretch-care-panel" class="stretch-care-panel parchment" hidden aria-label="Neck stretch care">
@@ -326,6 +360,7 @@
 <script src="./mock-source.js"></script>
 <script src="./scene.js"></script>
 <script src="./smile-chart.js"></script>
+<script src="./tend-strip-ui.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>

@@ -4,11 +4,11 @@
 
 const PANEL_MODES = Object.freeze(['idle', 'smile', 'talk', 'breathe', 'stretch']);
 const PANEL_LABELS = Object.freeze({
-    idle: 'Calm · waiting',
-    smile: 'Smile · water',
-    talk: 'Talk · fertilize',
-    breathe: 'Breathe · harvest',
-    stretch: 'Neck stretch · stake',
+    idle: 'Waiting for you',
+    smile: 'Watering',
+    talk: 'Fertilizing',
+    breathe: 'Harvesting',
+    stretch: 'Staking',
 });
 
 const CHANNEL_TO_PANEL = Object.freeze({
@@ -38,13 +38,13 @@ function panelModeFromCareChannel(channel) {
 }
 
 /**
- * Hysteresis: require `enterHoldSec` to switch to a non-idle mode,
- * and `exitHoldSec` to return to idle (reduces flicker).
+ * Hysteresis (signal-manifest): hold a detected state ≥400ms; ~1.2s of
+ * nothing before idle. `prefers-reduced-motion` callers may pass 0 holds.
  */
 function createSignalPanelSwitcher(opts) {
-    const enterHold = (opts && opts.enterHoldSec) > 0 ? opts.enterHoldSec : 0.32;
-    const exitHold = (opts && opts.exitHoldSec) > 0 ? opts.exitHoldSec : 0.5;
-    const blendSec = (opts && opts.blendSec) > 0 ? opts.blendSec : 0.45;
+    const enterHold = opts && Number.isFinite(opts.enterHoldSec) ? opts.enterHoldSec : 0.4;
+    const exitHold = opts && Number.isFinite(opts.exitHoldSec) ? opts.exitHoldSec : 1.2;
+    const blendSec = opts && Number.isFinite(opts.blendSec) ? opts.blendSec : 0.3;
     let mode = 'idle';
     let prevMode = 'idle';
     let blendT0 = 0;

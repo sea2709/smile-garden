@@ -66,7 +66,13 @@
         if (els.brandLogoDay.complete) markBrand();
     }
     const trace = new L.SmileTrace({ windowSec: 10, capacity: 480 });
-    const signalSwitcher = SP ? SP.createSignalPanelSwitcher() : null;
+    const reduceMotion = typeof window !== 'undefined' && window.matchMedia
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const signalSwitcher = SP ? SP.createSignalPanelSwitcher({
+        enterHoldSec: reduceMotion ? 0 : 0.4,
+        exitHoldSec: reduceMotion ? 0 : 1.2,
+        blendSec: reduceMotion ? 0 : 0.3,
+    }) : null;
     let signalPanelDemoLock = null;
     let screen = 'loading';
     let session = null;
@@ -2475,15 +2481,20 @@
         const chartOn = state.settings.chart && screen === 'visit';
         if (els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;
         if (chartOn && window.SmileChart.drawSignalPanel) {
-            const mode = signalSwitcher ? signalSwitcher.mode : 'smile';
-            const title = (window.SmileChart.PANEL_LABELS && window.SmileChart.PANEL_LABELS[mode]) || 'Signal';
-            if (els.chartTitle) els.chartTitle.textContent = title;
+            const mode = signalPanelDemoLock || (signalSwitcher ? signalSwitcher.mode : 'idle');
+            if (els.chartPanel) els.chartPanel.dataset.state = mode;
+            const freshBreath = signal.breathing && performance.now() - signal.breathing.at < 2500;
+            let breathPillState = 'warming';
+            if (freshBreath) breathPillState = signal.breathing.stable ? 'stable' : 'settling';
             window.SmileChart.drawSignalPanel(els.smileChart, trace, t, els.chartLive, {
                 mode,
-                prevMode: signalSwitcher ? signalSwitcher.prevMode : mode,
-                blend: signalSwitcher ? signalSwitcher.blendAlpha(t) : 1,
-                breathPacerFrac: session && session.pacer && session.pacer.total > 0
-                    ? session.breathT / session.pacer.total
+                night: lighting === 'night',
+                reducedMotion: reduceMotion,
+                breathPillState,
+                breathDotsDone: session && session.breathsDone ? session.breathsDone : 0,
+                breathDotsTotal: session && session.pacer ? session.pacer.breaths : state.settings.breaths,
+                stretchHoldFrac: session && session.stretchSnap
+                    ? Math.max(session.stretchSnap.leftProgress || 0, session.stretchSnap.rightProgress || 0)
                     : null,
             });
         } else if (chartOn) {
@@ -2736,7 +2747,10 @@
             const m = ['idle', 'smile', 'talk', 'breathe', 'stretch'].includes(mode) ? mode : 'idle';
             signalPanelDemoLock = m;
             state.settings.chart = true;
-            if (els.chartPanel) els.chartPanel.hidden = false;
+            if (els.chartPanel) {
+                els.chartPanel.hidden = false;
+                els.chartPanel.dataset.state = m;
+            }
             if (signalSwitcher) {
                 signalSwitcher.reset();
                 signalSwitcher.step(performance.now() / 1000, m);

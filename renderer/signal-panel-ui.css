@@ -1,0 +1,131 @@
+/* ---------- adaptive signal panel (Heily) ----------
+   Replaces .chart-panel / .chart-head / #smile-chart rules in renderer/styles.css.
+   Assets: assets/ui/signal/*.png + assets/ui/care/*.png (all 2x). See ui/signal/signal-manifest.json.
+   Suggested markup (one layer per state, crossfaded by [data-state] on the panel):
+
+   <section id="signal-panel" class="signal-panel" data-state="idle" hidden>
+     <div class="signal-head">
+       <span class="signal-icon">
+         <i class="signal-glow" data-for="smile"></i> ...one per state...
+         <i class="signal-ico"  data-for="smile"></i> ...one per state...
+       </span>
+       <span class="signal-labels" aria-live="polite">
+         <span class="signal-label" data-for="smile">Watering</span>
+         <span class="signal-label" data-for="talk">Fertilizing</span>
+         <span class="signal-label" data-for="stretch">Staking</span>
+         <span class="signal-label" data-for="breathe">Harvesting</span>
+         <span class="signal-label" data-for="idle"><span class="day-only">Waiting for you</span><span class="night-only">Resting</span></span>
+       </span>
+       <span id="chart-live" class="signal-live"></span><span class="kbd">G</span>
+     </div>
+     <div class="signal-chart">
+       <i class="signal-bg" data-for="smile"></i> ...one per state...
+       <canvas id="smile-chart" width="250" height="84"></canvas>
+     </div>
+   </section>
+   JS: panel.dataset.state = 'smile' | 'talk' | 'stretch' | 'breathe' | 'idle'.
+   For the canvas swap: add .is-swapping, wait 150ms, switch draw mode, remove it. */
+
+.signal-panel {
+    position: absolute; left: 18px; top: 66px; z-index: 18;
+    width: 282px; height: 136px; box-sizing: border-box;
+    border: 0 solid transparent;
+    border-image-source: url('../assets/ui/signal/panel-frame.png');
+    border-image-slice: 52 fill;
+    border-image-width: 26px;
+    border-image-repeat: stretch;
+    filter: drop-shadow(0 6px 14px rgba(70, 48, 20, 0.18)) drop-shadow(0 1px 3px rgba(70, 48, 20, 0.12));
+    color: var(--ink);
+}
+body[data-lighting="night"] .signal-panel { border-image-source: url('../assets/ui/signal/panel-frame-night.png'); color: #2f2a36; }
+
+.signal-head { position: absolute; left: 14px; right: 14px; top: 8px; height: 28px; }
+.signal-icon { position: absolute; left: 0; top: 0; width: 28px; height: 28px; }
+.signal-ico, .signal-glow, .signal-bg, .signal-label { position: absolute; opacity: 0; transition: opacity 300ms ease-in-out; }
+.signal-ico { inset: 0; background: center / 28px 28px no-repeat; }
+.signal-glow { left: -14px; top: -14px; width: 56px; height: 56px; background: center / 56px 56px no-repeat; }
+.signal-labels { position: absolute; left: 34px; top: 0; height: 28px; width: 150px; }
+.signal-label { left: 0; top: 5px; font: 800 13.5px/1.2 var(--sans); white-space: nowrap; }   /* baseline ~ y 27 in the panel */
+.signal-live { position: absolute; right: 22px; top: 7px; font: 800 12px/1.2 var(--sans); text-align: right; transition: color 300ms ease-in-out; }
+.signal-head .kbd { position: absolute; right: 0; top: 5px; }
+
+.signal-chart { position: absolute; left: 16px; top: 40px; width: 250px; height: 84px; }
+.signal-bg { inset: 0; background: center / 250px 84px no-repeat; }
+.signal-chart canvas { position: absolute; inset: 0; width: 250px; height: 84px; display: block; transition: opacity 150ms ease-in-out; }
+.signal-chart canvas.is-swapping { opacity: 0; }
+
+/* show the active state's layers */
+.signal-panel[data-state="smile"]   [data-for="smile"],
+.signal-panel[data-state="talk"]    [data-for="talk"],
+.signal-panel[data-state="stretch"] [data-for="stretch"],
+.signal-panel[data-state="breathe"] [data-for="breathe"],
+.signal-panel[data-state="idle"]    [data-for="idle"] { opacity: 1; }
+.signal-panel[data-state="idle"] .signal-glow[data-for="idle"] { opacity: 0.55; }
+
+/* active glow breathes gently while the camera sees the action */
+.signal-panel:not([data-state="idle"]) .signal-glow { animation: signal-glow-pulse 2.4s ease-in-out infinite; }
+@keyframes signal-glow-pulse { 0%, 100% { transform: scale(0.94); filter: brightness(0.96); } 50% { transform: scale(1.04); filter: brightness(1.04); } }
+
+/* per-state art */
+.signal-ico[data-for="smile"]   { background-image: url('../assets/ui/care/icon-water.png'); }
+.signal-ico[data-for="talk"]    { background-image: url('../assets/ui/care/icon-fertilizer.png'); }
+.signal-ico[data-for="stretch"] { background-image: url('../assets/ui/care/icon-stake.png'); }
+.signal-ico[data-for="breathe"] { background-image: url('../assets/ui/care/harvest-prompt-64.png'); }
+.signal-ico[data-for="idle"]    { background-image: url('../assets/ui/care/resting-leaf.png'); }
+.signal-glow[data-for="smile"]   { background-image: url('../assets/ui/signal/glow-smile.png'); }
+.signal-glow[data-for="talk"]    { background-image: url('../assets/ui/signal/glow-talk.png'); }
+.signal-glow[data-for="stretch"] { background-image: url('../assets/ui/signal/glow-stretch.png'); }
+.signal-glow[data-for="breathe"] { background-image: url('../assets/ui/signal/glow-breathe.png'); }
+.signal-glow[data-for="idle"]    { background-image: url('../assets/ui/signal/glow-idle.png'); }
+.signal-bg[data-for="smile"]   { background-image: url('../assets/ui/signal/chart-smile.png'); }
+.signal-bg[data-for="talk"]    { background-image: url('../assets/ui/signal/chart-talk.png'); }
+.signal-bg[data-for="stretch"] { background-image: url('../assets/ui/signal/chart-stretch.png'); }
+.signal-bg[data-for="breathe"] { background-image: url('../assets/ui/signal/chart-breathe.png'); }
+.signal-bg[data-for="idle"]    { background-image: url('../assets/ui/signal/chart-idle.png'); }
+
+body[data-lighting="night"] .signal-ico[data-for="smile"]   { background-image: url('../assets/ui/care/icon-water-night.png'); }
+body[data-lighting="night"] .signal-ico[data-for="talk"]    { background-image: url('../assets/ui/care/icon-fertilizer-night.png'); }
+body[data-lighting="night"] .signal-ico[data-for="stretch"] { background-image: url('../assets/ui/care/icon-stake-night.png'); }
+body[data-lighting="night"] .signal-ico[data-for="breathe"] { background-image: url('../assets/ui/care/harvest-prompt-64-night.png'); }
+body[data-lighting="night"] .signal-ico[data-for="idle"]    { background-image: url('../assets/ui/care/resting-leaf-night.png'); }
+body[data-lighting="night"] .signal-glow[data-for="smile"]   { background-image: url('../assets/ui/signal/glow-smile-night.png'); }
+body[data-lighting="night"] .signal-glow[data-for="talk"]    { background-image: url('../assets/ui/signal/glow-talk-night.png'); }
+body[data-lighting="night"] .signal-glow[data-for="stretch"] { background-image: url('../assets/ui/signal/glow-stretch-night.png'); }
+body[data-lighting="night"] .signal-glow[data-for="breathe"] { background-image: url('../assets/ui/signal/glow-breathe-night.png'); }
+body[data-lighting="night"] .signal-glow[data-for="idle"]    { background-image: url('../assets/ui/signal/glow-idle-night.png'); }
+body[data-lighting="night"] .signal-bg[data-for="smile"]   { background-image: url('../assets/ui/signal/chart-smile-night.png'); }
+body[data-lighting="night"] .signal-bg[data-for="talk"]    { background-image: url('../assets/ui/signal/chart-talk-night.png'); }
+body[data-lighting="night"] .signal-bg[data-for="stretch"] { background-image: url('../assets/ui/signal/chart-stretch-night.png'); }
+body[data-lighting="night"] .signal-bg[data-for="breathe"] { background-image: url('../assets/ui/signal/chart-breathe-night.png'); }
+body[data-lighting="night"] .signal-bg[data-for="idle"]    { background-image: url('../assets/ui/signal/chart-idle-night.png'); }
+
+.signal-label .night-only { display: none; }
+body[data-lighting="night"] .signal-label .day-only { display: none; }
+body[data-lighting="night"] .signal-label .night-only { display: inline; }
+
+/* live value colour (contrast >= 4.5:1 on the panel paper) */
+.signal-panel[data-state="smile"]   .signal-live { color: #3d6887; }
+.signal-panel[data-state="talk"]    .signal-live { color: #7e602d; }
+.signal-panel[data-state="stretch"] .signal-live { color: #536b30; }
+.signal-panel[data-state="breathe"] .signal-live { color: #546475; }
+body[data-lighting="night"] .signal-panel[data-state="smile"]   .signal-live { color: #193348; }
+body[data-lighting="night"] .signal-panel[data-state="talk"]    .signal-live { color: #403016; }
+body[data-lighting="night"] .signal-panel[data-state="stretch"] .signal-live { color: #263614; }
+body[data-lighting="night"] .signal-panel[data-state="breathe"] .signal-live { color: #26313e; }
+
+/* the stake gauge, if drawn in the DOM instead of on the canvas */
+.signal-gauge-arc { position: absolute; left: 39px; top: 0; width: 172px; height: 82.5px; background: url('../assets/ui/signal/gauge-arc.png') center / 100% 100% no-repeat; }
+.signal-gauge-needle {
+    position: absolute; left: 118px; top: 29.2px; width: 14px; height: 59px;   /* pivot (7, 52.8) lands on canvas (125, 82) */
+    background: url('../assets/ui/signal/gauge-needle.png') center / 100% 100% no-repeat;
+    transform-origin: 7px 52.8px; transform: rotate(var(--tilt, 0deg));
+    transition: transform 120ms linear;
+}
+body[data-lighting="night"] .signal-gauge-arc { background-image: url('../assets/ui/signal/gauge-arc-night.png'); }
+body[data-lighting="night"] .signal-gauge-needle { background-image: url('../assets/ui/signal/gauge-needle-night.png'); }
+
+@media (prefers-reduced-motion: reduce) {
+    .signal-ico, .signal-glow, .signal-bg, .signal-label, .signal-live,
+    .signal-chart canvas, .signal-gauge-needle { transition: none !important; }
+    .signal-glow { animation: none !important; }
+}
