@@ -21,7 +21,7 @@
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
         'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-card-bg', 'needs-card-fallback', 'needs-plant-name', 'needs-rows', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
-        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
+        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-prompt', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -86,7 +86,7 @@
     /** When true, HUD season stays on `state.season` (demo capture); otherwise it tracks `dayNumber`. */
     let hudSeasonOverride = false;
 
-    const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', faceGoneAt: 0, breathing: null, landmarks: null, landmarksAt: 0, landmarksStable: false };
+    const signal = { h: null, hAt: 0, talking: false, talkAt: 0, validation: 'Ok', validationHint: '', faceGoneAt: 0, breathing: null, landmarks: null, landmarksAt: 0, landmarksStable: false };
     let breathHudDemoLock = false;
     let stretchHudDemoLock = false;
     let stretchDemoSnap = null;
@@ -95,6 +95,51 @@
     let cameraDeniedDemo = false;
     let cameraCheckDemoLock = false;
     let pipHome = null;
+
+    /** Friendly copy for SmartSpectra ValidationCode (leading k stripped). */
+    function faceGuidance(code, sdkHint) {
+        const hint = (sdkHint || '').trim();
+        switch (code) {
+            case 'NoFaceFound':
+                return { title: 'Where did you go?', sub: hint || 'Look toward the camera, about an arm\'s length away. The timer waits for you.' };
+            case 'MultipleFacesFound':
+                return { title: 'One face at a time', sub: hint || 'Make sure only you are in the camera frame.' };
+            case 'FaceNotCentered':
+                return { title: 'Center your face', sub: hint || 'Move so your face sits in the middle of the preview.' };
+            case 'FaceSizeOutOfRange':
+                return { title: 'Adjust your distance', sub: hint || 'Move a little closer or farther until your head fills more of the preview.' };
+            case 'FaceTooClose':
+                return { title: 'A bit too close', sub: hint || 'Scoot back so your shoulders and face fit comfortably in frame.' };
+            case 'FaceTooFar':
+                return { title: 'A bit too far', sub: hint || 'Move closer — about an arm\'s length — so your face is easier to read.' };
+            case 'FaceTooHigh':
+                return { title: 'A little lower', sub: hint || 'Lower the camera or tilt your face down into the center of the frame.' };
+            case 'FaceTooLow':
+                return { title: 'A little higher', sub: hint || 'Raise the camera or sit up so your face is nearer the center.' };
+            case 'FaceNotForward':
+                return { title: 'Face the camera', sub: hint || 'Look straight at the lens — not turned to the side.' };
+            case 'TooDark':
+            case 'TooDarkOrBacklit':
+                return { title: 'A little more light, please', sub: hint || 'Soft, even light on your face (not behind you) helps.' };
+            case 'TooBright':
+                return { title: 'A little less glare', sub: hint || 'Soften bright light in front of you, or angle away from harsh lamps.' };
+            case 'ExcessiveMotion':
+                return { title: 'Hold still a moment', sub: hint || 'Stay steady while the garden finds your face.' };
+            case 'FrameRateTooLow':
+                return { title: 'Camera is struggling', sub: hint || 'Close other apps using the webcam, or try better light.' };
+            case 'ChestNotVisible':
+                return { title: 'Show a bit more of your torso', sub: hint || 'Back up slightly so your upper chest is in view.' };
+            case 'CameraTuning':
+            case 'Ok':
+                return null;
+            default:
+                if (!code || code === 'Ok') return null;
+                return {
+                    title: 'Adjust for the camera',
+                    sub: hint || `Camera says: ${code}. Reposition a little and hold still.`,
+                };
+        }
+    }
 
     // ------------------------------------------------------------------
     // Screens
@@ -328,6 +373,9 @@
                 denied: cameraDeniedDemo || !!snap.cameraDenied || !!snap.noCamera,
             });
             CCUI.renderPackets(els.ccPackets, snap, active, ART, artUrl, { denied: cameraDeniedDemo });
+            CCUI.renderPrompt(els.ccPrompt, snap, active, {
+                denied: cameraDeniedDemo || !!snap.cameraDenied || !!snap.noCamera,
+            });
             if (els.btnCcRetry) {
                 els.btnCcRetry.hidden = !(cameraDeniedDemo || snap.cameraDenied || snap.noCamera);
             }
@@ -419,7 +467,7 @@
         }
     }
 
-    function finishCameraCheckFlow() {
+    async function finishCameraCheckFlow() {
         CC.finishCameraSetup(state);
         save();
         cameraCheckSession = null;
@@ -429,6 +477,10 @@
         els.stretchGuide.hidden = true;
         restorePipHome();
         if (source && source.setPhase) source.setPhase('idle');
+        // Release the camera between warm-up and the visit. Leaving it running
+        // made beginVisit's second sdk.start() throw "Camera could not start".
+        if (source) { try { await source.stop(); } catch { /* ignore */ } }
+        sourceReady = false;
         show(state.version >= 5 ? 'idle' : 'greeting');
     }
 
@@ -1059,7 +1111,10 @@
                 at: performance.now(),
             };
         });
-        source.on('validation', (v) => { signal.validation = v.code; });
+        source.on('validation', (v) => {
+            signal.validation = v && v.code ? v.code : 'Ok';
+            signal.validationHint = (v && v.hint) || '';
+        });
         source.on('status', (s) => { document.body.dataset.status = s; });
         source.on('error', (e) => showError('SmartSpectra error', `${e.name}: ${e.message || ''}`, !config.mock));
         source.on('stream', (stream) => { els.preview.srcObject = stream || null; els.pip.hidden = !stream; });
@@ -1105,8 +1160,10 @@
         show('visit');
         onStep(session.step);
         try {
-            await source.start();
-            sourceReady = true;
+            if (!sourceReady) {
+                await source.start();
+                sourceReady = true;
+            }
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
         }
@@ -1127,8 +1184,10 @@
         session.begin();
         onStep(session.step);
         try {
-            await source.start();
-            sourceReady = true;
+            if (!sourceReady) {
+                await source.start();
+                sourceReady = true;
+            }
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
             CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
@@ -1589,7 +1648,7 @@
             const remH = session.remainingHarvestCount();
             els.stepLive.textContent = `${selectedPlantLabel()} · ready to pick · ${remH} bed${remH === 1 ? '' : 's'} left. Enter or Space to harvest.`;
         } else if (step === 'harvest-hold') {
-            els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
+            els.stepLive.textContent = session.poorReading ? pausedFaceLive()
                 : session.smiling ? '🧺 Picking… hold that smile' : `Smile gently · ${Math.ceil(rem)} s (or press Enter)`;
         } else if (step === 'pick') {
             const round = session.plantRound + 1;
@@ -1618,11 +1677,11 @@
             }
             els.stepLive.textContent = '🧺 Breathe with the guide to harvest this crop';
         } else if (step === 'smile') {
-            els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
+            els.stepLive.textContent = session.poorReading ? pausedFaceLive()
                 : session.smiling ? `☀ Sunlight pouring: ${session.sunHours.toFixed(1)} h` : `${session.sunHours.toFixed(1)} h of sun so far. Smile when you're ready`;
         } else if (step === 'talk') {
             els.stepText.textContent = `${STEP_COPY.talk.text} Try: “${TALK_PROMPTS[(talkPromptIdx + Math.floor(t / 7)) % TALK_PROMPTS.length]}”`;
-            els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
+            els.stepLive.textContent = session.poorReading ? pausedFaceLive()
                 : session.talking ? `💧 Watering: can ${Math.round(session.water * 100)}% full` : `Watering can ${Math.round(session.water * 100)}% full`;
         } else if (step === 'breathe-offer') {
             els.stepLive.textContent = '';
@@ -1674,23 +1733,39 @@
         updateHint(step, input);
     }
 
+    function pausedFaceLive() {
+        const g = faceGuidance(signal.validation, signal.validationHint);
+        if (g && signal.validation !== 'Ok' && signal.validation !== 'CameraTuning') {
+            return `Paused: ${g.title}`;
+        }
+        return 'Paused: waiting to see your face';
+    }
+
     function updateHint(step, input) {
         const active = step === 'smile' || step === 'talk' || step === 'care-smile' || step === 'care-talk';
         const poor = active && session.poorReading;
-        const dark = active && (signal.validation === 'TooDark' || signal.validation === 'TooDarkOrBacklit');
+        const code = signal.validation;
+        const dark = poor && (code === 'TooDark' || code === 'TooDarkOrBacklit');
         let title = '', sub = '';
-        if ((poor || dark) && lighting === 'night') {
+        // Only blame darkness when the camera says so — garden "night" lighting
+        // is cosmetic and must not override a bright room + missing face.
+        if (dark && lighting === 'night') {
             title = '🌙 It\'s a little dark in here';
             sub = 'Try turning on a soft light in front of you. Your garden will wait.';
-        } else if (dark) {
-            title = 'A little more light, please';
-            sub = 'Soft, even light on your face (not behind you) helps.';
         } else if (poor) {
-            title = 'Where did you go?';
-            sub = 'Look toward the camera, about an arm\'s length away. The timer waits for you.';
+            const g = faceGuidance(code, signal.validationHint);
+            if (g) {
+                title = g.title;
+                sub = g.sub;
+            } else {
+                // Validation Ok/CameraTuning but no fresh expression samples yet.
+                title = 'Looking for your expression…';
+                sub = 'Hold still, face the camera, and give a clear smile. Soft front light helps.';
+            }
         }
         els.hint.hidden = !title;
-        document.body.dataset.hint = title ? (lighting === 'night' ? 'night-light' : 'face') : '';
+        document.body.dataset.hint = dark && lighting === 'night' ? 'night-light' : (title ? 'face' : '');
+        document.body.dataset.validation = poor ? (code || '') : '';
         if (title) { els.hintTitle.textContent = title; els.hintSub.textContent = sub; }
     }
 

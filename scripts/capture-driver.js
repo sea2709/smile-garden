@@ -538,6 +538,16 @@ async function run(win, outDir) {
     }
     await G('g.finishCameraCheck()');
     await sleep(800);
+    await G('g.setChartForCapture(true)');
+    await G('g.setNeedsCardDemo(4, { sun: 1, water: 0, fertilizer: 0, stake: false })');
+    for (const m of ['idle', 'smile', 'talk', 'breathe', 'stretch']) {
+        await G(`g.setSignalPanelDemoForCapture("${m}")`);
+        await sleep(550);
+        await shot(`signal-panel-${m}.png`);
+    }
+    await G('g.clearSignalPanelDemoForCapture()');
+    await G('g.clearCaptureVisit()');
+    await sleep(400);
     await shot('02-garden-idle-dawn.png');
 
     await G('g.openPicker(4)');
@@ -563,13 +573,31 @@ async function run(win, outDir) {
     await shot('04-care-smile-midday.png');
     await shot('signal-panel-smile.png');
   await shot('visit-camera-preview-clear.png');
-    await G(`g.completeCareNeedForCapture('water')`);
+    await G(`(() => {
+        const g = window.__smileGarden;
+        const s = g.session;
+        if (!s || s.selectedPlot == null) return false;
+        const plot = s.selectedPlot;
+        const needs = window.SmileLogic.plantNeeds(s.plots[plot].plantId);
+        s.setCareProgress(plot, { sun: needs.sun, water: needs.water, fertilizer: 0, stake: false });
+        g.captureRedraw && g.captureRedraw();
+        return true;
+    })()`);
     await sleep(400);
     await G('(() => { window.__smileGarden.source.setPhase("care-hub-talk"); return true; })()');
     await sleep(900);
     await shot('05-care-talk.png');
     await shot('signal-panel-talk.png');
-    await G(`g.completeCareNeedForCapture('fertilizer')`);
+    await G(`(() => {
+        const g = window.__smileGarden;
+        const s = g.session;
+        if (!s || s.selectedPlot == null) return false;
+        const plot = s.selectedPlot;
+        const needs = window.SmileLogic.plantNeeds(s.plots[plot].plantId);
+        s.setCareProgress(plot, { sun: needs.sun, water: needs.water, fertilizer: 1, stake: false });
+        g.captureRedraw && g.captureRedraw();
+        return true;
+    })()`);
     await sleep(500);
     await shot('06-needs-card-partial.png');
     await G('g.setSelectedPlot(1)');

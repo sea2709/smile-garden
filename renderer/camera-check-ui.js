@@ -19,6 +19,15 @@
         stretch: 'Stake',
     });
 
+    const ACTIVE_PROMPTS = Object.freeze({
+        smile: 'Hold a natural smile — in the garden this waters your plant.',
+        talk: 'Say a few words aloud — talking fertilizes the bed.',
+        breath: 'Breathe slowly and steadily — calm breath harvests a fully grown crop.',
+        stretch: 'Tip each ear toward a shoulder — this stakes plants that need support.',
+    });
+
+    const IDLE_PROMPT = 'Tap a seed packet and hold the gesture so the camera learns you. Daylight fills sun needs by itself; when you tend, the camera applies smile, talk, breath, and stretch for you. Press Esc or go idle to stop.';
+
     const FALLBACK_ICON = Object.freeze({ smile: '☀', talk: '💬', breath: '🍃', stretch: '🌻' });
 
     function firstOpenCheck(snap) {
@@ -122,6 +131,21 @@
         }
     }
 
+    function renderPrompt(el, snap, active, opts) {
+        if (!el) return;
+        const denied = !!(opts && opts.denied) || !!(snap && (snap.cameraDenied || snap.noCamera));
+        el.hidden = false;
+        if (denied) {
+            el.textContent = 'Fix the camera tip above, or skip for now and start the garden.';
+            return;
+        }
+        if (active && ACTIVE_PROMPTS[active]) {
+            el.textContent = ACTIVE_PROMPTS[active];
+            return;
+        }
+        el.textContent = IDLE_PROMPT;
+    }
+
     function renderPackets(container, snap, active, ART, artUrl, opts) {
         if (!container) return;
         const denied = !!(opts && opts.denied);
@@ -176,8 +200,12 @@
 
     window.SmileCameraCheckUI = Object.freeze({
         CHECKS,
+        PACKET_CARE,
+        ACTIVE_PROMPTS,
+        IDLE_PROMPT,
         mountPackets,
         renderPackets,
         renderStatus,
+        renderPrompt,
     });
 })();

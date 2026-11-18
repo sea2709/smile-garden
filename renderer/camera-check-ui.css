@@ -62,14 +62,11 @@
     margin: 0;
     border-radius: 0;
     box-shadow: none;
-    transform: scaleX(-1);
-    transform-origin: center;
+    border: none;
+    z-index: 1;
 }
 
-.cc-preview-wrap video {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
+.cc-preview-wrap .pip .mirror-video {
     transform: scaleX(-1);
 }
 
@@ -205,6 +202,92 @@
     text-align: center;
 }
 
+.cc-howto {
+    position: absolute;
+    left: 28px;
+    top: 72px;
+    width: 248px;
+    padding: 0.85rem 0.95rem 0.9rem;
+    border-radius: 14px;
+    background: rgba(255, 248, 232, 0.9);
+    border: 1px solid rgba(120, 90, 55, 0.28);
+    box-shadow: 0 8px 18px rgba(50, 35, 18, 0.16);
+    backdrop-filter: blur(4px);
+    z-index: 8;
+    color: #3e2a1a;
+    pointer-events: none;
+}
+
+.cc-howto-title {
+    margin: 0 0 0.35rem;
+    font: 800 1.05rem/1.2 Georgia, "Iowan Old Style", "Palatino Linotype", Palatino, serif;
+    color: #3f5a2a;
+    letter-spacing: 0.01em;
+}
+
+.cc-howto-lead {
+    margin: 0 0 0.55rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    color: #5c4a3a;
+}
+
+.cc-howto-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.28rem;
+    font-size: 0.8rem;
+    line-height: 1.3;
+}
+
+.cc-howto-list li {
+    padding: 0.2rem 0.35rem;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.cc-howto-list strong {
+    color: #3e2a1a;
+    font-weight: 800;
+}
+
+.cc-howto-list em {
+    font-style: normal;
+    font-weight: 700;
+    color: #5a7a48;
+}
+
+.cc-howto-tip {
+    margin: 0.55rem 0 0;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    color: #7a6652;
+}
+
+.cc-prompt {
+    position: absolute;
+    left: 50%;
+    top: 412px;
+    transform: translateX(-50%);
+    width: min(500px, 42%);
+    margin: 0;
+    padding: 0.4rem 0.85rem;
+    border-radius: 999px;
+    background: rgba(255, 248, 232, 0.92);
+    border: 1px solid rgba(120, 90, 55, 0.22);
+    box-shadow: 0 4px 10px rgba(50, 35, 18, 0.12);
+    font-size: 0.8rem;
+    font-weight: 600;
+    line-height: 1.25;
+    color: #3e2a1a;
+    text-align: center;
+    z-index: 8;
+    pointer-events: none;
+}
+
 .cc-packets {
     position: absolute;
     inset: 0;
@@ -277,18 +360,18 @@
     position: absolute;
     width: 140px;
     transform: translateX(-50%);
-    top: 610px;
-    height: 40px;
+    top: 602px;
+    height: 52px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     text-align: center;
     font-size: 0.95rem;
     font-weight: 700;
     line-height: 1.15;
     color: #3e2a1a;
     flex-direction: column;
-    gap: 0.05rem;
+    gap: 0.02rem;
     text-shadow: 0 1px 6px rgba(255, 248, 228, 0.9);
     pointer-events: none;
     z-index: 7;
@@ -306,15 +389,23 @@
 
 .cc-packet-label .cc-packet-name {
     display: block;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     font-weight: 800;
     line-height: 1.1;
     color: #3e2a1a;
 }
 
+.cc-packet-label .cc-packet-purpose {
+    display: block;
+    font-size: 0.68rem;
+    font-weight: 600;
+    line-height: 1.1;
+    color: #5a7a48;
+}
+
 .cc-packet-label .cc-packet-status {
     display: block;
-    font-size: 0.72rem;
+    font-size: 0.68rem;
     font-weight: 600;
     color: #5c4a3a;
     line-height: 1.1;

@@ -77,7 +77,7 @@
 
     <!-- Camera preview (real mode) / demo badge (mock) -->
     <div id="pip" class="pip" hidden>
-        <video id="preview" autoplay playsinline muted></video>
+        <video id="preview" class="mirror-video" autoplay playsinline muted></video>
         <div id="pip-label" class="pip-label">You</div>
     </div>
     <div id="mock-badge" class="mock-badge" hidden>
@@ -205,6 +205,18 @@
                 <img id="cc-tilt-right" class="cc-tilt right" alt="" hidden>
                 <img id="cc-window-frame" class="cc-window-frame" alt="">
                 <img id="cc-sill" class="cc-sill" alt="">
+                <aside id="cc-howto" class="cc-howto" aria-label="Warm-up instructions">
+                    <h2 class="cc-howto-title">Camera warm-up</h2>
+                    <p class="cc-howto-lead">Tap each seed packet and hold the action for a couple of seconds so the camera can see it. In the garden, <em>daylight fills sun needs by itself</em> while you pick one plant and the camera tends it from your smile, voice, breath, and stretch.</p>
+                    <ul class="cc-howto-list">
+                        <li><strong>Smile</strong> — <em>waters</em> the bed</li>
+                        <li><strong>Talk</strong> — <em>fertilizes</em></li>
+                        <li><strong>Breathe</strong> — slow breath <em>harvests</em> a fully grown crop</li>
+                        <li><strong>Neck stretch</strong> — <em>stakes</em> tall plants</li>
+                    </ul>
+                    <p class="cc-howto-tip">Right-click a packet to skip it. When tending, press Esc or go idle to stop.</p>
+                </aside>
+                <p id="cc-prompt" class="cc-prompt" hidden></p>
                 <div id="cc-packets" class="cc-packets"></div>
                 <p id="cc-note" class="cc-note" hidden></p>
                 <button id="btn-cc-skip-now" class="cc-btn skip" type="button">Skip for now</button>

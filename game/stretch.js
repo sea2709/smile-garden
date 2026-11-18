@@ -44,9 +44,11 @@ function meanPoint(points, indices) {
 }
 
 /**
- * Head roll in radians (positive ≈ right ear toward shoulder / viewer's left).
+ * Head roll in radians from raw SDK landmarks (image space, not CSS-flipped).
+ * With `mirrored: true` (default for `.mirror-video` previews), negative roll means
+ * the player’s left shoulder — on-screen preview and guide lean the same way.
  * @param {Array<{x,y}>} points
- * @param {{ mirrored?: boolean }} opts — front camera mirroring flips sign
+ * @param {{ mirrored?: boolean }} opts — set false only when preview is not mirrored
  */
 function headRollRad(points, opts) {
     const o = opts || {};
@@ -59,7 +61,7 @@ function headRollRad(points, opts) {
     const dy = right.y - left.y;
     if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return 0;
     let roll = Math.atan2(dy, dx);
-    // Non-mirrored (raw image) coords flip user-left/right vs front-camera preview.
+    // Landmarks are unmirrored; CSS `scaleX(-1)` on the video flips the picture only.
     if (o.mirrored === false) roll = -roll;
     return roll;
 }
