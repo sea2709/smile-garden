@@ -29,6 +29,7 @@
 .signal-panel {
     position: absolute; left: 18px; top: 66px; z-index: 18;
     width: 282px; height: 136px; box-sizing: border-box;
+    overflow: hidden;
     border: 0 solid transparent;
     border-image-source: url('../assets/ui/signal/panel-frame.png');
     border-image-slice: 52 fill;

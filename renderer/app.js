@@ -98,6 +98,7 @@
     let cameraDeniedDemo = false;
     let cameraCheckDemoLock = false;
     let pipHome = null;
+    let mockPipCapture = false;
 
     /** Friendly copy for SmartSpectra ValidationCode (leading k stripped). */
     function faceGuidance(code, sdkHint) {
@@ -409,7 +410,7 @@
         if (pipHome && els.pip && els.pip.parentElement !== pipHome) {
             pipHome.appendChild(els.pip);
         }
-        if (config.mock) els.pip.hidden = true;
+        if (config.mock && !mockPipCapture) els.pip.hidden = true;
     }
 
     async function openCameraCheck() {
@@ -964,6 +965,25 @@
         renderTendStrip();
     }
 
+    function primeSignalTraceForCapture(mode, now) {
+        const t1 = Number(now) || performance.now() / 1000;
+        for (let i = 0; i < 48; i++) {
+            const t = t1 - 9.5 + (i / 47) * 9.5;
+            const phase = Math.sin(t * 1.8);
+            trace.push({
+                t,
+                happiness: mode === 'smile' ? 0.74 + phase * 0.08 : 0.55,
+                faceVisible: mode !== 'idle',
+                talking: mode === 'talk',
+                smiling: mode === 'smile',
+                breathRate: mode === 'breathe' ? 5.8 : null,
+                breathPhase: mode === 'breathe' ? phase : null,
+                rollDeg: mode === 'stretch' ? 18 + Math.sin(t * 2) * 6 : null,
+                panelMode: mode,
+            });
+        }
+    }
+
     const TALK_PROMPTS = ['What made you smile today?', 'Tell the tomatoes about your morning.', 'What are you looking forward to?',
         'Describe the weather where you are.', 'Say hello to each bed.', 'What would you cook with this harvest?'];
 
@@ -998,7 +1018,12 @@
         });
         source.on('status', (s) => { document.body.dataset.status = s; });
         source.on('error', (e) => showError('SmartSpectra error', `${e.name}: ${e.message || ''}`, !config.mock));
-        source.on('stream', (stream) => { els.preview.srcObject = stream || null; els.pip.hidden = !stream; });
+        source.on('stream', (stream) => {
+            els.preview.srcObject = stream || null;
+            const show = !!stream || mockPipCapture;
+            els.pip.hidden = !show;
+            els.pip.classList.toggle('pip-mock-capture', mockPipCapture && !stream);
+        });
         source.on('landmarks', (lm) => {
             if (!lm || !lm.points) return;
             signal.landmarks = lm.points;
@@ -2433,7 +2458,7 @@
             if (els.brandFallback) els.brandFallback.hidden = logoVisible;
         }
         renderMeters();
-        const chartOn = state.settings.chart && screen === 'visit';
+        const chartOn = state.settings.chart && (screen === 'visit' || !!signalPanelDemoLock);
         if (els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;
         if (chartOn && window.SmileChart.drawSignalPanel) {
             const mode = signalPanelDemoLock || (signalSwitcher ? signalSwitcher.mode : 'idle');
@@ -2647,7 +2672,13 @@
         /** Mock capture: fill one care meter then return to the hub without waiting on face input. */
         setNeedsCardDemo(plot, progress) {
             const i = Number(plot);
-            if (!(i >= 0 && i < state.plots.length && state.plots[i] && state.plots[i].plantId)) return null;
+            if (!(i >= 0 && i < state.plots.length)) return null;
+            if (!state.plots[i] || !state.plots[i].plantId) {
+                const res = V.plantSeed(state, i, 'lettuce', clock.now());
+                if (!res.ok) return null;
+                save();
+            }
+            if (!state.plots[i] || !state.plots[i].plantId) return null;
             const planted = state.plots.map((p, idx) => (p ? idx : -1)).filter((idx) => idx >= 0);
             if (!planted.includes(i)) planted.push(i);
             session = new V.VisitSession({
@@ -2700,20 +2731,70 @@
         },
         setSignalPanelDemoForCapture(mode) {
             const m = ['idle', 'smile', 'talk', 'breathe', 'stretch'].includes(mode) ? mode : 'idle';
+            const t = performance.now() / 1000;
             signalPanelDemoLock = m;
             state.settings.chart = true;
             if (els.chartPanel) {
                 els.chartPanel.hidden = false;
                 els.chartPanel.dataset.state = m;
             }
-            if (signalSwitcher) {
-                signalSwitcher.reset();
-                signalSwitcher.step(performance.now() / 1000, m);
+            if (signalSwitcher && signalSwitcher.forceMode) signalSwitcher.forceMode(m, t);
+            primeSignalTraceForCapture(m, t);
+            if (m === 'stretch') {
+                stretchDemoSnap = { rollDeg: 18, leftProgress: 0.4, rightProgress: 0, leftDone: false, rightDone: false };
+            }
+            if (m === 'breathe') {
+                signal.breathing = { rate: 5.8, confidence: 72, stable: true, at: performance.now() };
+            } else if (m !== 'idle') {
+                signal.breathing = null;
+            }
+            if (session) {
+                if (m === 'smile') session.activeCareChannel = 'water';
+                else if (m === 'talk') session.activeCareChannel = 'fertilizer';
+                else if (m === 'stretch') session.activeCareChannel = 'stake';
+                else if (m === 'breathe') session.activeCareChannel = 'harvest';
+                else session.activeCareChannel = null;
+                renderNeedsCard();
             }
             return m;
         },
+        primeSignalTraceForCapture,
         clearSignalPanelDemoForCapture() {
             signalPanelDemoLock = null;
+            stretchDemoSnap = null;
+            if (session) session.activeCareChannel = null;
+        },
+        async ensureSourceForCapture() {
+            return ensureSource();
+        },
+        async setMockPipForCapture(on) {
+            mockPipCapture = !!on;
+            if (mockPipCapture) {
+                await ensureSource();
+                if (source && source.start && !sourceReady) await source.start();
+                els.pip.hidden = false;
+            } else if (config.mock) {
+                els.pip.hidden = !els.preview.srcObject;
+            }
+            return mockPipCapture;
+        },
+        setCareHubProgressForCapture(plot, partial) {
+            if (!session) return null;
+            const i = Number(plot);
+            if (session.selectedPlot !== i) session.selectedPlot = i;
+            session.setCareProgress(i, Object.assign(C.emptyProgress(), partial));
+            renderNeedsCard();
+            plotsForScene({ instant: true });
+            return session.careProgressFor(i);
+        },
+        setTendStripActiveForCapture(channel) {
+            if (!session) return null;
+            session.activeCareChannel = channel || null;
+            if (window.SmileTendStrip && window.SmileTendStrip.primeActiveHold) {
+                window.SmileTendStrip.primeActiveHold(channel);
+            }
+            renderNeedsCard();
+            return channel;
         },
         /** Mock capture: garden tag/soil states without a live visit session. */
         unlockSeedsForCapture() {

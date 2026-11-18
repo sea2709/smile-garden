@@ -89,8 +89,22 @@ function createSignalPanelSwitcher(opts) {
         candidateSince = 0;
     }
 
+    /** Capture/UI: jump to a mode without waiting on hysteresis. */
+    function forceMode(m, now) {
+        const want = PANEL_MODES.includes(m) ? m : 'idle';
+        const t = Number(now) || 0;
+        if (want !== mode) {
+            prevMode = mode;
+            mode = want;
+            blendT0 = t;
+        }
+        candidate = want;
+        candidateSince = t;
+        return mode;
+    }
+
     return {
-        step, blendAlpha, reset,
+        step, blendAlpha, reset, forceMode,
         get mode() { return mode; },
         get prevMode() { return prevMode; },
         enterHoldSec: enterHold,

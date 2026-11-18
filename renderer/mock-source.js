@@ -45,7 +45,37 @@
         const Stretch = typeof window !== 'undefined' ? window.SmileStretch : null;
         let h = 0.1;
         let visitT = 0;
+        let previewCanvas = null;
+        let previewStream = null;
         const nowS = () => performance.now() / 1000;
+
+        function paintPreviewFrame() {
+            if (!previewCanvas) {
+                previewCanvas = document.createElement('canvas');
+                previewCanvas.width = 400;
+                previewCanvas.height = 300;
+            }
+            const ctx = previewCanvas.getContext('2d');
+            const g = ctx.createLinearGradient(0, 0, 0, 300);
+            g.addColorStop(0, '#6a8ba8');
+            g.addColorStop(1, '#c4d4e2');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, 400, 300);
+            ctx.fillStyle = 'rgba(255, 235, 210, 0.92)';
+            ctx.beginPath();
+            ctx.ellipse(200, 128, 72, 92, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#4a5560';
+            ctx.beginPath();
+            ctx.ellipse(172, 112, 10, 7, 0, 0, Math.PI * 2);
+            ctx.ellipse(228, 112, 10, 7, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#7a4a45';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.arc(200, 140, 28, 0.15, Math.PI - 0.15);
+            ctx.stroke();
+        }
 
         function setValidation(code, hint) {
             if (lastValidation === code) return;
@@ -183,6 +213,15 @@
                 await new Promise((r) => setTimeout(r, 200));
                 lastTick = nowS();
                 visitT = 0;
+                paintPreviewFrame();
+                try {
+                    if (!previewStream && previewCanvas && typeof previewCanvas.captureStream === 'function') {
+                        previewStream = previewCanvas.captureStream(12);
+                    }
+                } catch (e) {
+                    previewStream = null;
+                }
+                em.emit('stream', previewStream || null);
                 timer = setInterval(tick, 1000 / 30);
                 em.emit('status', 'Running');
             },

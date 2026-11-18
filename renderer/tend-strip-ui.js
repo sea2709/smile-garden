@@ -16,6 +16,12 @@
         for (const k of Object.keys(lastActiveAt)) lastActiveAt[k] = 0;
     }
 
+    function primeActiveHold(channel) {
+        const ch = CHANNEL_SLOT[channel];
+        if (!ch) return;
+        lastActiveAt[ch] = performance.now();
+    }
+
     function slotIsActive(needKey, activeChannel, nowMs) {
         const ch = CHANNEL_SLOT[activeChannel];
         if (ch === needKey) lastActiveAt[needKey] = nowMs;
@@ -171,5 +177,5 @@
         }
     }
 
-    global.SmileTendStrip = { render, resetActiveHold, HOLD_MS };
+    global.SmileTendStrip = { render, resetActiveHold, primeActiveHold, HOLD_MS };
 }(window));

@@ -26,6 +26,12 @@ test('signal panel hysteresis holds before switching modes', () => {
     assert.equal(sw.step(2.21, 'idle'), 'idle');
 });
 
+test('forceMode jumps without hysteresis delay', () => {
+    const sw = SP.createSignalPanelSwitcher();
+    assert.equal(sw.forceMode('talk', 1), 'talk');
+    assert.equal(sw.step(1.01, 'idle'), 'talk');
+});
+
 test('default hysteresis matches signal-manifest (400ms / 1.2s)', () => {
     const sw = SP.createSignalPanelSwitcher();
     assert.equal(sw.enterHoldSec, 0.4);
