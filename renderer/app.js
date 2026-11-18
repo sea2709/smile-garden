@@ -20,7 +20,7 @@
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-card-bg', 'needs-card-fallback', 'needs-plant-name', 'needs-rows', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'tend-strip', 'tend-name', 'tend-stamp', 'tend-row', 'tend-harvest', 'tend-harvest-icon', 'tend-harvest-img', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-prompt', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
@@ -156,7 +156,8 @@
             els.hint.hidden = true;
         }
         if (name !== 'visit') {
-            if (els.needsCard) els.needsCard.hidden = true;
+            if (els.tendStrip) els.tendStrip.hidden = true;
+            document.body.dataset.tendStrip = '0';
             if (els.stretchCarePanel) els.stretchCarePanel.hidden = true;
             document.body.dataset.stretchCare = '0';
             document.body.dataset.step = '';
@@ -926,163 +927,40 @@
         img.src = artUrl(src);
     }
 
-    function renderNeedsCard() {
-        if (!session || !els.needsCard || !C) return;
+    function tendStripVisibleStep(step) {
+        return ['care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'].includes(step);
+    }
+
+    function renderTendStrip() {
+        if (!session || !els.tendStrip || !C || !window.SmileTendStrip) return;
         const plot = session.selectedPlot;
-        const careSteps = ['care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
-        const show = careSteps.includes(session.step);
-        els.needsCard.hidden = !show || plot == null;
-        if (!show || plot == null) return;
-        const pl = state.plots[plot];
-        if (!pl) return;
-        const needs = L.plantNeeds(pl.plantId);
-        const prog = session.careProgressFor(plot);
-        const kind = L.plantById(pl.plantId);
-        els.needsPlantName.textContent = `${kind.name} · bed ${plot + 1}`;
-        bindNeedsArt(els.needsCardBg, ART.needsCardSrc(lighting), els.needsCardFallback);
-        const cardCareLight = 'midday';
-        const allMet = C.allNeedsMet(prog, needs, pl.staked);
-        const showResting = !!pl.tagResting && !allMet;
-        if (els.needsBloomStamp) {
-            bindNeedsArt(els.needsBloomStamp, ART.needs.bloomStamp, null);
-            els.needsBloomStamp.hidden = !allMet;
-        }
-        if (els.needsRestingStamp) {
-            bindNeedsArt(els.needsRestingStamp, ART.needs.restingLeaf, els.needsRestingFallback);
-            els.needsRestingStamp.hidden = !showResting;
-            if (els.needsRestingFallback) els.needsRestingFallback.hidden = !showResting || !els.needsRestingStamp.hidden;
-        }
-        function sunCardGlowLevel(prog, needs) {
-            if (lighting === 'night') return 'rest';
-            const req = C.dotsForNeed(needs, 'sun');
-            if (req <= 0) return 3;
-            const got = Math.max(0, Number(prog.sun) || 0);
-            if (got + 1e-6 >= req) return 3;
-            return Math.min(3, Math.ceil(3 * (got / req)));
-        }
-        const rowsEl = els.needsRows;
-        if (rowsEl) {
-            rowsEl.textContent = '';
-            const half = (n) => n / 2;
-            const rowsOriginY = half(ART.needs.cardRows[0].row[1]);
-            for (const rowSpec of ART.needs.cardRows) {
-                const key = rowSpec.key;
-                const req = C.dotsForNeed(needs, key);
-                if (req <= 0) continue;
-                const done = C.fillFraction(prog, needs, key, pl.staked) >= 1;
-                const activeCh = session.activeCareChannel;
-                const detecting = (activeCh === 'water' && key === 'water')
-                    || (activeCh === 'fertilizer' && key === 'fertilizer')
-                    || (activeCh === 'stake' && key === 'stake');
-                const row = document.createElement('div');
-                row.className = 'need-row' + (done ? ' need-row--done' : '') + (detecting ? ' need-row--detecting' : '');
-                row.setAttribute('role', 'group');
-                row.setAttribute('aria-label', (NEED_LABELS[key] || key) + (detecting ? ' · detecting' : ''));
-                const [rx0, ry0, rx1, ry1] = rowSpec.row;
-                const rowAbsTop = half(ry0);
-                const rowTop = rowAbsTop - rowsOriginY;
-                row.style.top = `${rowTop}px`;
-                row.style.height = `${half(ry1 - ry0)}px`;
-                const [ix0, iy0, ix1, iy1] = rowSpec.icon;
-                const icon = document.createElement('img');
-                icon.className = 'need-row-icon';
-                icon.alt = '';
-                if (key === 'sun') {
-                    const lvl = sunCardGlowLevel(prog, needs);
-                    if (lvl === 'rest') icon.src = artUrl(ART.sunRestingSrc('night', true));
-                    else icon.src = artUrl(ART.sunGlowSrc(lvl, cardCareLight));
-                } else {
-                    icon.src = artUrl(ART.needsIconSrc(key, cardCareLight));
-                }
-                icon.style.left = `${half(ix0)}px`;
-                icon.style.top = `${half(iy0) - rowAbsTop}px`;
-                icon.style.width = `${half(ix1 - ix0)}px`;
-                icon.style.height = `${half(iy1 - iy0)}px`;
-                icon.onerror = () => { icon.replaceWith(document.createTextNode(NEED_EMOJI[key] || '•')); };
-                const dotsWrap = document.createElement('span');
-                dotsWrap.className = 'need-row-dots';
-                const got = key === 'stake'
-                    ? (C.stakeNeedMet(prog, pl.staked) ? 1 : 0)
-                    : Math.min(req, Math.floor((Number(prog[key]) || 0) + 1e-6));
-                const dotSz = half(rowSpec.dotSize);
-                if (key === 'sun') {
-                    const [cx, cy] = ART.needs.badgeByDaylightCardCenter;
-                    const [bw, bh] = ART.needs.badgeByDaylightDisplay;
-                    const badge = document.createElement('img');
-                    badge.className = 'need-row-sun-badge';
-                    badge.alt = '';
-                    badge.src = artUrl(ART.badgeByDaylightSrc(lighting, true));
-                    badge.style.width = `${half(bw)}px`;
-                    badge.style.height = `${half(bh)}px`;
-                    badge.style.left = `${half(cx) - half(bw) / 2}px`;
-                    badge.style.top = `${half(cy) - rowAbsTop - half(bh) / 2}px`;
-                    badge.style.position = 'absolute';
-                    dotsWrap.appendChild(badge);
-                }
-                rowSpec.dots.slice(0, key === 'sun' ? 0 : req).forEach((cent, d) => {
-                    const dot = document.createElement('img');
-                    dot.className = 'need-row-dot';
-                    dot.alt = '';
-                    dot.src = artUrl(ART.needsDotSrc(d < got, cardCareLight));
-                    dot.style.width = `${dotSz}px`;
-                    dot.style.height = `${dotSz}px`;
-                    dot.style.left = `${half(cent[0]) - dotSz / 2}px`;
-                    dot.style.top = `${half(cent[1]) - rowAbsTop - dotSz / 2}px`;
-                    dot.style.position = 'absolute';
-                    dot.onerror = () => {
-                        const span = document.createElement('span');
-                        span.className = `need-dot-fallback ${key}${d < got ? ' on' : ''}`;
-                        dotsWrap.appendChild(span);
-                        return;
-                    };
-                    dotsWrap.appendChild(dot);
-                });
-                if (done) {
-                    const [sx0, sy0, sx1, sy1] = rowSpec.status;
-                    const check = document.createElement('img');
-                    check.className = 'need-row-check';
-                    check.alt = '';
-                    check.src = artUrl(ART.needsDoneSrc(cardCareLight));
-                    check.style.left = `${half(sx0)}px`;
-                    check.style.top = `${half(sy0) - rowAbsTop}px`;
-                    check.style.width = `${half(sx1 - sx0)}px`;
-                    check.style.height = `${half(sy1 - sy0)}px`;
-                    row.append(check);
-                }
-                row.append(icon, dotsWrap);
-                if (key === 'sun') {
-                    row.classList.add('need-row--auto');
-                    const auto = document.createElement('span');
-                    auto.className = 'need-row-auto-label';
-                    auto.textContent = lighting === 'night' ? 'Pauses at night' : 'Fills by daylight';
-                    row.append(auto);
-                }
-                rowsEl.appendChild(row);
-            }
-            if (session.canCareHarvest && session.canCareHarvest(plot)) {
-                const rowSpec = ART.needs.cardRows[2];
-                const harvestActive = session.activeCareChannel === 'harvest';
-                const row = document.createElement('div');
-                row.className = 'need-row need-row--harvest' + (harvestActive ? ' need-row--detecting' : '');
-                row.setAttribute('role', 'group');
-                const rowAbsTop = half(rowSpec.row[1]);
-                const rowsOriginY = half(ART.needs.cardRows[0].row[1]);
-                row.style.top = `${rowAbsTop - rowsOriginY + half(rowSpec.row[3] - rowSpec.row[1]) + 4}px`;
-                row.style.height = `${half(52)}px`;
-                const icon = document.createElement('img');
-                icon.className = 'need-row-icon';
-                icon.alt = '';
-                icon.src = artUrl(ART.needsIconSrc('harvest', cardCareLight));
-                icon.onerror = () => { icon.replaceWith(document.createTextNode(NEED_EMOJI.harvest)); };
-                const label = document.createElement('span');
-                label.className = 'need-row-harvest-label';
-                label.textContent = 'Breathe to harvest';
-                row.append(icon, label);
-                rowsEl.appendChild(row);
-            }
-        }
+        const show = tendStripVisibleStep(session.step);
+        window.SmileTendStrip.render({
+            strip: els.tendStrip,
+            nameEl: els.tendName,
+            stampEl: els.tendStamp,
+            rowEl: els.tendRow,
+            harvestIconEl: els.tendHarvestIcon,
+            harvestImgEl: els.tendHarvestImg,
+            show,
+            plot,
+            state,
+            session,
+            lighting,
+            ART,
+            C,
+            L,
+            artUrl,
+            nowMs: performance.now(),
+        });
+        if (!show) document.body.dataset.tendStrip = '0';
         plotsForScene();
     }
+
+    function renderNeedsCard() {
+        renderTendStrip();
+    }
+
     const TALK_PROMPTS = ['What made you smile today?', 'Tell the tomatoes about your morning.', 'What are you looking forward to?',
         'Describe the weather where you are.', 'Say hello to each bed.', 'What would you cook with this harvest?'];
 
@@ -1227,7 +1105,7 @@
         els.stretchCarePanel.hidden = !stretchCare;
         if (stretchCare) renderStretchCarePanel(step);
         const careMode = step === 'care-hub' || step === 'care-smile' || step === 'care-talk' || step === 'care-harvest';
-        els.needsCard && (els.needsCard.hidden = !careMode && step !== 'stretch-offer' && step !== 'stretch');
+        if (els.tendStrip) els.tendStrip.hidden = !(careMode || step === 'stretch-offer' || step === 'stretch');
         if (careMode || step === 'stretch-offer' || step === 'stretch') renderNeedsCard();
         const copy = STEP_COPY[step] || STEP_COPY.smile;
         const who = selectedPlantLabel();
@@ -2384,7 +2262,6 @@
     els.btnJournalClose.addEventListener('click', closeJournal);
     els.screenJournal.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => renderJournal(b.dataset.tab)));
     els.btnVisit.addEventListener('click', () => (state.version >= 5 ? beginVisit() : show('greeting')));
-    if (els.btnNeedsDone) els.btnNeedsDone.addEventListener('click', () => { if (session) onStep(session.finishCareHub()); });
     els.btnBed.addEventListener('click', () => goToBed());
     els.btnPlantIdle.addEventListener('click', () => openPicker());
     els.btnDev.addEventListener('click', () => toggleDev());
@@ -2787,7 +2664,7 @@
             session.setCareProgress(i, Object.assign(C.emptyProgress(), progress));
             show('visit');
             onStep('care-hub');
-            els.needsCard.hidden = false;
+            if (els.tendStrip) els.tendStrip.hidden = false;
             renderNeedsCard();
             refreshLighting();
             renderHud();
