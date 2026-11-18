@@ -45,6 +45,8 @@
         realMsPerGardenMinute: gardenMinuteMs,
     });
     let saveAcc = 0;
+    /** @type {null | Record<number, boolean>} capture-only picked sprites */
+    let forcePickedPlots = null;
     function safeGet() { try { return localStorage.getItem(STORE_KEY); } catch { return null; } }
     function save() {
         state.settings.offsetDays = clock.offsetDays;
@@ -212,7 +214,7 @@
             return {
                 plantId: p.plantId,
                 stage: p.stage,
-                pickedSprite: regrow,
+                pickedSprite: !!(forcePickedPlots && forcePickedPlots[i]) || regrow,
                 ready: V.isPlotReady(p, today),
                 tendedToday: D.plotTendedToday(state, i),
                 staked: !!p.staked,
@@ -2758,6 +2760,50 @@
             plotsForScene({ instant: true });
             renderHud();
             return state.plots.filter(Boolean).length;
+        },
+        primeMaturePlantsForCapture() {
+            forcePickedPlots = null;
+            session = null;
+            show('idle');
+            const beds = [
+                ['lettuce', 0],
+                ['mint', 1],
+                ['tomato', 2],
+                ['cucumber', 4],
+                ['sunflower', 6],
+                ['apple', 3],
+            ];
+            for (const [id, plot] of beds) {
+                if (!state.plots[plot]) {
+                    const res = V.plantSeed(state, plot, id, clock.now());
+                    if (!res.ok) continue;
+                }
+                const p = state.plots[plot];
+                p.stage = V.MAX_STAGE;
+                p.tagResting = false;
+                p.picked = false;
+                p.pickDay = null;
+            }
+            save();
+            plotsForScene({ instant: true });
+            renderHud();
+            return beds.length;
+        },
+        primePickedSpritesForCapture() {
+            forcePickedPlots = { 1: true, 2: true, 4: true };
+            session = null;
+            show('idle');
+            for (const [id, plot] of [['mint', 1], ['tomato', 2], ['cucumber', 4], ['apple', 3]]) {
+                if (!state.plots[plot]) V.plantSeed(state, plot, id, clock.now());
+                const p = state.plots[plot];
+                if (!p) continue;
+                p.stage = V.MAX_STAGE;
+                p.tagResting = false;
+            }
+            save();
+            plotsForScene({ instant: true });
+            renderHud();
+            return Object.keys(forcePickedPlots).length;
         },
         applyTagGardenDemo(mode) {
             session = null;

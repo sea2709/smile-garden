@@ -341,6 +341,39 @@ async function runTagsArt(win, outDir) {
     await shot('needs-garden-tags-midday.png', { uniqueTag: true });
 }
 
+async function runPlantsClean(win, outDir) {
+    fs.mkdirSync(outDir, { recursive: true });
+    const wc = win.webContents;
+    const js = (code) => wc.executeJavaScript(code, true);
+    const G = (expr) => js(`(() => { const g = window.__smileGarden; return ${expr}; })()`);
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const shot = async (name) => {
+        await sleep(500);
+        await G('g.captureRedraw()');
+        const img = await wc.capturePage();
+        fs.writeFileSync(path.join(outDir, name), img.toPNG());
+        console.log('[capture] wrote', name, img.getSize());
+    };
+    const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(1400); };
+    const t0 = Date.now();
+    while (Date.now() - t0 < 60000) {
+        const ready = await js("document.body.dataset.ready === '1'");
+        if (ready) break;
+        await sleep(120);
+    }
+    await G('g.reset()');
+    await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
+    await sleep(700);
+    await lightingTo('midday');
+    await G('g.unlockSeedsForCapture()');
+    await G('g.primeMaturePlantsForCapture()');
+    await sleep(1600);
+    await shot('plants-clean-mature-garden.png');
+    await G('g.primePickedSpritesForCapture()');
+    await sleep(1600);
+    await shot('plants-clean-picked-garden.png');
+}
+
 async function runStakeArt(win, outDir) {
     fs.mkdirSync(outDir, { recursive: true });
     const wc = win.webContents;
@@ -411,6 +444,11 @@ async function runStakeArt(win, outDir) {
 async function run(win, outDir) {
     if (process.env.SMILE_GARDEN_TAGS_SHOTS === '1') {
         await runTagsArt(win, outDir);
+        app.quit();
+        return;
+    }
+    if (process.env.SMILE_GARDEN_PLANTS_CLEAN === '1') {
+        await runPlantsClean(win, outDir);
         app.quit();
         return;
     }
