@@ -69,6 +69,16 @@ function createSdkSource(config) {
     const withCardio = !!config.calmCheck;
     let sdk = null;
     let running = false;
+    // Serialize start/stop/reset. Overlapping calls (warm-up finish + visit
+    // begin, or stop then immediate re-acquire) are what surface as
+    // "Camera could not start" from the SmartSpectra renderer SDK.
+    let gate = Promise.resolve();
+
+    function enqueue(fn) {
+        const run = gate.then(fn, fn);
+        gate = run.catch(() => {});
+        return run;
+    }
 
     function build() {
         sdk = new SmartSpectraSDK({
@@ -177,33 +187,60 @@ function createSdkSource(config) {
         sdk.on('streamAvailable', (stream) => em.emit('stream', stream));
     }
 
+    async function startOnce() {
+        if (running) return;
+        if (!sdk) build();
+        running = true;
+        try {
+            await sdk.start();
+        } catch (e) {
+            running = false;
+            throw e;
+        }
+    }
+
     return {
         kind: 'sdk',
         calmCheck: withCardio,
         on: em.on.bind(em),
-        async start() {
-            if (running) return;
-            if (!sdk) build();
-            running = true;
-            try {
-                await sdk.start();
-            } catch (e) {
-                running = false;
-                throw e;
-            }
+        start() {
+            return enqueue(async () => {
+                try {
+                    await startOnce();
+                } catch (first) {
+                    // After stop()/error, a fresh start can fail while the OS
+                    // still holds the device. reset() releases SDK state, then
+                    // retry once after a short settle.
+                    try {
+                        if (sdk) {
+                            try { await sdk.reset(); } catch { /* best-effort */ }
+                            running = false;
+                            em.emit('stream', null);
+                        }
+                        await new Promise((r) => setTimeout(r, 250));
+                        await startOnce();
+                    } catch {
+                        throw first;
+                    }
+                }
+            });
         },
-        async stop() {
-            if (!sdk) return;
-            try { await sdk.stop(); } finally {
+        stop() {
+            return enqueue(async () => {
+                if (!sdk) return;
+                try { await sdk.stop(); } finally {
+                    running = false;
+                    em.emit('stream', null);
+                }
+            });
+        },
+        reset() {
+            return enqueue(async () => {
+                if (!sdk) return;
+                await sdk.reset(); // rebuild after kError; releases the camera
                 running = false;
                 em.emit('stream', null);
-            }
-        },
-        async reset() {
-            if (!sdk) return;
-            await sdk.reset(); // rebuild after kError; releases the camera
-            running = false;
-            em.emit('stream', null);
+            });
         },
         destroy() {
             if (!sdk) return;

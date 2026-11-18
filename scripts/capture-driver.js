@@ -483,15 +483,12 @@ async function run(win, outDir) {
         console.log('[capture] wrote', name, img.getSize());
     }
     async function captureSignalPanel(mode) {
-        await js('window.__smileGarden.ensureSourceForCapture()');
+        await js('window.__smileGarden.setMockPipForCapture(false)');
         await G('g.setChartForCapture(true)');
-        await js('window.__smileGarden.setMockPipForCapture(true)');
-        const onVisit = await G('!!g.session');
-        if (!onVisit) await G('g.setNeedsCardDemo(4, { sun: 1, water: 0, fertilizer: 0, stake: false })');
         await G(`g.setSignalPanelDemoForCapture("${mode}")`);
-        await sleep(450);
+        await sleep(200);
         await G('g.captureRedraw()');
-        await sleep(280);
+        await sleep(350);
         await shot(`signal-panel-${mode}.png`);
     }
     async function breathUiShot(name, mode, countDone) {
@@ -595,7 +592,7 @@ async function run(win, outDir) {
 
     // --- a full visit at midday ---
     await lightingTo('midday');
-    await js('window.__smileGarden.setMockPipForCapture(true)');
+    await js('window.__smileGarden.setMockPipForCapture(false)');
     await G('g.begin()');
     await waitFor('care hub', (d) => d.step === 'care-hub', 10000);
     await G('g.setChartForCapture(true)');
@@ -609,7 +606,11 @@ async function run(win, outDir) {
     await shot('04-care-smile-midday.png');
     await shot('tend-strip-day.png');
     await shot('tend-strip-active-glow.png');
+    await js('window.__smileGarden.setMockPipForCapture(true, { stream: false })');
+    await sleep(400);
+    await G('g.captureRedraw()');
     await shot('visit-camera-preview-clear.png');
+    await js('window.__smileGarden.setMockPipForCapture(false)');
     await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
     await G(`g.setSignalPanelDemoForCapture('talk')`);
     await G(`g.setTendStripActiveForCapture('fertilizer')`);
@@ -631,12 +632,16 @@ async function run(win, outDir) {
     await G('g.clearStretchHudDemo()');
     await G('g.setSelectedPlot(4)');
     await G(`g.setCareHubProgressForCapture(4, { sun: 3, water: 2, fertilizer: 1, stake: false })`);
+    await G('g.setSelectedPlot(4)');
     await G('g.primeCareHarvestForCapture(4)');
     await G(`g.setSignalPanelDemoForCapture('breathe')`);
     await G(`g.setTendStripActiveForCapture('harvest')`);
     await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-breathe'); return true; })()`);
     await sleep(900);
+    await G('g.captureRedraw()');
     await shot('07-care-harvest.png');
+    await waitTendStrip(wc, { plant: 'cucumber' });
+    await sleep(400);
     await shot('tend-strip-harvest.png');
     await lightingTo('night');
     await G(`g.setCareHubProgressForCapture(4, { sun: 0, water: 1, fertilizer: 0, stake: false })`);
@@ -650,10 +655,12 @@ async function run(win, outDir) {
     await sleep(600);
     if ((await ds()).screen === 'summary') {
         await waitFor('revealed', (d) => d.revealed === '1', 15000);
+        await G(`g.previewSummaryDay({ grew: [{ plot: 4, plantId: 'cucumber', name: 'Cucumber', from: 3, to: 4, mature: false }], careStats: { sunDots: 3, waterDots: 2, fertilizerDots: 1, stakes: 0, harvests: 1 }, weekly: 2 })`);
+        await sleep(800);
         await shot('08-summary-growth-day.png');
         await js(`document.getElementById('btn-sum-done').click()`);
     } else {
-        await G('g.previewSummaryDay()');
+        await G(`g.previewSummaryDay({ grew: [{ plot: 4, plantId: 'cucumber', name: 'Cucumber', from: 3, to: 4, mature: false }], careStats: { sunDots: 3, waterDots: 2, fertilizerDots: 1, stakes: 0, harvests: 1 }, weekly: 2 })`);
         await sleep(1200);
         await shot('08-summary-growth-day.png');
         await G(`g.show('idle')`);

@@ -41,7 +41,7 @@
 body[data-lighting="night"] .signal-panel { border-image-source: url('../assets/ui/signal/panel-frame-night.png'); color: #2f2a36; }
 
 .signal-head { position: absolute; left: 14px; right: 14px; top: 8px; height: 28px; }
-.signal-icon { position: absolute; left: 0; top: 0; width: 28px; height: 28px; }
+.signal-icon { position: absolute; left: 0; top: 0; width: 28px; height: 28px; overflow: hidden; }
 .signal-ico, .signal-glow, .signal-bg, .signal-label { position: absolute; opacity: 0; transition: opacity 300ms ease-in-out; }
 .signal-ico { inset: 0; background: center / 28px 28px no-repeat; }
 .signal-glow { left: -14px; top: -14px; width: 56px; height: 56px; background: center / 56px 56px no-repeat; }

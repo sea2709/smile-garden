@@ -17,7 +17,7 @@
     const STORE_KEY = 'smile-garden.v3';
     const $ = (id) => document.getElementById(id);
     const els = {};
-    for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-title', 'chart-live',
+    for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-camera-check', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-live',
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
@@ -25,7 +25,7 @@
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-prompt', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
-        'screen-summary', 'sum-card', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
+        'screen-summary', 'sum-card', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'btn-dev-close', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
         'dev-ready', 'dev-fill', 'dev-reset', 'basket-chip', 'basket-count', 'screen-unlock', 'unlock-title', 'unlock-body', 'unlock-art', 'btn-unlock-ok',
         'brand-logo-day', 'brand-logo-night', 'brand-fallback',
         'error-banner', 'error-title', 'error-message', 'btn-error-keyboard', 'btn-error-dismiss']) {
@@ -83,6 +83,9 @@
     let session = null;
     let source = null;
     let sourceReady = false;
+    // Keep start/stop ordered across warm-up, visit, and retry so a second
+    // sdk.start() never races a still-running session.
+    let cameraGate = Promise.resolve();
     let lastResult = null;
     let pickerTarget = null;
     let currentDay = clock.today();
@@ -294,8 +297,10 @@
     function closeJournal() { show(journalReturn === 'journal' || journalReturn === 'loading' ? 'idle' : journalReturn); }
 
     // ------------------------------------------------------------------
-    // Camera check (pre-garden setup)
+    // Camera check (pre-garden setup + reopen from garden)
     // ------------------------------------------------------------------
+    let cameraCheckReturn = 'idle';
+    let cameraCheckReturnToGarden = false;
     let cameraCheckGridMounted = false;
     function mountCameraCheckGrid() {
         if (cameraCheckGridMounted || !CCUI || !els.ccPackets) return;
@@ -415,28 +420,70 @@
         if (config.mock && !mockPipCapture) els.pip.hidden = true;
     }
 
-    async function openCameraCheck() {
+    function enqueueCamera(fn) {
+        const run = cameraGate.then(fn, fn);
+        cameraGate = run.catch(() => {});
+        return run;
+    }
+
+    async function startCamera() {
+        return enqueueCamera(async () => {
+            if (!(await ensureSource())) throw new Error('Camera source unavailable');
+            if (sourceReady) return;
+            await source.start();
+            sourceReady = true;
+        });
+    }
+
+    async function stopCamera() {
+        return enqueueCamera(async () => {
+            if (!source) {
+                sourceReady = false;
+                return;
+            }
+            try { await source.stop(); } catch { /* ignore */ }
+            sourceReady = false;
+        });
+    }
+
+    function gardenDestFrom(name) {
+        if (name === 'greeting' || name === 'idle' || name === 'summary') return name;
+        return state.version >= 5 ? 'idle' : 'greeting';
+    }
+
+    function syncCameraCheckCtas() {
+        if (els.btnCcStart) {
+            els.btnCcStart.textContent = cameraCheckReturnToGarden ? 'Back to the garden' : 'Start my garden';
+        }
+        if (els.btnCcSkipNow) {
+            els.btnCcSkipNow.textContent = cameraCheckReturnToGarden ? 'Back without testing' : 'Skip for now';
+        }
+    }
+
+    async function openCameraCheck(opts) {
+        if (screen === 'visit' || screen === 'camera-check') return;
+        const options = opts || {};
+        const fromScreen = screen === 'journal' ? journalReturn : screen;
+        cameraCheckReturn = gardenDestFrom(fromScreen);
+        // Reopen from garden/settings once setup is done (vs first-launch warm-up).
+        cameraCheckReturnToGarden = options.reopen === true
+            || (options.reopen !== false && !!state.setupDone && screen !== 'wellness' && screen !== 'loading');
+        syncCameraCheckCtas();
         mountCameraCheckGrid();
         cameraCheckDemoLock = false;
         cameraCheckSession = CC.createCameraCheckSession({
             smileOn: L.DEFAULTS.smileOn,
             Stretch: window.SmileStretch,
         });
-        journalReturn = screen === 'journal' ? journalReturn : screen;
         placePipForCameraCheck();
         show('camera-check');
-        const ok = await ensureSource();
-        if (!ok) {
-            cameraDeniedDemo = !config.mock;
-            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-            return;
-        }
-        if (!sourceReady) {
-            try {
-                await source.start();
-                sourceReady = true;
-                state.cameraCheckNote = null;
-            } catch (e) {
+        try {
+            await startCamera();
+            state.cameraCheckNote = null;
+        } catch (e) {
+            if (!source) {
+                cameraDeniedDemo = !config.mock;
+            } else {
                 CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
                 save();
             }
@@ -451,44 +498,48 @@
         cameraCheckDemoLock = false;
         signal.validation = 'Ok';
         signal.faceGoneAt = 0;
-        const ok = await ensureSource();
-        if (!ok) {
-            cameraDeniedDemo = !config.mock;
-            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-            return;
-        }
         try {
-            if (!sourceReady) {
-                await source.start();
-                sourceReady = true;
-            }
+            await stopCamera();
+            await startCamera();
             state.cameraCheckNote = null;
             if (source.setPhase && cameraCheckSession.active) {
                 source.setPhase(`camera-check-${cameraCheckSession.active}`);
             }
             renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
         } catch (e) {
-            CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
-            save();
+            if (!source) {
+                cameraDeniedDemo = !config.mock;
+            } else {
+                CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
+                save();
+            }
             renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
         }
     }
 
     async function finishCameraCheckFlow() {
+        const returnToGarden = cameraCheckReturnToGarden;
+        const dest = returnToGarden ? cameraCheckReturn : gardenDestFrom('idle');
         CC.finishCameraSetup(state);
         save();
         cameraCheckSession = null;
         lastCameraCheckSnap = null;
         cameraDeniedDemo = false;
+        cameraCheckReturnToGarden = false;
         els.breathGuide.hidden = true;
         els.stretchGuide.hidden = true;
         restorePipHome();
         if (source && source.setPhase) source.setPhase('idle');
-        // Release the camera between warm-up and the visit. Leaving it running
-        // made beginVisit's second sdk.start() throw "Camera could not start".
-        if (source) { try { await source.stop(); } catch { /* ignore */ } }
-        sourceReady = false;
-        show(state.version >= 5 ? 'idle' : 'greeting');
+        if (returnToGarden) {
+            // Free the camera after a mid-session check; next visit starts fresh.
+            await stopCamera();
+            els.pip.hidden = true;
+        }
+        // First-launch warm-up keeps the session alive into the next visit so a
+        // stop→start race does not throw "Camera could not start". beginVisit is
+        // idempotent via sourceReady / startCamera().
+        show(dest);
+        syncCameraCheckCtas();
     }
 
     function updateCameraCheckScreen(dt) {
@@ -968,8 +1019,9 @@
     }
 
     function primeSignalTraceForCapture(mode, now) {
+        trace.clear();
         const t1 = Number(now) || performance.now() / 1000;
-        for (let i = 0; i < 48; i++) {
+        for (let i = 0; i < 80; i++) {
             const t = t1 - 9.5 + (i / 47) * 9.5;
             const phase = Math.sin(t * 1.8);
             trace.push({
@@ -984,6 +1036,29 @@
                 panelMode: mode,
             });
         }
+    }
+
+    function redrawSignalPanel(t) {
+        const chartOn = state.settings.chart && (screen === 'visit' || !!signalPanelDemoLock);
+        if (!chartOn || !els.chartPanel || !window.SmileChart.drawSignalPanel) return;
+        const mode = signalPanelDemoLock || (signalSwitcher ? signalSwitcher.mode : 'idle');
+        els.chartPanel.hidden = false;
+        els.chartPanel.dataset.state = mode;
+        const freshBreath = signal.breathing && performance.now() - signal.breathing.at < 2500;
+        let breathPillState = 'warming';
+        if (freshBreath) breathPillState = signal.breathing.stable ? 'stable' : 'settling';
+        const snap = stretchDemoSnap || (session && session.stretchSnap);
+        window.SmileChart.drawSignalPanel(els.smileChart, trace, t, els.chartLive, {
+            mode,
+            night: lighting === 'night',
+            reducedMotion: reduceMotion,
+            breathPillState,
+            breathDotsDone: session && session.breathsDone ? session.breathsDone : 0,
+            breathDotsTotal: session && session.pacer ? session.pacer.breaths : state.settings.breaths,
+            stretchHoldFrac: snap
+                ? Math.max(snap.leftProgress || 0, snap.rightProgress || 0)
+                : null,
+        });
     }
 
     const TALK_PROMPTS = ['What made you smile today?', 'Tell the tomatoes about your morning.', 'What are you looking forward to?',
@@ -1068,10 +1143,7 @@
         show('visit');
         onStep(session.step);
         try {
-            if (!sourceReady) {
-                await source.start();
-                sourceReady = true;
-            }
+            await startCamera();
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
         }
@@ -1092,10 +1164,7 @@
         session.begin();
         onStep(session.step);
         try {
-            if (!sourceReady) {
-                await source.start();
-                sourceReady = true;
-            }
+            await startCamera();
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
             CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
@@ -1689,8 +1758,7 @@
         out.decorUnlocks = unlocks.decor;
         lastResult = Object.assign({}, out);
         save();
-        if (source) { try { await source.stop(); } catch { /* ignore */ } }
-        sourceReady = false;
+        await stopCamera();
         session = null;
         scene.setEffects({ sun: 0, water: 0, fert: 0 });
         plotsForScene();
@@ -1723,8 +1791,7 @@
         out.decorUnlocks = unlocks.decor;
         lastResult = Object.assign({}, out);
         save();
-        if (source) { try { await source.stop(); } catch { /* ignore */ } }
-        sourceReady = false;
+        await stopCamera();
         session = null;
         scene.setEffects({ sun: 0, water: 0, fert: 0 });
         document.body.dataset.step = 'summary';
@@ -1922,7 +1989,7 @@
             btn.addEventListener('click', () => {
                 closeJournal();
                 state.cameraCheckNote = null;
-                openCameraCheck();
+                void openCameraCheck({ reopen: true });
             });
             row.appendChild(btn);
             body.appendChild(row);
@@ -2211,9 +2278,16 @@
     els.chkAdult.addEventListener('change', () => { els.btnWellnessOk.disabled = !els.chkAdult.checked; });
     els.btnWellnessOk.addEventListener('click', ackWellness);
     function ackWellness() { state.wellnessAck = true; save(); afterWellnessOrResume(); }
-    if (els.btnCcStart) els.btnCcStart.addEventListener('click', finishCameraCheckFlow);
-    if (els.btnCcSkipNow) els.btnCcSkipNow.addEventListener('click', finishCameraCheckFlow);
+    if (els.btnCcStart) els.btnCcStart.addEventListener('click', () => { void finishCameraCheckFlow(); });
+    if (els.btnCcSkipNow) els.btnCcSkipNow.addEventListener('click', () => { void finishCameraCheckFlow(); });
     if (els.btnCcRetry) els.btnCcRetry.addEventListener('click', () => { void retryCameraCheck(); });
+    if (els.btnCameraCheck) {
+        els.btnCameraCheck.addEventListener('click', () => {
+            if (screen === 'visit' || screen === 'camera-check' || screen === 'wellness') return;
+            state.cameraCheckNote = null;
+            void openCameraCheck({ reopen: true });
+        });
+    }
     els.btnGreetPlant.addEventListener('click', () => openPicker());
     els.btnBegin.addEventListener('click', beginVisit);
     els.btnPickerClose.addEventListener('click', closePicker);
@@ -2224,6 +2298,7 @@
     els.btnBed.addEventListener('click', () => goToBed());
     els.btnPlantIdle.addEventListener('click', () => openPicker());
     els.btnDev.addEventListener('click', () => toggleDev());
+    els.btnDevClose.addEventListener('click', () => toggleDev(false));
     els.btnErrorDismiss.addEventListener('click', () => { els.errorBanner.hidden = true; });
     els.btnErrorKeyboard.addEventListener('click', () => {
         els.errorBanner.hidden = true;
@@ -2234,10 +2309,8 @@
         els.btnBegin.disabled = false;
         toast('Keyboard mode: hold S to smile, T to talk.');
         if (session) {
-            ensureSource().then((ok) => {
-                if (!ok) return;
-                source.setPhase(session.step);
-                return source.start();
+            startCamera().then(() => {
+                if (source && source.setPhase) source.setPhase(session.step);
             }).catch(() => {});
         }
     });
@@ -2319,9 +2392,20 @@
         const k = e.key.toLowerCase();
         if (k === 'g') { state.settings.chart = !state.settings.chart; save(); toast(state.settings.chart ? 'Smile chart on (shows during visits)' : 'Smile chart hidden'); return; }
         if (k === 'j') { screen === 'journal' ? closeJournal() : openJournal('diary'); return; }
+        if (k === 'c' && screen !== 'visit' && screen !== 'camera-check' && screen !== 'wellness') {
+            state.cameraCheckNote = null;
+            void openCameraCheck({ reopen: true });
+            return;
+        }
         if (k === 'd') { toggleDev(); return; }
         if (k === 'n' && devOpen) { nextDay(); return; }
-        if (k === 'escape') { if (screen === 'journal') closeJournal(); else if (screen === 'picker') closePicker(); toggleDev(false); return; }
+        if (k === 'escape') {
+            if (screen === 'journal') closeJournal();
+            else if (screen === 'picker') closePicker();
+            else if (screen === 'camera-check' && cameraCheckReturnToGarden) void finishCameraCheckFlow();
+            toggleDev(false);
+            return;
+        }
         if (screen === 'visit' && session) {
             if (k === 'enter' || k === ' ') {
                 e.preventDefault();
@@ -2390,27 +2474,8 @@
         }
         renderMeters();
         const chartOn = state.settings.chart && (screen === 'visit' || !!signalPanelDemoLock);
-        if (els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;
-        if (chartOn && window.SmileChart.drawSignalPanel) {
-            const mode = signalPanelDemoLock || (signalSwitcher ? signalSwitcher.mode : 'idle');
-            if (els.chartPanel) els.chartPanel.dataset.state = mode;
-            const freshBreath = signal.breathing && performance.now() - signal.breathing.at < 2500;
-            let breathPillState = 'warming';
-            if (freshBreath) breathPillState = signal.breathing.stable ? 'stable' : 'settling';
-            window.SmileChart.drawSignalPanel(els.smileChart, trace, t, els.chartLive, {
-                mode,
-                night: lighting === 'night',
-                reducedMotion: reduceMotion,
-                breathPillState,
-                breathDotsDone: session && session.breathsDone ? session.breathsDone : 0,
-                breathDotsTotal: session && session.pacer ? session.pacer.breaths : state.settings.breaths,
-                stretchHoldFrac: session && session.stretchSnap
-                    ? Math.max(session.stretchSnap.leftProgress || 0, session.stretchSnap.rightProgress || 0)
-                    : null,
-            });
-        } else if (chartOn) {
-            window.SmileChart.drawSmileChart(els.smileChart, trace, t, els.chartLive);
-        }
+        if (els.chartPanel && els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;
+        if (chartOn) redrawSignalPanel(t);
         hudAcc += dt;
         if (hudAcc > 0.35) {
             hudAcc = 0;
@@ -2491,7 +2556,7 @@
         get scene() { return scene; },
         get stretchDemoSnap() { return stretchDemoSnap; },
         clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness: () => ackWellness(),
-        openCameraCheck: () => openCameraCheck(),
+        openCameraCheck: (opts) => openCameraCheck(opts),
         retryCameraCheck: () => retryCameraCheck(),
         finishCameraCheck: () => finishCameraCheckFlow(),
         selectCameraCheck(key) {
@@ -2640,15 +2705,20 @@
             session = null;
             stretchHudDemoLock = false;
             stretchDemoSnap = null;
+            if (els.breathGuide) els.breathGuide.hidden = true;
+            if (els.stretchGuide) els.stretchGuide.hidden = true;
             syncTendRing();
             plotsForScene({ instant: true });
             show('idle');
         },
         captureRedraw() {
+            const t = performance.now() / 1000;
             plotsForScene({ instant: true });
             renderHud();
+            renderNeedsCard();
+            redrawSignalPanel(t);
             try {
-                scene.draw(performance.now() / 1000);
+                scene.draw(t);
             } catch (e) {
                 console.error('[captureRedraw] scene.draw failed', e);
             }
@@ -2665,12 +2735,14 @@
             const t = performance.now() / 1000;
             signalPanelDemoLock = m;
             state.settings.chart = true;
+            if (els.breathGuide) els.breathGuide.hidden = true;
             if (els.chartPanel) {
                 els.chartPanel.hidden = false;
                 els.chartPanel.dataset.state = m;
             }
             if (signalSwitcher && signalSwitcher.forceMode) signalSwitcher.forceMode(m, t);
             primeSignalTraceForCapture(m, t);
+            redrawSignalPanel(t);
             if (m === 'stretch') {
                 stretchDemoSnap = { rollDeg: 18, leftProgress: 0.4, rightProgress: 0, leftDone: false, rightDone: false };
             }
@@ -2698,14 +2770,27 @@
         async ensureSourceForCapture() {
             return ensureSource();
         },
-        async setMockPipForCapture(on) {
+        async setMockPipForCapture(on, opts) {
+            const o = opts || {};
             mockPipCapture = !!on;
+            restorePipHome();
+            if (els.screenCameraCheck) els.screenCameraCheck.hidden = screen !== 'camera-check';
             if (mockPipCapture) {
-                await ensureSource();
-                if (source && source.start && !sourceReady) await source.start();
-                els.pip.hidden = false;
-            } else if (config.mock) {
-                els.pip.hidden = !els.preview.srcObject;
+                const wantStream = o.stream !== false;
+                if (wantStream) {
+                    await ensureSource();
+                    if (source && source.start && !sourceReady) await startCamera();
+                    els.pip.hidden = false;
+                    els.pip.classList.toggle('pip-mock-capture', !els.preview.srcObject);
+                } else {
+                    els.pip.hidden = false;
+                    els.pip.classList.add('pip-mock-capture');
+                    if (els.preview) els.preview.srcObject = null;
+                }
+            } else {
+                els.pip.hidden = true;
+                els.pip.classList.remove('pip-mock-capture');
+                if (els.preview) els.preview.srcObject = null;
             }
             return mockPipCapture;
         },
@@ -2927,8 +3012,9 @@
             });
             session.selectedPlot = i;
             plotsForScene({ instant: true });
+            renderNeedsCard();
             renderHud();
-            return true;
+            return session.canCareHarvest(i);
         },
         startBreathing: (o) => session && session.startBreathing(o || {}),
         launchStretchCare(returnStep) {

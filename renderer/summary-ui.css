@@ -13,7 +13,7 @@
     --sum-btn-bottom: #4F6B35;     /* #FFFAF0 on these: 4.7:1 / 5.8:1 */
     box-sizing: border-box;
     width: 480px;
-    max-height: 648px;             /* top-anchored at y=60 (below the HUD buttons), ends by y=708 */
+    max-height: min(648px, calc(100vh - 68px));  /* top-anchored at y=60; fit 1280×800 without inner scroll */
     padding: 30px 40px 26px;
     display: flex; flex-direction: column; gap: 0;
     color: var(--sum-ink);
@@ -88,7 +88,9 @@
 .sg-summary .btn-primary { color: #FFFAF0; background: linear-gradient(180deg, var(--sum-btn-top), var(--sum-btn-bottom)); }
 
 /* the list can scroll if a big day (many unlocks) ever overflows; the care block never moves */
-.sg-summary .sum-scroll { overflow-y: auto; min-height: 0; flex: 0 1 auto; scrollbar-width: thin; scrollbar-color: rgba(107, 79, 54, 0.35) transparent; }
+.sg-summary .sum-scroll { overflow-y: visible; min-height: 0; flex: 0 1 auto; }
+.sg-summary .sum-scroll:has(.more) { overflow-y: auto; max-height: 120px; scrollbar-width: thin; scrollbar-color: rgba(107, 79, 54, 0.35) transparent; }
+.sg-summary[data-mode="night"] .sum-hero-art { width: 260px; height: 124px; margin: 4px auto -4px; }
 .sg-summary .sum-care, .sg-summary .sum-head, .sg-summary .sum-divider { flex: none; }
 
 /* night: dim the garden a little more behind the card so nothing glows through */
