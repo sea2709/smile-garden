@@ -108,6 +108,19 @@ test('loadState v3 migrates with empty pantry and decor', () => {
     assert.equal(s.plots[0].plantId, 'mint');
 });
 
+test('completeCareHarvest clears regrow beds when CARE_HARVEST_BED_RESET is empty', () => {
+    const H = require('../game/harvest.js');
+    const s = V.createState(at(2026, 11, 16));
+    V.plantSeed(s, 0, 'cucumber', at(2026, 11, 16));
+    s.plots[0].staked = true;
+    s.plots[0].stage = 5;
+    const dk = V.calendarKey(s, at(2026, 11, 16));
+    const r = H.completeCareHarvest(s, 0, dk, require('../game/logic.js').plantById);
+    assert.equal(r.ok, true);
+    assert.equal(s.plots[0], null);
+    assert.equal(H.CARE_HARVEST_BED_RESET, 'empty');
+});
+
 test('applySessionHarvests applies pending visit harvests', () => {
     const s = V.createState(at(2026, 11, 16));
     V.plantSeed(s, 0, 'cucumber', at(2026, 11, 16));

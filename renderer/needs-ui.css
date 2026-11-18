@@ -1,8 +1,10 @@
 /* Painted needs card (assets/ui/tag/needs-card.png @ 360×280 display) */
 .needs-card {
     position: fixed;
-    right: max(12px, env(safe-area-inset-right));
-    top: max(108px, env(safe-area-inset-top));
+    left: max(12px, env(safe-area-inset-left));
+    bottom: max(14px, env(safe-area-inset-bottom));
+    top: auto;
+    right: auto;
     width: 360px;
     max-width: min(360px, calc(100vw - 24px));
     z-index: 28;
@@ -136,6 +138,68 @@
     position: absolute;
     inset: 0;
     pointer-events: none;
+}
+
+.need-row--auto {
+    cursor: default;
+    opacity: 0.95;
+}
+
+.need-row--auto.need-row--done {
+    opacity: 1;
+}
+
+.need-row-auto-label {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #5a7a48;
+    pointer-events: none;
+}
+
+body[data-lighting="night"] .need-row-auto-label {
+    color: #8a7a68;
+}
+
+.need-row-sun-badge {
+    pointer-events: none;
+    object-fit: contain;
+}
+
+.need-row--detecting .need-row-icon {
+    filter: drop-shadow(0 0 6px rgba(244, 196, 80, 0.85)) drop-shadow(0 0 2px rgba(255, 240, 200, 0.9));
+    transform: scale(1.06);
+    transition: filter 0.35s ease, transform 0.35s ease;
+}
+
+.need-row--detecting.need-row--harvest .need-row-icon,
+.need-row--detecting.need-row--stake .need-row-icon {
+    filter: drop-shadow(0 0 6px rgba(120, 168, 120, 0.75));
+}
+
+.need-row {
+    pointer-events: none;
+    border: none;
+    background: transparent;
+    text-align: left;
+    width: 100%;
+}
+
+.need-row--harvest {
+    border: 1px dashed rgba(90, 122, 72, 0.45);
+}
+
+.need-row-harvest-label {
+    position: absolute;
+    left: 88px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #3e2a1a;
 }
 
 .need-row-dot {

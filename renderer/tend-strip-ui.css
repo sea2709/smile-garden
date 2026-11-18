@@ -1,0 +1,90 @@
+/* Compact tending STATUS strip (Heily, 11-18) — replaces the 360×280 needs card + "Done tending" button.
+   Care is automatic now: the player picks a plant once, the camera does the rest. Nothing here is tappable.
+   Art: assets/ui/tend/*  (2x PNGs, drawn at half size). Reuses assets/ui/care/* icons, dots, sun rings.
+   Placement: docked bottom-centre, 16px above the window edge, so it never reaches the camera
+   preview (.pip, 200×150 at right:18 top:66).
+   Size: 280×112 CSS px = 31,360 px², about 26% of the old card (360×332 = 119,520 px² incl. button). */
+
+.tend-strip {
+    position: fixed;
+    left: 50%;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: 280px;
+    height: 112px;
+    box-sizing: border-box;
+    padding: 9px 16px 8px 18px;
+    z-index: 28;
+    pointer-events: none;                         /* pure status: clicks fall through to the garden */
+    user-select: none;
+    border: 0;                                    /* painted parchment, 9-slice: 64px slice @2x drawn as 32px corners */
+    border-image: url('../assets/ui/tend/tend-strip-9s.png') 64 fill / 32px / 0 round;
+    filter: drop-shadow(0 6px 14px rgba(40, 28, 12, 0.16));
+    color: #3e2a1a;                               /* same ink at night (night card rule) */
+    display: grid;
+    grid-template-rows: 18px 1fr;
+    row-gap: 3px;
+    animation: tend-rise 0.35s ease;
+}
+/* Fixed-size alternative (one image, same look): background: url('../assets/ui/tend/tend-strip.png') 0 0 / 100% 100%; border-image: none; */
+body[data-lighting='night'] .tend-strip { border-image-source: url('../assets/ui/tend/tend-strip-9s-night.png'); }
+
+@keyframes tend-rise { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+/* --- header: plant name + tiny status stamp --- */
+.tend-head { display: flex; align-items: center; gap: 6px; min-width: 0; padding-top: 2px; }
+.tend-name { font-family: var(--serif); font-weight: 600; font-size: 13px; line-height: 16px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tend-name small { font-family: var(--sans); font-weight: 700; font-size: 11px; color: #7a6652; margin-left: 5px; }
+.tend-stamp { width: 18px; height: 18px; object-fit: contain; margin-left: auto; }   /* care/bloom-stamp.png (all met) or care/resting-leaf.png */
+
+/* --- care row (status only) --- */
+.tend-row { display: flex; align-items: flex-start; gap: 6px; }
+.tend-slot { position: relative; width: 52px; height: 72px; display: flex; flex-direction: column; align-items: center; }
+.tend-icon { width: 46px; height: 46px; object-fit: contain; position: relative; z-index: 1; transition: transform 0.3s ease; }
+.tend-dots { display: flex; gap: 3px; height: 10px; margin-top: 1px; }
+.tend-dots img { width: 10px; height: 10px; }            /* care/need-dot-filled|empty.png — day art, also on the night strip */
+.tend-verb { font-size: 10px; line-height: 12px; font-weight: 800; color: #7a6652; letter-spacing: 0.02em; margin-top: 1px; }
+.tend-slot--done .tend-icon { opacity: 0.8; }
+.tend-slot--done::after {                                 /* leaf check on the icon's shoulder */
+    content: ''; position: absolute; right: 0; top: 0; width: 16px; height: 16px; z-index: 2;
+    background: url('../assets/ui/care/need-done.png') center / contain no-repeat;
+}
+
+/* ACTIVE: the camera sees this action right now (smile → water, talk → fertilizer, neck stretch → stake, breathing → harvest).
+   Add .is-active to the slot; remove it ~400ms after the signal drops so it doesn't flicker. */
+.tend-slot::before, .tend-harvest-icon::before {
+    content: ''; position: absolute; left: -6px; top: -8px; width: 64px; height: 64px; z-index: 0;
+    background: center / contain no-repeat; opacity: 0; transform: scale(0.85);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.tend-slot.is-active::before, .tend-harvest-icon.is-active::before { opacity: 1; transform: scale(1); animation: tend-breathe 2.4s ease-in-out 0.35s infinite; }
+.tend-slot.is-active .tend-icon { transform: translateY(-2px) scale(1.06); }
+.tend-slot.is-active .tend-verb { color: #3e2a1a; }
+.tend-slot[data-need='water']::before      { background-image: url('../assets/ui/tend/tend-glow-water.png'); }
+.tend-slot[data-need='fertilizer']::before { background-image: url('../assets/ui/tend/tend-glow-fertilizer.png'); }
+.tend-slot[data-need='stake']::before      { background-image: url('../assets/ui/tend/tend-glow-stake.png'); }
+.tend-harvest-icon::before                 { background-image: url('../assets/ui/tend/tend-glow-harvest.png'); }
+body[data-lighting='night'] .tend-slot[data-need='water']::before      { background-image: url('../assets/ui/tend/tend-glow-water-night.png'); }
+body[data-lighting='night'] .tend-slot[data-need='fertilizer']::before { background-image: url('../assets/ui/tend/tend-glow-fertilizer-night.png'); }
+body[data-lighting='night'] .tend-slot[data-need='stake']::before      { background-image: url('../assets/ui/tend/tend-glow-stake-night.png'); }
+body[data-lighting='night'] .tend-harvest-icon::before                 { background-image: url('../assets/ui/tend/tend-glow-harvest-night.png'); }
+@keyframes tend-breathe { 50% { opacity: 0.6; transform: scale(0.93); } }
+@media (prefers-reduced-motion: reduce) { .tend-slot.is-active::before, .tend-harvest-icon.is-active::before { animation: none; } }
+
+/* SUN is passive: the glow ring itself fills with daylight (care/sun-glow-0..3.png), care/sun-resting.png at night. No dots, no glow state. */
+.tend-slot--sun .tend-verb { font-weight: 700; font-style: italic; }
+
+.tend-divider { width: 5px; height: 64px; margin: 2px 1px 0; background: url('../assets/ui/tend/tend-divider.png') center / 5px 64px no-repeat; }
+body[data-lighting='night'] .tend-divider { background-image: url('../assets/ui/tend/tend-divider-night.png'); }
+
+/* --- harvest-ready: the care row becomes one breathe-to-harvest line --- */
+.tend-harvest { display: flex; align-items: center; gap: 10px; }
+.tend-harvest-icon { position: relative; width: 52px; height: 52px; }
+.tend-harvest-icon img { position: relative; z-index: 1; width: 52px; height: 52px; object-fit: contain; }   /* care/harvest-prompt-64(-night).png */
+.tend-harvest b { display: block; font-family: var(--serif); font-size: 14px; line-height: 18px; }
+.tend-harvest span { display: block; font-size: 11.5px; line-height: 15px; color: #7a6652; font-weight: 700; }
+.tend-strip--harvest .tend-row { display: none; }
+.tend-strip:not(.tend-strip--harvest) .tend-harvest { display: none; }
+
+body[data-tend-strip='1'] #hint,
+body[data-tend-strip='1'] #toast { visibility: hidden !important; pointer-events: none; }

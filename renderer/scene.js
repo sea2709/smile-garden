@@ -97,6 +97,14 @@
         }
         if (logoDayImg) logoDayImg.addEventListener('load', refreshLogoOnCanvas);
         if (logoNightImg) logoNightImg.addEventListener('load', refreshLogoOnCanvas);
+        let harvestBadgeImg = null;
+        let harvestBadgeImgNight = null;
+        let harvestBadgeGlowImg = null;
+        if (ART.needs && ART.needs.harvestReadyBadge) {
+            harvestBadgeImg = loadImage(ART.needs.harvestReadyBadge);
+            if (ART.needs.harvestReadyBadgeNight) harvestBadgeImgNight = loadImage(ART.needs.harvestReadyBadgeNight);
+            if (ART.needs.harvestReadyBadgeGlow) harvestBadgeGlowImg = loadImage(ART.needs.harvestReadyBadgeGlow);
+        }
         if (ART.harvest) {
             readyStrips.day = loadImage(ART.readyStripSrc('day'));
             readyStrips.night = loadImage(ART.readyStripSrc('night'));
@@ -146,6 +154,14 @@
                 needsFaceImgs[`${key}-day`] = loadImage(resolveArt(ART.needsIconSrc(key, 'day')));
                 needsFaceImgs[`${key}-night`] = loadImage(resolveArt(ART.needsIconSrc(key, 'night')));
             }
+            for (let lv = 0; lv <= 3; lv++) {
+                needsFaceImgs[`sun-glow-${lv}-day`] = loadImage(resolveArt(ART.sunGlowSrc(lv, 'day')));
+                needsFaceImgs[`sun-glow-${lv}-night`] = loadImage(resolveArt(ART.sunGlowSrc(lv, 'night')));
+            }
+            needsFaceImgs['sun-rest-day'] = loadImage(resolveArt(ART.sunRestingSrc('day', false)));
+            needsFaceImgs['sun-rest-night'] = loadImage(resolveArt(ART.sunRestingSrc('night', false)));
+            needsFaceImgs['harvest-prompt-day'] = loadImage(resolveArt(ART.harvestPrompt64Src('day')));
+            needsFaceImgs['harvest-prompt-night'] = loadImage(resolveArt(ART.harvestPrompt64Src('night')));
             needsFaceImgs['bloom-day'] = loadImage(resolveArt(ART.needsBloomSrc('day')));
             needsFaceImgs['bloom-night'] = loadImage(resolveArt(ART.needsBloomSrc('night')));
             needsFaceImgs['rest-day'] = loadImage(resolveArt(ART.needsRestingSrc('day')));
@@ -156,6 +172,56 @@
             needsFaceImgs['dot-off-night'] = loadImage(resolveArt(ART.needsDotSrc(false, 'night')));
         }
         const soilFadeT0 = new Array(8).fill(null);
+        const sunGlowBlend = new Array(8).fill(null);
+
+        function sunGlowLevel(prog, needs, isDaylight) {
+            if (!isDaylight) return 'rest';
+            const req = Care.dotsForNeed(needs, 'sun');
+            if (req <= 0) return 3;
+            const got = Math.max(0, Number(prog && prog.sun) || 0);
+            if (got + 1e-6 >= req) return 3;
+            return Math.min(3, Math.ceil(3 * (got / req)));
+        }
+
+        const lastSunLevel = new Array(8).fill(0);
+
+        function syncSunGlowBlend(i, level, now) {
+            const prev = lastSunLevel[i];
+            if (prev === level) return;
+            sunGlowBlend[i] = { from: prev, to: level, t0: now };
+            lastSunLevel[i] = level;
+        }
+
+        function drawSunGlowIcon(ix, iy, iconPx, level, kind, now, blendKey) {
+            const drawOne = (lvl, alpha) => {
+                if (lvl === 'rest') {
+                    const im = needsFaceImgs[`sun-rest-${kind}`];
+                    if (ready(im) && alpha > 0.02) {
+                        ctx.save();
+                        ctx.globalAlpha = alpha;
+                        ctx.drawImage(im, ix, iy, iconPx, iconPx);
+                        ctx.restore();
+                    }
+                    return;
+                }
+                const im = needsFaceImgs[`sun-glow-${lvl}-${kind}`];
+                if (ready(im) && alpha > 0.02) {
+                    ctx.save();
+                    ctx.globalAlpha = alpha;
+                    ctx.drawImage(im, ix, iy, iconPx, iconPx);
+                    ctx.restore();
+                }
+            };
+            const blend = sunGlowBlend[blendKey];
+            const dur = ART.needs.sunGlowCrossfadeSec || 0.6;
+            if (!blend || now - blend.t0 >= dur) {
+                drawOne(level, 1);
+                return;
+            }
+            const k = (now - blend.t0) / dur;
+            drawOne(blend.from, 1 - k);
+            drawOne(blend.to, k);
+        }
         // one-shot absorb plays per plot: { kind, t0, i }
         const absorbs = [];
         const SPRITE_KINDS = { sun: 'sun', water: 'water', fert: 'fertilizer', stake: 'stake' };
@@ -367,7 +433,18 @@
                     soilTended: !!raw.soilTended,
                     tagResting: !!raw.tagResting,
                     tagProgress: raw.tagProgress || null,
+                    harvestReadyBadge: !!raw.harvestReadyBadge,
+                    harvestTagPrompt: !!raw.harvestTagPrompt,
+                    isDaylight: raw.isDaylight !== false,
                 } : null;
+                if (n && Care && L) {
+                    const needs = L.plantNeeds(n.plantId);
+                    const lvl = sunGlowLevel(n.tagProgress || {}, needs, n.isDaylight);
+                    syncSunGlowBlend(i, lvl, now);
+                } else if (!n) {
+                    lastSunLevel[i] = 0;
+                    sunGlowBlend[i] = null;
+                }
                 const o = plots[i];
                 if (n && n.soilTended && (!o || !o.soilTended)) soilFadeT0[i] = now;
                 if (n && !n.soilTended) soilFadeT0[i] = null;
@@ -420,10 +497,22 @@
                 if (fxWasOn[k] && !on) playAbsorb(k, effectPlot);
                 fxWasOn[k] = on;
             }
-            if ('sun' in e) fx.sunTarget = clamp(e.sun);
-            if ('water' in e) fx.waterTarget = clamp(e.water);
-            if ('fert' in e) fx.fertTarget = clamp(e.fert);
-            if ('stake' in e) fx.stakeTarget = clamp(e.stake);
+            if ('sun' in e) {
+                fx.sunTarget = clamp(e.sun);
+                if (fx.sunTarget < 0.03) fx.sun = 0;
+            }
+            if ('water' in e) {
+                fx.waterTarget = clamp(e.water);
+                if (fx.waterTarget < 0.03) fx.water = 0;
+            }
+            if ('fert' in e) {
+                fx.fertTarget = clamp(e.fert);
+                if (fx.fertTarget < 0.03) fx.fert = 0;
+            }
+            if ('stake' in e) {
+                fx.stakeTarget = clamp(e.stake);
+                if (fx.stakeTarget < 0.03) fx.stake = 0;
+            }
             if ('breath' in e) fx.breath = clamp(e.breath);
         }
         const clamp = (x) => (x > 1 ? 1 : x < 0 || !Number.isFinite(x) ? 0 : x);
@@ -967,6 +1056,7 @@
             const meta = id && ART.plants[id] ? ART.plants[id].stages[4] : null;
             const ax = H.frameW / 2;
             ctx.save();
+            clipToBed(i, 16);
             ctx.globalAlpha = Math.min(1, alpha);
             ctx.translate(p.x, p.y - 4);
             ctx.scale(s, s);
@@ -1245,6 +1335,16 @@
             const needs = L.plantNeeds(pl.plantId);
             const prog = pl.tagProgress || { sun: 0, water: 0, fertilizer: 0, stake: false };
             const allMet = pl.careAllMet || (Care && Care.allNeedsMet(prog, needs, pl.staked));
+            const nowSec = performance.now() / 1000;
+            if (pl.harvestTagPrompt) {
+                const im = needsFaceImgs[`harvest-prompt-${kind}`];
+                if (ready(im)) {
+                    const bw = ART.needs.iconDisplay[0] * sc * 1.5;
+                    const bh = ART.needs.iconDisplay[1] * sc * 1.5;
+                    ctx.drawImage(im, fx0 + (fw - bw) / 2, fy0 + (fh - bh) / 2, bw, bh);
+                }
+                return;
+            }
             if (allMet) {
                 const im = needsFaceImgs[`bloom-${kind}`];
                 if (ready(im)) {
@@ -1266,9 +1366,14 @@
             const keys = ['sun', 'water', 'fertilizer', 'stake'].filter((k) => Care.dotsForNeed(needs, k) > 0);
             const iconPx = (ART.needs.tagFaceIconPx || 48) * sf;
             const gap = keys.length > 1 ? (fw - keys.length * iconPx) / (keys.length + 1) : (fw - iconPx) / 2;
+            const sunLvl = sunGlowLevel(prog, needs, pl.isDaylight !== false);
             keys.forEach((key, idx) => {
                 const ix = fx0 + gap + idx * (iconPx + gap);
                 const iy = fy0 + 4 * sf;
+                if (key === 'sun') {
+                    drawSunGlowIcon(ix, iy, iconPx, sunLvl, kind, nowSec, i);
+                    return;
+                }
                 const im = needsFaceImgs[`${key}-${kind}`];
                 if (ready(im)) ctx.drawImage(im, ix, iy, iconPx, iconPx);
                 const req = Care.dotsForNeed(needs, key);
@@ -1301,6 +1406,7 @@
             if (!ready(img) || !off) return;
             const pulse = tendRingPulse ? 0.75 + 0.25 * (0.5 + 0.5 * Math.sin(t * Math.PI)) : 1;
             ctx.save();
+            clipToBed(i, 24);
             ctx.globalAlpha = pulse;
             ctx.drawImage(img, off[0], off[1]);
             ctx.restore();
@@ -1373,6 +1479,48 @@
             if (pl.staked) drawStake(i, pl);
             const st = plantSpriteStage(pl, i);
             if (st != null) drawSprite(pl.plantId, st, i, t, 1, 1);
+            if (pl.harvestReadyBadge) drawHarvestReadyBadge(i, pl, t);
+        }
+
+        function drawHarvestReadyBadge(i, pl, t) {
+            const p = ART.plots[i];
+            const meta = ART.plants[pl.plantId]?.stages?.[(pl.stage || 1) - 1];
+            const hgt = meta ? (meta.base - meta.top) * p.scale : 80;
+            const bob = Math.sin(t * 0.5 * Math.PI * 2 / 4 + i) * 2;
+            const disp = (ART.needs && ART.needs.harvestReadyBadgeDisplay) || [64, 64];
+            const w = disp[0];
+            const h = disp[1];
+            const x = p.x - w / 2;
+            const y = p.y - hgt - h - 8 + bob;
+            const badge = (lighting === 'night' && harvestBadgeImgNight && ready(harvestBadgeImgNight))
+                ? harvestBadgeImgNight
+                : harvestBadgeImg;
+            const breathCycle = 0.5 - 0.5 * Math.cos(t * Math.PI * 2 / 4);
+            const glowA = 0.35 + 0.65 * breathCycle;
+            if (harvestBadgeGlowImg && ready(harvestBadgeGlowImg)) {
+                ctx.save();
+                ctx.globalAlpha = glowA;
+                ctx.drawImage(harvestBadgeGlowImg, x - w * 0.15, y - h * 0.15, w * 1.3, h * 1.3);
+                ctx.restore();
+            }
+            if (badge && ready(badge)) {
+                ctx.drawImage(badge, x, y, w, h);
+                return;
+            }
+            ctx.save();
+            ctx.font = `bold ${Math.round(w * 0.55)}px Nunito, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillStyle = 'rgba(255, 248, 228, 0.92)';
+            ctx.strokeStyle = 'rgba(62, 42, 26, 0.35)';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(x, y, w, h, 10);
+            ctx.fill();
+            ctx.stroke();
+            ctx.fillStyle = '#3e2a1a';
+            ctx.fillText('🧺', p.x, y + h / 2);
+            ctx.restore();
         }
 
         function drawPlants(t) {
@@ -1504,6 +1652,14 @@
 
         // Painted effect strips over each planted bed. Sun uses additive blending;
         // water and fertilizer stay normal so the damp patch darkens the soil.
+        function clipToBed(i, pad) {
+            const b = ART.plots[i].box;
+            const m = Number(pad) || 0;
+            ctx.beginPath();
+            ctx.rect(b[0] - m, b[1] - m - 40, b[2] - b[0] + m * 2, b[3] - b[1] + m * 2 + 48);
+            ctx.clip();
+        }
+
         function drawFxFrame(kind, mode, i, frame, alpha) {
             const E = ART.effects;
             const img = fxImgs[SPRITE_KINDS[kind] + '-' + (lighting === 'night' ? 'night' : 'day') + '-' + mode];
@@ -1511,6 +1667,7 @@
             const p = ART.plots[i];
             const s = p.w / 180;
             ctx.save();
+            clipToBed(i, 12);
             ctx.globalAlpha = Math.min(1, alpha);
             ctx.globalCompositeOperation = kind === 'sun' ? 'lighter' : 'source-over';
             ctx.translate(p.x, p.y - 4);

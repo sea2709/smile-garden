@@ -261,6 +261,30 @@
             bloomStampNight: '../assets/ui/care/bloom-stamp-night.png',
             restingLeaf: '../assets/ui/care/resting-leaf.png',
             restingLeafNight: '../assets/ui/care/resting-leaf-night.png',
+            sunGlow: Object.freeze([
+                { day: '../assets/ui/care/sun-glow-0.png', night: '../assets/ui/care/sun-glow-0-night.png' },
+                { day: '../assets/ui/care/sun-glow-1.png', night: '../assets/ui/care/sun-glow-1-night.png' },
+                { day: '../assets/ui/care/sun-glow-2.png', night: '../assets/ui/care/sun-glow-2-night.png' },
+                { day: '../assets/ui/care/sun-glow-3.png', night: '../assets/ui/care/sun-glow-3-night.png' },
+            ]),
+            sunResting: '../assets/ui/care/sun-resting.png',
+            sunRestingNight: '../assets/ui/care/sun-resting-night.png',
+            badgeByDaylight: '../assets/ui/care/badge-by-daylight.png',
+            badgeByDaylightNight: '../assets/ui/care/badge-by-daylight-night.png',
+            badgeByDaylightBlank: '../assets/ui/care/badge-by-daylight-blank.png',
+            badgeByDaylightBlankNight: '../assets/ui/care/badge-by-daylight-blank-night.png',
+            badgeByDaylightDisplay: Object.freeze([88, 32]),
+            badgeByDaylightCardCenter: Object.freeze([548, 233]),
+            sunGlowCrossfadeSec: 0.6,
+            harvestReadyBadge: '../assets/ui/care/harvest-badge.png',
+            harvestReadyBadgeNight: '../assets/ui/care/harvest-badge-night.png',
+            harvestReadyBadgeGlow: '../assets/ui/care/harvest-badge-glow.png',
+            harvestReadyBadgePixels: Object.freeze([128, 128]),
+            harvestReadyBadgeDisplay: Object.freeze([64, 64]),
+            harvestPrompt64: '../assets/ui/care/harvest-prompt-64.png',
+            harvestPrompt64Night: '../assets/ui/care/harvest-prompt-64-night.png',
+            iconHarvest: '../assets/ui/care/harvest-prompt-64.png',
+            iconHarvestNight: '../assets/ui/care/harvest-prompt-64-night.png',
             iconDisplay: Object.freeze([32, 32]),
             dotDisplay: Object.freeze([14, 14]),
             bloomDisplay: Object.freeze([64, 64]),
@@ -285,7 +309,33 @@
             if (key === 'water') return night ? n.iconWaterNight : n.iconWater;
             if (key === 'fertilizer') return night ? n.iconFertilizerNight : n.iconFertilizer;
             if (key === 'stake') return night ? n.iconStakeNight : n.iconStake;
+            if (key === 'harvest') return night ? (n.iconHarvestNight || n.harvestPrompt64Night) : (n.iconHarvest || n.harvestPrompt64);
             return n.iconSun;
+        },
+        sunGlowSrc(level, lighting) {
+            const n = this.needs;
+            const idx = Math.max(0, Math.min(3, Math.round(Number(level) || 0)));
+            const pair = n.sunGlow && n.sunGlow[idx];
+            if (!pair) return n.iconSun;
+            return lighting === 'night' ? pair.night : pair.day;
+        },
+        sunRestingSrc(lighting, forCard) {
+            const n = this.needs;
+            if (forCard) return n.sunResting;
+            return lighting === 'night' ? n.sunRestingNight : n.sunResting;
+        },
+        badgeByDaylightSrc(lighting, forCard) {
+            const n = this.needs;
+            if (forCard || lighting !== 'night') return n.badgeByDaylight;
+            return n.badgeByDaylightNight;
+        },
+        harvestReadyBadgeSrc(lighting) {
+            const n = this.needs;
+            return lighting === 'night' ? (n.harvestReadyBadgeNight || n.harvestReadyBadge) : n.harvestReadyBadge;
+        },
+        harvestPrompt64Src(lighting) {
+            const n = this.needs;
+            return lighting === 'night' ? n.harvestPrompt64Night : n.harvestPrompt64;
         },
         needsDotSrc(filled, lighting) {
             const n = this.needs;

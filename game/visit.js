@@ -35,6 +35,9 @@
     const C = (typeof require === 'function')
         ? require('./care-needs.js')
         : (typeof self !== 'undefined' ? self.SmileCareNeeds : null);
+    const Summary = (typeof require === 'function')
+        ? require('./summary-data.js')
+        : (typeof self !== 'undefined' ? self.SmileSummaryData : null);
 
     const STATE_VERSION = 6;
     const PLOTS = 8;
@@ -646,7 +649,10 @@
         const out = applyOvernightGrowth(state, d);
         const completedDay = state.dayNumber;
         const completedKey = D.gardenDayKey(completedDay);
-        state.morningPending = Object.assign({ day: completedDay + 1 }, out);
+        const careStats = (Summary && C)
+            ? Summary.aggregateCareFromDailyTends(state, completedDay, (id) => L.plantNeeds(id))
+            : null;
+        state.morningPending = Object.assign({ day: completedDay + 1 }, out, { careStats });
         state.daysCompleted = completedDay;
         state.dayNumber += 1;
         state.season = D.seasonForDayNumber(state.dayNumber);
@@ -663,7 +669,7 @@
             day, ts: d.getTime(), kind: 'bedtime',
             text: out.grew.length ? `Overnight: ${out.grew.length} plant(s) grew.` : 'A quiet night in the garden.',
         });
-        return out;
+        return Object.assign({}, out, { careStats });
     }
 
     /**
@@ -737,12 +743,24 @@
             addJournal(state, { day, ts: d.getTime(), kind: 'unlock', plantId: id, text: `New seeds: ${L.plantById(id).name}.` });
         }
         const legacy = bedResults[0] || { sunHours: 0, water: 0, fertilizer: 0 };
+        let careStats = null;
+        if (result && result.careMode && C && Summary && state.version >= 6) {
+            careStats = Summary.aggregateCareFromBeds(
+                result.careBeds,
+                (result.harvestPlots || []).length,
+                state,
+                (id) => L.plantNeeds(id),
+            );
+        }
         return {
             day, sunHours: sumSun, water: sumWater, fertilizer: sumFert,
             tended, grew, waiting, unlocked, firstVisitToday,
             weekly: weeklyVisits(state, d), visits: visitCount(state),
             banked: legacy.sunHours * (1 + TUNING.fertilizerBoost * legacy.fertilizer),
             watered: legacy.water >= TUNING.waterToGrow,
+            careMode: !!(result && result.careMode),
+            careStats,
+            harvestPlots: (result && result.harvestPlots) || [],
         };
     }
 
@@ -828,7 +846,7 @@
     // ------------------------------------------------------------------
     const STEPS = Object.freeze([
         'greeting', 'pick-harvest', 'harvest-hold', 'pick',
-        'care-hub', 'care-sun', 'care-water', 'care-breathe',
+        'care-hub', 'care-smile', 'care-talk', 'care-harvest',
         'smile', 'talk', 'breathe-offer', 'breathe', 'stretch-offer', 'stretch', 'summary',
     ]);
 
@@ -910,6 +928,7 @@
             this._careSmileRaw = 0;
             this._careTalkRaw = 0;
             this._careBreathRaw = 0;
+            this.activeCareChannel = null;
             for (const plot of this.plantedBeds) this._loadCareProgress(plot);
         }
 
@@ -949,22 +968,59 @@
             const p = this.plots[this.selectedPlot];
             const needs = L.plantNeeds(p.plantId);
             if (needKey === 'stake' && needs.stake) return this.launchStretchCare('care-hub');
-            if (needKey === 'sun' && needs.sun > 0) {
-                this._careSmileRaw = 0;
-                return this.go('care-sun');
-            }
+            if (needKey === 'sun') return this.step;
             if (needKey === 'water' && needs.water > 0) {
-                this._careTalkRaw = 0;
-                return this.go('care-water');
+                this._careSmileRaw = 0;
+                this.stepTime = 0;
+                return this.go('care-smile');
             }
             if (needKey === 'fertilizer' && needs.fertilizer > 0) {
-                this.pacer = new BreathPacer({ pace: this.pace, breaths: needs.fertilizer, easeIn: false });
+                this._careTalkRaw = 0;
+                this.stepTime = 0;
+                return this.go('care-talk');
+            }
+            if (needKey === 'harvest' && this.canCareHarvest(this.selectedPlot)) {
+                this.pacer = new BreathPacer({ pace: this.pace, breaths: 1, easeIn: false });
                 this.breathT = 0;
                 this.breathsDone = 0;
                 this._careBreathRaw = 0;
-                return this.go('care-breathe');
+                return this.go('care-harvest');
             }
             return this.step;
+        }
+
+        careGardenDayKey() {
+            if (this.gardenDay != null) return D.gardenDayKey(this.gardenDay);
+            return null;
+        }
+
+        canCareHarvest(plot) {
+            const p = this.plots[plot];
+            if (!p || !H) return false;
+            if (p.stage < MAX_STAGE) return false;
+            const today = this.careGardenDayKey();
+            if (!today || !H.isPlotReady(p, today)) return false;
+            const needs = L.plantNeeds(p.plantId);
+            return C.allNeedsMet(this.careProgressFor(plot), needs, p.staked);
+        }
+
+        _tickAutoSunForAll(dt, isDaylight) {
+            if (!C || !isDaylight) return;
+            for (const plot of this.plantedBeds) {
+                const p = this.plots[plot];
+                if (!p || H.isPlotReady(p, this.careGardenDayKey())) continue;
+                const needs = L.plantNeeds(p.plantId);
+                if (needs.sun <= 0) continue;
+                const prog = C.addAutoSun(this.careProgressFor(plot), needs, dt, isDaylight);
+                this.setCareProgress(plot, prog);
+            }
+        }
+
+        _completeCareHarvest() {
+            if (this.selectedPlot == null) return this.go('care-hub');
+            this.pendingHarvests.push(this.selectedPlot);
+            this.events.push({ type: 'harvest-ready', plot: this.selectedPlot });
+            return this.go('care-hub');
         }
 
         finishCareHub() {
@@ -1084,7 +1140,7 @@
                 return this.harvestQueue.filter((i) => !this.harvestedPlots.includes(i));
             }
             if (this.step === 'pick' || this.step === 'care-hub'
-                || this.step === 'care-sun' || this.step === 'care-water' || this.step === 'care-breathe'
+                || this.step === 'care-smile' || this.step === 'care-talk' || this.step === 'care-harvest'
                 || this.step === 'stretch-offer' || this.step === 'stretch') {
                 return this.plantedBeds;
             }
@@ -1108,19 +1164,18 @@
             if (this.step === 'talk') return this.talkSeconds;
             if (this.step === 'harvest-hold') return this.harvestSeconds;
             if (this.step === 'breathe') return this.pacer ? this.pacer.total : 0;
-            if (this.step === 'care-sun') return this._careDotSecondsLeft('sun');
-            if (this.step === 'care-water') return this._careDotSecondsLeft('water');
-            if (this.step === 'care-breathe') {
-                if (this.pacer) return this.pacer.total;
-                return this._careDotSecondsLeft('fertilizer');
-            }
+            if (this.step === 'care-smile') return this._careDotSecondsLeft('water');
+            if (this.step === 'care-talk') return this._careDotSecondsLeft('fertilizer');
+            if (this.step === 'care-harvest' && this.pacer) return this.pacer.total;
             return 0;
         }
         stepRemaining() {
             if (this.step === 'harvest-hold') return Math.max(0, this.harvestSeconds - this.harvestSmile);
             if (this.step === 'breathe') return Math.max(0, this.stepDuration() - this.breathT);
-            if (this.step === 'care-sun' || this.step === 'care-water') return this._careDotSecondsLeft(this.step === 'care-sun' ? 'sun' : 'water');
-            if (this.step === 'care-breathe' && this.pacer) return Math.max(0, this.pacer.total - this.breathT);
+            if (this.step === 'care-smile' || this.step === 'care-talk') {
+                return this._careDotSecondsLeft(this.step === 'care-smile' ? 'water' : 'fertilizer');
+            }
+            if (this.step === 'care-harvest' && this.pacer) return Math.max(0, this.pacer.total - this.breathT);
             return Math.max(0, this.stepDuration() - this.stepTime);
         }
 
@@ -1144,6 +1199,11 @@
             if (step === 'harvest-hold') {
                 this.harvestSmile = 0;
             }
+            if (step === 'care-harvest') {
+                this.pacer = new BreathPacer({ pace: this.pace, breaths: 1, easeIn: false });
+                this.breathT = 0;
+                this.breathsDone = 0;
+            }
             if (step === 'stretch') {
                 if (this.stretchFlow) this.stretchFlow.reset();
                 this.stretchSnap = { leftProgress: 0, rightProgress: 0, rollDeg: 0, needsFaceHint: false };
@@ -1162,12 +1222,6 @@
         remainingHarvestCount() { return this._remainingHarvest().length; }
 
         begin() {
-            const remH = this._remainingHarvest();
-            if (remH.length) {
-                this.phase = 'harvest';
-                this.selectedPlot = remH[0];
-                return this.go('pick-harvest');
-            }
             if (!this.plantedBeds.length) return this.go('summary');
             this.phase = 'tend';
             this.plantRound = 0;
@@ -1191,7 +1245,7 @@
             const i = Number(plot);
             const list = this.selectablePlots();
             if (!(i >= 0 && i < PLOTS) || !list.includes(i)) return false;
-            const careSteps = ['pick', 'pick-harvest', 'care-hub', 'care-sun', 'care-water', 'care-breathe', 'stretch-offer', 'stretch'];
+            const careSteps = ['pick', 'pick-harvest', 'care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
             if (!careSteps.includes(this.step)) return false;
             this.selectedPlot = i;
             this._loadCareProgress(i);
@@ -1201,7 +1255,8 @@
         }
 
         moveSelection(dir) {
-            if (this.step !== 'pick' && this.step !== 'pick-harvest' && this.step !== 'care-hub') return this.selectedPlot;
+            if (this.step !== 'pick' && this.step !== 'pick-harvest' && this.step !== 'care-hub'
+                && this.step !== 'care-smile' && this.step !== 'care-talk' && this.step !== 'care-harvest') return this.selectedPlot;
             const list = this.selectablePlots();
             const next = movePlotSelection(this.selectedPlot, dir, list);
             if (next !== null && next !== this.selectedPlot) {
@@ -1282,7 +1337,7 @@
                 return this.maybeChainStretchAfterBreathing();
             }
             if (this.step === 'stretch-offer' || this.step === 'stretch') return this.skipStretchCare();
-            if (this.step === 'care-sun' || this.step === 'care-water' || this.step === 'care-breathe') return this.go('care-hub');
+            if (this.step === 'care-smile' || this.step === 'care-talk' || this.step === 'care-harvest') return this.go('care-hub');
             if (this.step === 'care-hub') return this.finishCareHub();
             return this.step;
         }
@@ -1342,31 +1397,96 @@
                     this._saveLiveToTally();
                     this.maybeChainStretchAfterBreathing();
                 }
-            } else if (this.step === 'care-sun' && this.selectedPlot != null && C) {
+            }
+            const careSteps = new Set(['care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch']);
+            if (careSteps.has(this.step) && C) {
+                this._tickAutoSunForAll(step, !!inp.isDaylight);
+            }
+            if (this.step === 'care-hub' && this.selectedPlot != null && C) {
+                const plot = this.selectedPlot;
+                const p = this.plots[plot];
+                const needs = L.plantNeeds(p.plantId);
+                let stretchSnap = this.stretchSnap;
+                const stakeOpen = needs.stake && !C.stakeNeedMet(this.careProgressFor(plot), p.staked);
+                if (stakeOpen && this.stretchFlow) {
+                    stretchSnap = this.stretchFlow.update(step, inp.stretch || {});
+                    this.stretchSnap = stretchSnap;
+                    if (stretchSnap.complete) {
+                        const prog = this.careProgressFor(plot);
+                        prog.stake = true;
+                        this.setCareProgress(plot, prog);
+                        this.stretchFlow.reset();
+                        this.stretchSnap = { leftProgress: 0, rightProgress: 0, rollDeg: 0, needsFaceHint: false };
+                    }
+                }
+                const stretchEngaged = !!(stakeOpen && (
+                    stretchSnap.activeSide
+                    || Math.abs(Number(stretchSnap.rollDeg) || 0) >= 8
+                    || (stretchSnap.leftProgress || 0) > 0.05
+                    || (stretchSnap.rightProgress || 0) > 0.05
+                ));
+                const breathingFresh = !!(inp.breathing && inp.breathing.fresh);
+                const harvestStarted = this.breathT > 0.05 || !!this.pacer;
+                const channel = C.pickAutoCareChannel({
+                    faceVisible,
+                    poorReading: this.poorReading,
+                    smiling: this.smiling,
+                    talking: this.talking,
+                    breathingFresh,
+                    stretchEngaged,
+                    needs,
+                    progress: this.careProgressFor(plot),
+                    plotStaked: p.staked,
+                    canHarvest: this.canCareHarvest(plot),
+                    harvestBreathStarted: harvestStarted,
+                });
+                this.activeCareChannel = channel;
+                if (channel === 'water' && !this.poorReading) {
+                    const prog = C.addDotTime(this.careProgressFor(plot), 'water', step, needs);
+                    this.setCareProgress(plot, prog);
+                } else if (channel === 'fertilizer' && !this.poorReading) {
+                    const prog = C.addDotTime(this.careProgressFor(plot), 'fertilizer', step, needs);
+                    this.setCareProgress(plot, prog);
+                } else if (channel === 'harvest') {
+                    if (!this.pacer) {
+                        this.pacer = new BreathPacer({ pace: this.pace, breaths: 1, easeIn: false });
+                        this.breathT = 0;
+                        this.breathsDone = 0;
+                    }
+                    if (breathingFresh) this.breathT += step;
+                    this.breathsDone = this.pacer.completedAt(this.breathT);
+                    if (this.breathT >= this.pacer.total) {
+                        this.pacer = null;
+                        this.breathT = 0;
+                        this.breathsDone = 0;
+                        this._completeCareHarvest();
+                    }
+                } else if (harvestStarted && this.canCareHarvest(plot)) {
+                    this.pacer = null;
+                    this.breathT = 0;
+                    this.breathsDone = 0;
+                }
+            }
+            if (this.step === 'care-smile' && this.selectedPlot != null && C) {
                 const plot = this.selectedPlot;
                 const needs = L.plantNeeds(this.plots[plot].plantId);
                 if (this.smiling && faceVisible) {
-                    const prog = C.addDotTime(this.careProgressFor(plot), 'sun', step, needs);
-                    this.setCareProgress(plot, prog);
-                }
-                if (C.fillFraction(this.careProgressFor(plot), needs, 'sun', this.plots[plot].staked) >= 1) this.go('care-hub');
-            } else if (this.step === 'care-water' && this.selectedPlot != null && C) {
-                const plot = this.selectedPlot;
-                const needs = L.plantNeeds(this.plots[plot].plantId);
-                if (this.talking && faceVisible) {
                     const prog = C.addDotTime(this.careProgressFor(plot), 'water', step, needs);
                     this.setCareProgress(plot, prog);
                 }
                 if (C.fillFraction(this.careProgressFor(plot), needs, 'water', this.plots[plot].staked) >= 1) this.go('care-hub');
-            } else if (this.step === 'care-breathe' && this.selectedPlot != null && C) {
+            } else if (this.step === 'care-talk' && this.selectedPlot != null && C) {
                 const plot = this.selectedPlot;
                 const needs = L.plantNeeds(this.plots[plot].plantId);
+                if (this.talking && faceVisible) {
+                    const prog = C.addDotTime(this.careProgressFor(plot), 'fertilizer', step, needs);
+                    this.setCareProgress(plot, prog);
+                }
+                if (C.fillFraction(this.careProgressFor(plot), needs, 'fertilizer', this.plots[plot].staked) >= 1) this.go('care-hub');
+            } else if (this.step === 'care-harvest' && this.selectedPlot != null && C) {
                 this.breathT += step;
                 this.breathsDone = this.pacer ? this.pacer.completedAt(this.breathT) : 0;
-                const prog = C.addDotTime(this.careProgressFor(plot), 'fertilizer', step, needs);
-                this.setCareProgress(plot, prog);
-                if (this.pacer && this.breathT >= this.pacer.total) this.go('care-hub');
-                else if (C.fillFraction(this.careProgressFor(plot), needs, 'fertilizer', this.plots[plot].staked) >= 1) this.go('care-hub');
+                if (this.pacer && this.breathT >= this.pacer.total) this._completeCareHarvest();
             } else if (this.step === 'stretch' && this.stretchFlow) {
                 const snap = this.stretchFlow.update(step, input && input.stretch ? input.stretch : {});
                 this.stretchSnap = snap;
@@ -1442,8 +1562,12 @@
 
     function applySessionHarvests(state, plotIndices, now) {
         const out = [];
+        const key = calendarKey(state, now);
         for (const plot of plotIndices || []) {
-            const r = H.harvestPlot(state, plot, calendarKey(state, now), L.plantById);
+            const harvestFn = (state.version >= 6 && H.completeCareHarvest)
+                ? H.completeCareHarvest.bind(H)
+                : H.harvestPlot.bind(H);
+            const r = harvestFn(state, plot, key, L.plantById);
             if (r.ok) out.push(r);
         }
         return out;
@@ -1482,12 +1606,11 @@
                     if (p.stage >= MAX_STAGE) return;
                     const needs = L.plantNeeds(p.plantId);
                     const fill = (n) => (q >= 0.99 ? n : Math.min(n, Math.floor(n * q)));
-                    const progress = {
-                        sun: fill(needs.sun),
-                        water: fill(needs.water),
-                        fertilizer: fill(needs.fertilizer),
-                        stake: needs.stake ? (p.staked || q >= 0.99) : false,
-                    };
+                    let progress = C.emptyProgress();
+                    progress = C.addAutoSun(progress, needs, needs.sun * C.CARE_DOT_SECONDS.sun * q, true);
+                    progress.water = fill(needs.water);
+                    progress.fertilizer = fill(needs.fertilizer);
+                    progress.stake = needs.stake ? (p.staked || q >= 0.99) : false;
                     const allMet = C.allNeedsMet(progress, needs, p.staked);
                     careBeds.push({ plot, progress, allMet, stake: progress.stake });
                 });

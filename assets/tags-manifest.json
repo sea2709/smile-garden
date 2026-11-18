@@ -638,5 +638,142 @@
   "order": "draw after drawBackdrop() and before plants/selection ring; pre-shaped to each bed's soil quad (stone rims and lawn left clear), no masking needed",
   "lighting": "day file for dawn/midday/golden-hour, night file for night; crossfade with the same lightWeights as the backdrop (day alpha = 1 - weights.night)",
   "fade": "fade in over ~1.2 s when a tag completes; remove at the morning reset"
+ },
+ "passiveSun": {
+  "added": "2026-11-18 care remap: sun fills by itself during the day (no player action)",
+  "levels": {
+   "level0": {
+    "file": "ui/care/sun-glow-0.png",
+    "night": "ui/care/sun-glow-0-night.png",
+    "px": [
+     64,
+     64
+    ],
+    "display": [
+     32,
+     32
+    ],
+    "anchor": "centre"
+   },
+   "level1": {
+    "file": "ui/care/sun-glow-1.png",
+    "night": "ui/care/sun-glow-1-night.png",
+    "px": [
+     64,
+     64
+    ],
+    "display": [
+     32,
+     32
+    ],
+    "anchor": "centre"
+   },
+   "level2": {
+    "file": "ui/care/sun-glow-2.png",
+    "night": "ui/care/sun-glow-2-night.png",
+    "px": [
+     64,
+     64
+    ],
+    "display": [
+     32,
+     32
+    ],
+    "anchor": "centre"
+   },
+   "level3": {
+    "file": "ui/care/sun-glow-3.png",
+    "night": "ui/care/sun-glow-3-night.png",
+    "px": [
+     64,
+     64
+    ],
+    "display": [
+     32,
+     32
+    ],
+    "anchor": "centre"
+   }
+  },
+  "levelsNote": "drop-in replacement for icon-sun in the sun slot (same 64px / 32 display, centred). The ring has 3 arcs clockwise from 12 o'clock: 0 = faint dotted ring + pale sun (dawn, nothing yet), 1/2/3 = arcs lit with a growing warm halo; 3 = full ring = sun need met. Suggested mapping: level = ceil(3 * sunGiven / sunNeeded) so 1-, 2- and 3-dot plants all end on the full ring; or drive it from daylight progress. Crossfade between levels ~0.6 s.",
+  "resting": {
+   "file": "ui/care/sun-resting.png",
+   "night": "ui/care/sun-resting-night.png",
+   "px": [
+    64,
+    64
+   ],
+   "display": [
+    32,
+    32
+   ],
+   "anchor": "centre",
+   "note": "night: replaces the sun slot (sun is paused, not failed). Tag in the scene uses -night (30% tint so the cloud still reads); the needs card at night uses sun-resting.png (card rule: day files on the card). Whatever sun was earned today stays counted."
+  },
+  "badge": {
+   "file": "ui/care/badge-by-daylight.png",
+   "night": "ui/care/badge-by-daylight-night.png",
+   "blank": "ui/care/badge-by-daylight-blank.png",
+   "blankNight": "ui/care/badge-by-daylight-blank-night.png",
+   "px": [
+    176,
+    64
+   ],
+   "display": [
+    88,
+    32
+   ],
+   "anchor": "centre",
+   "cardPlacement": "sun row (rows[0]) only: centre at (548, row.top+43) PNG px, i.e. x460-636, so it sits where the dots were and leaves the status box free. Not tappable, no hover. Text \"by daylight\" is baked in Lora (ink #5C4028 day / #3E2A1A on the night card); the -blank files let code draw its own text at x>=0.31*w.",
+   "note": "Card at night: per the card rule use badge-by-daylight.png (day) on needs-card-night, or the -night file if it looks too bright. The -night badge is mostly for any in-scene use."
+  },
+  "cardRow": "Sun row = icon box shows sun-glow-{level} (sun-resting at night), label \"Sunlight\", the by-daylight badge replaces the 1-3 dots; show need-done in the status box once level 3. Keep icon-sun + need dots files: if Sprout keeps sun dots on tags, fill them automatically and still show the badge on the card.",
+  "tag": "On the wooden tag: put sun-glow-{level} (48 PNG px, i.e. 0.75x, same as other icons) in the sun column with no dots under it (the ring is the meter); at night use sun-resting-night. Columns: sun, water, fertilizer, [stake]."
+ },
+ "harvestPrompt": {
+  "added": "2026-11-18: breathing harvests a fully grown plant",
+  "icon": {
+   "file": "ui/care/harvest-prompt.png",
+   "night": "ui/care/harvest-prompt-night.png",
+   "px": [
+    128,
+    128
+   ],
+   "display": [
+    64,
+    64
+   ],
+   "anchor": "centre",
+   "note": "basket of produce with a soft breath swirl; use as the \"breathe to harvest\" prompt over or next to a fully grown plant / its tag"
+  },
+  "iconSmall": {
+   "file": "ui/care/harvest-prompt-64.png",
+   "night": "ui/care/harvest-prompt-64-night.png",
+   "px": [
+    64,
+    64
+   ],
+   "display": [
+    32,
+    32
+   ],
+   "anchor": "centre",
+   "note": "care-icon size, e.g. on the tag face or needs card in place of the care rows once fully grown"
+  },
+  "badge": {
+   "file": "ui/care/harvest-badge.png",
+   "night": "ui/care/harvest-badge-night.png",
+   "glow": "ui/care/harvest-badge-glow.png",
+   "px": [
+    128,
+    128
+   ],
+   "display": [
+    64,
+    64
+   ],
+   "anchor": "bottom-centre of the badge sits ~8 display px above the top of the plant sprite (or centred over the tag face)",
+   "note": "cream disc + honey ring + basket. harvest-badge-glow.png is the warm ring alone: draw it under the badge and pulse opacity 0.35->1 on a 4 s in/out cycle in time with the breath guide (inhale brighten, exhale soften). Gentle bob 2 px. Show only when the plant is fully grown and harvestable; hide while the breath harvest is running."
+  }
  }
 }

@@ -1,0 +1,343 @@
+{
+ "name": "Day summary + morning card (redesign v1)",
+ "artist": "Heily",
+ "scale": 2,
+ "game": [
+  1280,
+  720
+ ],
+ "note": "All PNGs are 2x; CSS px = PNG px / 2. Care icons are reused from ui/care/ (not duplicated here).",
+ "files": {
+  "summary-card-9s.png": {
+   "use": "card background, border-image",
+   "slice_png": 96,
+   "slice_css": 48,
+   "edges": "round (tile 60 css)",
+   "fill": true,
+   "css": "border-image: url(...) 96 fill / 48px round"
+  },
+  "summary-card-9s-night.png": {
+   "use": "same, morning card / night",
+   "paper": "#EFE3CB"
+  },
+  "summary-card.png": {
+   "use": "baked 480x650 preview / fallback only",
+   "size_png": [
+    960,
+    1300
+   ]
+  },
+  "summary-card-night.png": {
+   "use": "baked night preview / fallback",
+   "size_png": [
+    960,
+    1300
+   ]
+  },
+  "stat-tile-9s.png": {
+   "use": "care cells (water/fertilizer/stakes/harvests)",
+   "slice_png": 48,
+   "slice_css": 24,
+   "css": "border-image: url(...) 48 fill / 24px stretch"
+  },
+  "stat-tile-9s-night.png": {
+   "use": "care cells at night"
+  },
+  "sun-strip-9s.png": {
+   "use": "full-width sunlight row (automatic)",
+   "slice_png": 48,
+   "slice_css": 24
+  },
+  "sun-strip-9s-night.png": {
+   "use": "sunlight row at night"
+  },
+  "summary-divider.png": {
+   "use": "divider between garden and care",
+   "size_png": [
+    896,
+    40
+   ],
+   "css": [
+    448,
+    20
+   ]
+  },
+  "summary-divider-night.png": {
+   "use": "divider, night"
+  },
+  "hero-glow.png": {
+   "use": "soft glow behind the 52px hero icon",
+   "size_png": [
+    192,
+    192
+   ],
+   "css_box": "inset -14px around a 56px icon box"
+  },
+  "hero-glow-night.png": {
+   "use": "hero glow, night"
+  },
+  "morning-hero.png": {
+   "use": "painted glowing bed on the morning card (from bedtime/morning-card.png, background removed)",
+   "size_png": [
+    720,
+    356
+   ],
+   "css": [
+    300,
+    148
+   ]
+  },
+  "summary-ui.css": {
+   "use": "suggested CSS (link after styles.css)"
+  },
+  "summary-render.js": {
+   "use": "reference DOM builder renderSummaryCard(cardEl, data, {night})"
+  }
+ },
+ "careIcons": {
+  "sunlight": "ui/care/sun-glow-3.png (sun-glow-0..3 by hours, sun-resting.png if 0 h at night)",
+  "water": "ui/care/icon-water.png",
+  "fertilizer": "ui/care/icon-fertilizer.png",
+  "stakes": "ui/care/icon-stake.png",
+  "harvests": "ui/care/harvest-prompt-64.png",
+  "heroGrew": "ui/care/bloom-stamp.png",
+  "heroResting": "ui/care/resting-leaf.png",
+  "rowGrew": "ui/care/need-done.png",
+  "rowHarvest/ready": "ui/care/harvest-badge.png",
+  "rowResting": "ui/care/resting-leaf.png",
+  "rowUnlock": "ui/care/bloom-stamp.png",
+  "nightIcons": "use the day icons on the cream card at night too; the -night icons were painted for the grey tag card and look muddy on cream"
+ },
+ "layout_css_px": {
+  "card": {
+   "width": 480,
+   "maxHeight": 648,
+   "anchor": "right 22px, top 60px (below the HUD buttons)",
+   "padding": [
+    30,
+    40,
+    26,
+    40
+   ],
+   "contentWidth": 400
+  },
+  "order": [
+   "eyebrow (date \u00b7 light \u00b7 N visits this week)",
+   "title",
+   "hero (icon 56 + number + phrase)",
+   "garden rows (max 3, then '+N more in your journal')",
+   "divider",
+   "TODAY'S CARE label",
+   "sunlight strip (full width)",
+   "2x2 care grid: water, fertilizer / stakes, harvests",
+   "note (night only)",
+   "actions"
+  ],
+  "spacing": "4px base; 8/12/16 between groups; care grid gap 6; rows 34 min; sun strip 52; care cells 56"
+ },
+ "type": {
+  "eyebrow": "Nunito 700 18/24 #6B4F36",
+  "title": "Lora 600 32/38 #3E2A1A",
+  "heroNumber": "Lora 600 44/48 #3E2A1A",
+  "heroText": "Nunito 700 22/28 #3E2A1A",
+  "gardenRow": "Nunito 18/24: name 800 #3E2A1A, meta 600 #6B4F36",
+  "sectionLabel": "Nunito 800 18/24 uppercase +0.06em #7A5A3C",
+  "careLabel": "Nunito 800 18/24 #3E2A1A",
+  "careSource": "Nunito 600 18/24 #6B4F36",
+  "careValue": "Lora 600 22/24 (sunlight 24/28) #3E2A1A",
+  "note": "Nunito 600 18/24 #6B4F36",
+  "buttons": "Nunito 800 18, min-height 46"
+ },
+ "colours": {
+  "ink": "#3E2A1A",
+  "inkSoft": "#6B4F36",
+  "label": "#7A5A3C",
+  "paperDay": "#F8EEDA",
+  "paperNight": "#EFE3CB",
+  "tileDay": "#F1E4C8",
+  "sunTileDay": "#F6E4B2",
+  "buttonPrimary": "linear-gradient(#5D7A40, #4F6B35), text #FFFAF0",
+  "buttonSoft": "#FBF5E6, 1px rgba(150,120,80,.45), text #3E2A1A"
+ },
+ "contrast_measured": {
+  "ink/paperDay": 11.8,
+  "inkSoft/paperDay": 6.5,
+  "label/paperDay": 5.4,
+  "ink/careTile": 11.0,
+  "inkSoft/careTile": 6.1,
+  "ink/paperNight": 10.6,
+  "inkSoft/paperNight": 5.9,
+  "buttonText/primary": "4.7-5.8"
+ },
+ "copy": {
+  "resting": "'resting', 'resting, wants water', 'resting, saving up sunshine', 'resting until tended'; never failed/missed/wilted",
+  "notDone": "show a soft en dash in the value; never 'skipped'",
+  "sunSource": "'from daylight, all by itself'",
+  "sources": {
+   "water": "from smiles",
+   "fertilizer": "from talking",
+   "stakes": "from stretching",
+   "harvests": "from breathing"
+  },
+  "titles": {
+   "grew": "Your garden grew today",
+   "mature": "Something grew all the way!",
+   "quiet": "A lovely, quiet visit",
+   "night": "Your garden grew overnight / A quiet night in the garden"
+  }
+ },
+ "assets_detail": {
+  "day": {
+   "card9s": {
+    "file": "ui/summary/summary-card-9s.png",
+    "size2x": [
+     312,
+     312
+    ],
+    "slice2x": 96,
+    "slice_css": 48,
+    "repeat": "round",
+    "fill": true,
+    "tile2x": 120,
+    "content_padding_css": [
+     40,
+     40,
+     32,
+     40
+    ],
+    "paper_hex": "#F8EEDA"
+   },
+   "cardBaked": {
+    "file": "ui/summary/summary-card.png",
+    "size2x": [
+     960,
+     1300
+    ],
+    "css": [
+     480,
+     650
+    ],
+    "use": "fallback / fixed-size preview only"
+   },
+   "statTile9s": {
+    "file": "ui/summary/stat-tile-9s.png",
+    "size2x": [
+     216,
+     216
+    ],
+    "slice2x": 48,
+    "slice_css": 24,
+    "tile_hex": "#F1E4C8"
+   },
+   "sunStrip9s": {
+    "file": "ui/summary/sun-strip-9s.png",
+    "size2x": [
+     216,
+     216
+    ],
+    "slice2x": 48,
+    "slice_css": 24,
+    "tile_hex": "#F6E4B2"
+   },
+   "divider": {
+    "file": "ui/summary/summary-divider.png",
+    "size2x": [
+     896,
+     40
+    ],
+    "css": [
+     448,
+     20
+    ]
+   },
+   "heroGlow": {
+    "file": "ui/summary/hero-glow.png",
+    "size2x": [
+     192,
+     192
+    ],
+    "css": [
+     96,
+     96
+    ],
+    "anchor": "centre behind hero icon"
+   }
+  },
+  "night": {
+   "card9s": {
+    "file": "ui/summary/summary-card-9s-night.png",
+    "size2x": [
+     312,
+     312
+    ],
+    "slice2x": 96,
+    "slice_css": 48,
+    "repeat": "round",
+    "fill": true,
+    "tile2x": 120,
+    "content_padding_css": [
+     40,
+     40,
+     32,
+     40
+    ],
+    "paper_hex": "#EFE3CB"
+   },
+   "cardBaked": {
+    "file": "ui/summary/summary-card-night.png",
+    "size2x": [
+     960,
+     1300
+    ],
+    "css": [
+     480,
+     650
+    ],
+    "use": "fallback / fixed-size preview only"
+   },
+   "statTile9s": {
+    "file": "ui/summary/stat-tile-9s-night.png",
+    "size2x": [
+     216,
+     216
+    ],
+    "slice2x": 48,
+    "slice_css": 24,
+    "tile_hex": "#E8DABE"
+   },
+   "sunStrip9s": {
+    "file": "ui/summary/sun-strip-9s-night.png",
+    "size2x": [
+     216,
+     216
+    ],
+    "slice2x": 48,
+    "slice_css": 24,
+    "tile_hex": "#F0DEB0"
+   },
+   "divider": {
+    "file": "ui/summary/summary-divider-night.png",
+    "size2x": [
+     896,
+     40
+    ],
+    "css": [
+     448,
+     20
+    ]
+   },
+   "heroGlow": {
+    "file": "ui/summary/hero-glow-night.png",
+    "size2x": [
+     192,
+     192
+    ],
+    "css": [
+     96,
+     96
+    ],
+    "anchor": "centre behind hero icon"
+   }
+  }
+ }
+}

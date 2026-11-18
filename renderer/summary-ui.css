@@ -1,0 +1,100 @@
+/* Smile Garden — day summary / morning card (Heily, v1)
+   Drop into renderer/ (e.g. renderer/summary-ui.css) and link after styles.css.
+   All art is 2x; sizes below are CSS px at the game's 1280x720.
+   Contrast (WCAG): ink #3E2A1A on paper #F8EEDA = 11.8:1, soft ink #6B4F36 = 6.5:1;
+   on the night paper #EFE3CB: 10.7:1 / 5.9:1; on stat tiles never below 5.4:1. */
+
+.sg-summary {
+    overflow: hidden;
+    --sum-ink: #3E2A1A;
+    --sum-ink-soft: #6B4F36;
+    --sum-paper: #F8EEDA;
+    --sum-label: #7A5A3C;          /* only for the uppercase section label (18px/800): 5.3:1 */
+    --sum-btn-top: #5D7A40;
+    --sum-btn-bottom: #4F6B35;     /* #FFFAF0 on these: 4.7:1 / 5.8:1 */
+    box-sizing: border-box;
+    width: 480px;
+    max-height: min(648px, calc(100vh - 68px));  /* top-anchored at y=60; fit 1280×800 without inner scroll */
+    padding: 30px 40px 26px;
+    display: flex; flex-direction: column; gap: 0;
+    color: var(--sum-ink);
+    font-family: var(--sans);
+    background: none;
+    border: 0 solid transparent;   /* border-image paints over the padding box */
+    border-image: url('../assets/ui/summary/summary-card-9s.png') 96 fill / 48px round;
+    filter: drop-shadow(0 12px 22px rgba(70, 48, 20, 0.22));
+    box-shadow: none;
+    animation: rise 0.7s ease;
+}
+.sg-summary[data-mode="night"] {
+    --sum-paper: #EFE3CB;
+    border-image-source: url('../assets/ui/summary/summary-card-9s-night.png');
+    filter: drop-shadow(0 14px 28px rgba(10, 8, 30, 0.45));
+}
+
+/* ---- head ---- */
+.sg-summary .sum-eyebrow { font-size: 18px; line-height: 24px; font-weight: 700; color: var(--sum-ink-soft); margin: 0; }
+.sg-summary .sum-title { font-family: var(--serif); font-weight: 600; font-size: 32px; line-height: 38px; margin: 4px 0 0; color: var(--sum-ink); }
+
+/* ---- hero: what happened in the garden ---- */
+.sg-summary .sum-hero { display: grid; grid-template-columns: 56px 1fr; column-gap: 14px; align-items: center; margin-top: 12px; }
+.sg-summary .sum-hero-icon { width: 56px; height: 56px; position: relative; display: grid; place-items: center; }
+.sg-summary .sum-hero-icon::before { content: ''; position: absolute; inset: -14px; background: url('../assets/ui/summary/hero-glow.png') center / contain no-repeat; }
+.sg-summary[data-mode="night"] .sum-hero-icon::before { background-image: url('../assets/ui/summary/hero-glow-night.png'); }
+.sg-summary .sum-hero-icon img { position: relative; width: 52px; height: 52px; object-fit: contain; }
+.sg-summary .sum-hero-num { font-family: var(--serif); font-weight: 600; font-size: 44px; line-height: 48px; }
+.sg-summary .sum-hero-text { font-size: 22px; line-height: 28px; font-weight: 700; }
+.sg-summary .sum-hero-line { display: flex; align-items: baseline; gap: 10px; }
+.sg-summary .sum-hero-art { display: block; width: 300px; height: 148px; margin: 6px auto -8px; object-fit: contain; }  /* night: morning-hero.png */
+
+.sg-summary .sum-garden { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.sg-summary .sum-garden li { display: grid; grid-template-columns: 40px 1fr; column-gap: 12px; align-items: center; min-height: 34px; font-size: 18px; line-height: 24px; }
+.sg-summary .sum-garden li img { width: 32px; height: 32px; object-fit: contain; justify-self: center; }
+.sg-summary .sum-garden li img.plant { width: 32px; height: 38px; object-position: bottom; }
+.sg-summary .sum-garden .name { font-weight: 800; color: var(--sum-ink); }
+.sg-summary .sum-garden .meta { font-weight: 600; color: var(--sum-ink-soft); }
+.sg-summary .sum-garden .more { font-weight: 600; color: var(--sum-ink-soft); padding-left: 52px; display: block; }
+
+/* ---- divider ---- */
+.sg-summary .sum-divider { display: block; width: 100%; height: 20px; margin: 12px 0 8px; background: url('../assets/ui/summary/summary-divider.png') center / 100% 20px no-repeat; border: 0; }
+.sg-summary[data-mode="night"] .sum-divider { background-image: url('../assets/ui/summary/summary-divider-night.png'); }
+
+/* ---- care given ---- */
+.sg-summary .sum-label { font-size: 18px; line-height: 24px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--sum-label); margin: 0 0 8px; }
+.sg-summary .sum-sun, .sg-summary .sum-cell {
+    display: grid; grid-template-columns: 44px 1fr auto; column-gap: 12px; align-items: center;
+    min-height: 52px; padding: 4px 14px 4px 10px; box-sizing: border-box;
+    border-image: url('../assets/ui/summary/stat-tile-9s.png') 48 fill / 24px stretch;
+}
+.sg-summary .sum-sun { border-image-source: url('../assets/ui/summary/sun-strip-9s.png'); }
+.sg-summary[data-mode="night"] .sum-cell { border-image-source: url('../assets/ui/summary/stat-tile-9s-night.png'); }
+.sg-summary[data-mode="night"] .sum-sun  { border-image-source: url('../assets/ui/summary/sun-strip-9s-night.png'); }
+.sg-summary .sum-sun img, .sg-summary .sum-cell img { width: 40px; height: 40px; object-fit: contain; }
+.sg-summary .sum-care-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 6px; }
+.sg-summary .sum-cell { grid-template-columns: 38px 1fr; column-gap: 10px; min-height: 56px; padding: 4px 12px 4px 8px; }
+.sg-summary .sum-cell img { width: 38px; height: 38px; }
+.sg-summary .sum-cell .row1 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.sg-summary .k { font-size: 18px; line-height: 24px; font-weight: 800; color: var(--sum-ink); }
+.sg-summary .src { display: block; font-size: 18px; line-height: 24px; font-weight: 600; color: var(--sum-ink-soft); }
+.sg-summary .v { font-family: var(--serif); font-weight: 600; font-size: 24px; line-height: 28px; color: var(--sum-ink); white-space: nowrap; }
+.sg-summary .sum-cell .v { font-size: 22px; line-height: 24px; }
+.sg-summary .v.quiet { color: var(--sum-ink-soft); }  /* an en dash when an action was not done today: neutral, never "missed" */
+.sg-summary .sum-cell > div { min-width: 0; }
+
+/* ---- footer ---- */
+.sg-summary .sum-note { font-size: 18px; line-height: 24px; font-weight: 600; color: var(--sum-ink-soft); margin: 14px 0 0; }
+.sg-summary .actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 14px; flex: none; }
+.sg-summary .btn { font-size: 18px; padding: 11px 22px; min-height: 46px; font-weight: 800; }
+.sg-summary .btn-soft { color: var(--sum-ink); background: #FBF5E6; border: 1px solid rgba(150, 120, 80, 0.45); }
+.sg-summary .btn-primary { color: #FFFAF0; background: linear-gradient(180deg, var(--sum-btn-top), var(--sum-btn-bottom)); }
+
+/* the list can scroll if a big day (many unlocks) ever overflows; the care block never moves */
+.sg-summary .sum-scroll { overflow-x: hidden; overflow-y: auto; min-height: 0; flex: 1 1 auto; scrollbar-width: thin; scrollbar-color: rgba(107, 79, 54, 0.35) transparent; }
+.sg-summary .sum-scroll:has(.more) { max-height: 120px; }
+.sg-summary[data-mode="night"] .sum-hero-art { width: 260px; height: 124px; margin: 4px auto 4px; }
+.sg-summary .sum-care, .sg-summary .sum-head, .sg-summary .sum-divider { flex: none; }
+
+/* night: dim the garden a little more behind the card so nothing glows through */
+/* anchor the card under the HUD row instead of centring it */
+#screen-summary { align-items: flex-start; padding-top: 60px; }
+#screen-summary.is-night { background: linear-gradient(to left, rgba(16, 12, 30, 0.42), rgba(16, 12, 30, 0) 55%); }

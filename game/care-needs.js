@@ -8,6 +8,15 @@ const CARE_DOT_SECONDS = Object.freeze({
     fertilizer: 15,
 });
 
+/** Player inputs for daily care (sun is automatic by daylight). */
+const CARE_PLAYER = Object.freeze({
+    sun: { auto: true, label: 'Sunlight' },
+    water: { step: 'care-smile', input: 'smile', label: 'Water' },
+    fertilizer: { step: 'care-talk', input: 'talk', label: 'Fertilize' },
+    harvest: { step: 'care-harvest', input: 'breathe', label: 'Harvest' },
+    stake: { step: 'stretch', input: 'stretch', label: 'Stake' },
+});
+
 const NEED_KEYS = Object.freeze(['sun', 'water', 'fertilizer', 'stake']);
 
 function emptyProgress() {
@@ -56,6 +65,19 @@ function allNeedsMet(progress, needs, plotStaked) {
     return totalDots(n) > 0 || true;
 }
 
+/** Fill sun dots over time while the garden clock is in daylight (not at night). */
+function addAutoSun(progress, needs, dtSeconds, isDaylight) {
+    const p = Object.assign(emptyProgress(), progress);
+    if (!isDaylight) return p;
+    const n = normalizeNeeds(needs);
+    if (n.sun <= 0) return p;
+    const req = n.sun;
+    if ((Number(p.sun) || 0) + 1e-6 >= req) return p;
+    const add = (Number(dtSeconds) || 0) / CARE_DOT_SECONDS.sun;
+    p.sun = Math.min(req, (Number(p.sun) || 0) + add);
+    return p;
+}
+
 function addDotTime(progress, key, seconds, needs) {
     const p = Object.assign(emptyProgress(), progress);
     if (key === 'stake') {
@@ -99,6 +121,35 @@ function migrateLegacyTend(raw, needs, plotStaked) {
     return p;
 }
 
+function needStillOpen(progress, needs, plotStaked, key) {
+    return fillFraction(progress, needs, key, plotStaked) < 1 - 1e-6;
+}
+
+/**
+ * Which care channel auto-detection should apply this frame (null = none).
+ * Priority: stake > harvest breath > talk > smile.
+ * Overlap: talk beats smile; harvest blocks water/fert until breath finishes or is abandoned.
+ */
+function pickAutoCareChannel(ctx) {
+    const c = ctx || {};
+    if (!c.faceVisible || c.poorReading) return null;
+    const needs = normalizeNeeds(c.needs);
+    const progress = Object.assign(emptyProgress(), c.progress);
+    const plotStaked = !!c.plotStaked;
+
+    if (needs.stake && !stakeNeedMet(progress, plotStaked) && c.stretchEngaged) return 'stake';
+
+    if (c.canHarvest && (c.harvestBreathStarted || c.breathingFresh)) return 'harvest';
+
+    if (needs.fertilizer > 0 && needStillOpen(progress, needs, plotStaked, 'fertilizer') && c.talking) {
+        return 'fertilizer';
+    }
+    if (needs.water > 0 && needStillOpen(progress, needs, plotStaked, 'water') && c.smiling) {
+        return 'water';
+    }
+    return null;
+}
+
 function toDailyTendRecord(progress, needs, plotStaked, day) {
     const p = Object.assign(emptyProgress(), progress);
     const allMet = allNeedsMet(p, needs, plotStaked);
@@ -114,7 +165,9 @@ function toDailyTendRecord(progress, needs, plotStaked, day) {
 
 const api = {
     CARE_DOT_SECONDS,
+    CARE_PLAYER,
     NEED_KEYS,
+    addAutoSun,
     emptyProgress,
     normalizeNeeds,
     totalDots,
@@ -123,6 +176,8 @@ const api = {
     fillFraction,
     allNeedsMet,
     addDotTime,
+    needStillOpen,
+    pickAutoCareChannel,
     toDailyTendRecord,
     migrateLegacyTend,
     readProgressFromDailyTend,

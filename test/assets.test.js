@@ -246,6 +246,18 @@ test('tags art matches assets/tags-manifest.json', () => {
     for (const key of ['sun', 'water', 'fertilizer', 'stake']) {
         assert.ok(fs.existsSync(path.join(root, 'assets', manifest.icons[key].file)), key);
     }
+    if (manifest.passiveSun) {
+        for (const k of Object.keys(manifest.passiveSun.levels)) {
+            const e = manifest.passiveSun.levels[k];
+            assert.ok(fs.existsSync(path.join(root, 'assets', e.file)), e.file);
+            assert.ok(fs.existsSync(path.join(root, 'assets', e.night)), e.night);
+        }
+        assert.ok(fs.existsSync(path.join(root, 'assets', manifest.passiveSun.resting.file)));
+        assert.ok(fs.existsSync(path.join(root, 'assets', manifest.passiveSun.badge.file)));
+        assert.ok(fromRenderer(ART.needs.harvestReadyBadge).includes('harvest-badge'));
+        assert.ok(fs.existsSync(fromRenderer(ART.needs.harvestReadyBadgeGlow)));
+        assert.ok(fs.existsSync(fromRenderer(ART.harvestPrompt64Src('day'))));
+    }
     assert.ok(fs.existsSync(path.join(root, 'assets', manifest.icons.bloom.file)));
     assert.ok(fs.existsSync(path.join(root, 'assets', manifest.icons.resting.file)));
 });
@@ -271,6 +283,32 @@ test('stretch UI art: manifest paths, css, and art spec doc', () => {
     assert.ok(fs.existsSync(path.join(root, 'renderer', 'stretch-ui.css')));
     assert.ok(fs.existsSync(path.join(root, 'docs', 'ART-NEEDS.md')));
     assert.ok(fs.existsSync(path.join(root, 'game', 'stretch.js')));
+});
+
+test('signal panel art (Heily manifest)', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'ui', 'signal', 'signal-manifest.json'), 'utf8'));
+    assert.equal(manifest.panel.css[0], 282);
+    assert.equal(manifest.panel.css[1], 136);
+    for (const st of ['smile', 'talk', 'stretch', 'breathe', 'idle']) {
+        const e = manifest.states[st];
+        assert.ok(e.chartBg.day.startsWith('ui/signal/'), st);
+        assert.ok(fs.existsSync(path.join(root, 'assets', e.chartBg.day)), st);
+        assert.ok(fs.existsSync(path.join(root, 'assets', e.chartBg.night)), `${st} night`);
+        assert.ok(fs.existsSync(path.join(root, 'assets', e.glow.day)), `${st} glow`);
+    }
+    assert.ok(fs.existsSync(path.join(root, 'assets', manifest.gauge.arc.day)));
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'signal-panel-ui.css')));
+});
+
+test('summary card art (Heily manifest)', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'ui', 'summary', 'summary-manifest.json'), 'utf8'));
+    assert.equal(manifest.layout_css_px.card.width, 480);
+    assert.equal(manifest.type.eyebrow.split(' ').includes('18px') || manifest.type.eyebrow.includes('18'), true);
+    for (const f of ['summary-card-9s.png', 'summary-card-9s-night.png', 'stat-tile-9s.png', 'sun-strip-9s.png', 'summary-divider.png', 'morning-hero.png']) {
+        assert.ok(fs.existsSync(path.join(root, 'assets', 'ui', 'summary', f)), f);
+    }
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'summary-ui.css')));
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'summary-render.js')));
 });
 
 test('selection ring art: 8 day/night sprites and backdrop offsets', () => {

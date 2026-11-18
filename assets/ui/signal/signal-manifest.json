@@ -1,0 +1,350 @@
+{
+ "note": "Adaptive left signal panel. All PNGs are 2x: draw at half the pixel size. Geometry marked Css is in CSS px; Px is PNG px. Night = body[data-lighting=\"night\"].",
+ "panel": {
+  "css": [
+   282,
+   136
+  ],
+  "position": "left:18px; top:66px (same spot as today's #chart-panel); PiP video is right:18px top:66px 200x150, so they never overlap on a >=520px wide window",
+  "frame": {
+   "day": "ui/signal/panel-frame.png",
+   "night": "ui/signal/panel-frame-night.png",
+   "px": [
+    564,
+    272
+   ],
+   "slicePx": [
+    52,
+    52,
+    52,
+    52
+   ],
+   "sliceCss": 26,
+   "css": "border-image: url(panel-frame.png) 52 fill / 26px stretch",
+   "note": "painted at exactly 282x136 so it is pixel-perfect at the default size; it stretches cleanly from ~200 to ~420 px wide (edges are paper + stitch)"
+  },
+  "headerIcon": {
+   "boxCss": [
+    14,
+    8,
+    28,
+    28
+   ],
+   "centerCss": [
+    28.0,
+    22.0
+   ],
+   "src": "64x64 2x icons from ui/care, drawn at 28x28"
+  },
+  "glow": {
+   "sizeCss": 56,
+   "centerCss": [
+    28.0,
+    22.0
+   ],
+   "px": [
+    112,
+    112
+   ],
+   "use": "show (opacity 1) while the camera detects the state's action; gentle 2.4s breathing pulse 0.75<->1; idle glow stays at 0.55, no pulse"
+  },
+  "label": {
+   "leftCss": 48,
+   "baselineCss": 27,
+   "font": "Nunito 800 13.5px",
+   "color": {
+    "day": "#4a3b2c",
+    "night": "#2f2a36"
+   }
+  },
+  "live": {
+   "rightCss": 246,
+   "baselineCss": 27,
+   "font": "Nunito 800 12px",
+   "note": "right-aligned; keep the existing G kbd chip at right:14px"
+  },
+  "canvas": {
+   "leftCss": 16,
+   "topCss": 40,
+   "css": [
+    250,
+    84
+   ],
+   "note": "same 250x84 canvas as smile-chart.js today"
+  }
+ },
+ "chartBackground": {
+  "px": [
+   500,
+   168
+  ],
+  "css": [
+   250,
+   84
+  ],
+  "note": "sits directly under the canvas (same box). Painted wash + pencil grid; code draws only lines/fills on a cleared, transparent canvas.",
+  "plotCss": {
+   "x": 20,
+   "y": 6,
+   "w": 222,
+   "h": 60
+  },
+  "plotNote": "smile + talk + idle: grid painted for this rect (x0=20,y0=6,plotW=222,plotH=60, exactly smile-chart.js). Smile grid: solid line at 0, dashed at 0.5 and 1, dashed verticals every 2 s of a 10 s window. Talk: solid midline at y0+plotH/2, dashed guides at 18% / 82%.",
+  "breathePlotCss": {
+   "x": 20,
+   "y": 4,
+   "w": 222,
+   "h": 38
+  },
+  "breatheRowCss": {
+   "pillX": 20,
+   "pillY": 48,
+   "pillW": 92,
+   "pillH": 32,
+   "dotsX": 122,
+   "dotsY": 56,
+   "dot": 16,
+   "gap": 5,
+   "count": 6
+  },
+  "breatheNote": "wave in breathePlot (dashed midline painted); bottom row: existing breath-rate pill (ui/breath/pill-warming|settling|stable.png, 9-slice 28 32, 32px tall) at pillX/pillY, 92px wide, existing 24px icon at +10px, ONE short word (Warming / Settling / Steady), rate itself goes in the header live value; then up to 6 existing dots (ui/breath/dot-on/off.png drawn at 16px, gap 5) from dotsX. The pills/dots have no night variant (same as the breath guide today)."
+ },
+ "gauge": {
+  "arc": {
+   "day": "ui/signal/gauge-arc.png",
+   "night": "ui/signal/gauge-arc-night.png",
+   "px": [
+    344,
+    165
+   ],
+   "pivotPx": [
+    172.0,
+    164.0
+   ],
+   "placeCss": {
+    "left": 39.0,
+    "top": -0.0,
+    "width": 172.0,
+    "height": 82.5
+   }
+  },
+  "needle": {
+   "day": "ui/signal/gauge-needle.png",
+   "night": "ui/signal/gauge-needle-night.png",
+   "px": [
+    28,
+    118
+   ],
+   "pivotPx": [
+    14.0,
+    105.6
+   ],
+   "pivotCss": [
+    7.0,
+    52.8
+   ],
+   "lengthCss": 52.3
+  },
+  "pivotInCanvasCss": [
+   125,
+   82
+  ],
+  "tickRadiusCss": 56.2,
+  "sweepDeg": [
+   -78,
+   78
+  ],
+  "direction": "mirrored-view: 0deg = upright; positive (clockwise) = needle leans to SCREEN RIGHT = the way the player sees their head move in the mirrored preview. Use the same sign as the post-#15 tilt hint arrows, NOT raw camera roll (raw roll is un-mirrored and needs a sign flip).",
+  "draw": "canvas: ctx.drawImage(arc, 39, 0, 172, 82.5); ctx.save(); ctx.translate(125, 82); ctx.rotate(deg * Math.PI / 180); ctx.drawImage(needle, -7, -52.8, 14, 59); ctx.restore();  (or the DOM version in signal-panel.css: .signal-gauge-arc / .signal-gauge-needle with --tilt)",
+  "holdZone": "optional: tint the arc ends with the state fill while the hold timer runs"
+ },
+ "states": {
+  "smile": {
+   "label": "Watering",
+   "labelNight": "Watering",
+   "headerIcon": {
+    "day": "ui/care/icon-water.png",
+    "night": "ui/care/icon-water-night.png"
+   },
+   "glow": {
+    "day": "ui/signal/glow-smile.png",
+    "night": "ui/signal/glow-smile-night.png"
+   },
+   "chartBg": {
+    "day": "ui/signal/chart-smile.png",
+    "night": "ui/signal/chart-smile-night.png"
+   },
+   "colors": {
+    "day": {
+     "accent": "#6fa3c7",
+     "line": "#4f86ad",
+     "fill": "rgba(127, 169, 201, 0.30)",
+     "grid": "#8fb3cc",
+     "wash": "#cfe2ee",
+     "liveText": "#3d6887"
+    },
+    "night": {
+     "accent": "#a9c8de",
+     "line": "#2f5f86",
+     "fill": "rgba(150, 190, 222, 0.34)",
+     "grid": "#4e6a86",
+     "wash": "#9fb4c8",
+     "liveText": "#193348"
+    }
+   },
+   "liveSuggestion": "score 0.00-1.00 + \"watering\"",
+   "chart": "line = HAPPY score; fill under the line while watering (score above the 0.50 on-threshold); on-threshold dashed in accent, off-threshold dashed in grid; no-face gaps rgba(150,140,130,0.18)"
+  },
+  "talk": {
+   "label": "Fertilizing",
+   "labelNight": "Fertilizing",
+   "headerIcon": {
+    "day": "ui/care/icon-fertilizer.png",
+    "night": "ui/care/icon-fertilizer-night.png"
+   },
+   "glow": {
+    "day": "ui/signal/glow-talk.png",
+    "night": "ui/signal/glow-talk-night.png"
+   },
+   "chartBg": {
+    "day": "ui/signal/chart-talk.png",
+    "night": "ui/signal/chart-talk-night.png"
+   },
+   "colors": {
+    "day": {
+     "accent": "#b8924e",
+     "line": "#8f6d34",
+     "fill": "rgba(201, 166, 98, 0.32)",
+     "grid": "#c2a676",
+     "wash": "#eedfbd",
+     "liveText": "#7e602d"
+    },
+    "night": {
+     "accent": "#d6bd8c",
+     "line": "#5e4620",
+     "fill": "rgba(214, 186, 128, 0.34)",
+     "grid": "#6e5d44",
+     "wash": "#b3a690",
+     "liveText": "#403016"
+    }
+   },
+   "liveSuggestion": "voice level or \"talking\"",
+   "chart": "soft voice wave: mirrored amplitude envelope around the painted midline, filled with fill, edge stroked with line at 1.6px, round joins; smooth amplitude with ~120ms EMA so it reads as a gentle wave"
+  },
+  "stretch": {
+   "label": "Staking",
+   "labelNight": "Staking",
+   "headerIcon": {
+    "day": "ui/care/icon-stake.png",
+    "night": "ui/care/icon-stake-night.png"
+   },
+   "glow": {
+    "day": "ui/signal/glow-stretch.png",
+    "night": "ui/signal/glow-stretch-night.png"
+   },
+   "chartBg": {
+    "day": "ui/signal/chart-stretch.png",
+    "night": "ui/signal/chart-stretch-night.png"
+   },
+   "colors": {
+    "day": {
+     "accent": "#8aa456",
+     "line": "#6b8a3e",
+     "fill": "rgba(138, 164, 86, 0.28)",
+     "grid": "#a7b886",
+     "wash": "#e0e9c9",
+     "liveText": "#536b30"
+    },
+    "night": {
+     "accent": "#b5c98d",
+     "line": "#3f5a22",
+     "fill": "rgba(160, 186, 112, 0.32)",
+     "grid": "#55623f",
+     "wash": "#a4ad94",
+     "liveText": "#263614"
+    }
+   },
+   "liveSuggestion": "\"lean left\" / \"lean right\" / hold time",
+   "chart": "no line chart: draw gauge-arc + gauge-needle; optional hold progress as a thin line arc (line colour, 3px, round caps) at tickRadius-6"
+  },
+  "breathe": {
+   "label": "Harvesting",
+   "labelNight": "Harvesting",
+   "headerIcon": {
+    "day": "ui/care/harvest-prompt-64.png",
+    "night": "ui/care/harvest-prompt-64-night.png"
+   },
+   "glow": {
+    "day": "ui/signal/glow-breathe.png",
+    "night": "ui/signal/glow-breathe-night.png"
+   },
+   "chartBg": {
+    "day": "ui/signal/chart-breathe.png",
+    "night": "ui/signal/chart-breathe-night.png"
+   },
+   "colors": {
+    "day": {
+     "accent": "#8a9cb0",
+     "line": "#66798e",
+     "fill": "rgba(138, 156, 176, 0.28)",
+     "grid": "#a3b1c0",
+     "wash": "#dde3ea",
+     "liveText": "#546475"
+    },
+    "night": {
+     "accent": "#b6c3d1",
+     "line": "#3c4d61",
+     "fill": "rgba(166, 182, 200, 0.32)",
+     "grid": "#535f6e",
+     "wash": "#a3a9b3",
+     "liveText": "#26313e"
+    }
+   },
+   "liveSuggestion": "breaths/min (existing pill states)",
+   "chart": "breath wave in breathePlot with fill under it + existing pill and dots row"
+  },
+  "idle": {
+   "label": "Waiting for you",
+   "labelNight": "Resting",
+   "headerIcon": {
+    "day": "ui/care/resting-leaf.png",
+    "night": "ui/care/resting-leaf-night.png"
+   },
+   "glow": {
+    "day": "ui/signal/glow-idle.png",
+    "night": "ui/signal/glow-idle-night.png"
+   },
+   "chartBg": {
+    "day": "ui/signal/chart-idle.png",
+    "night": "ui/signal/chart-idle-night.png"
+   },
+   "colors": {
+    "day": {
+     "accent": "#9aae86",
+     "line": "#93a383",
+     "fill": "rgba(154, 174, 134, 0.22)",
+     "grid": "#b3c0a6",
+     "wash": "#e3eadb",
+     "liveText": "#5f6954"
+    },
+    "night": {
+     "accent": "#bfcdb0",
+     "line": "#4f5e44",
+     "fill": "rgba(170, 190, 150, 0.26)",
+     "grid": "#5c6655",
+     "wash": "#a7ada0",
+     "liveText": "#2d3526"
+    }
+   },
+   "liveSuggestion": "(empty)",
+   "chart": "nothing drawn (painted resting leaf + dashed calm line are in the background); fade the canvas to empty"
+  }
+ },
+ "transition": {
+  "crossfadeMs": 300,
+  "easing": "ease-in-out",
+  "canvas": "fade canvas to 0 over 150ms, switch draw mode, fade back over 150ms",
+  "reducedMotion": "instant swap, no glow pulse",
+  "hysteresis": "suggest holding a detected state >=400ms before switching and >=1.2s of nothing before going idle, so the panel never flickers"
+ }
+}

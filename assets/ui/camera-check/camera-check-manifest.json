@@ -410,6 +410,13 @@
    69,
    14
   ],
+  "icons": {
+   "smile": "water drop (smiling waters)",
+   "talk": "fertilizer sack (talking fertilizes; same painting as ui/care/icon-fertilizer)",
+   "breathe": "harvest basket (breathing harvests a fully grown plant)",
+   "stretch": "stake (neck stretch stakes)"
+  },
+  "icons_updated": "2026-11-18 care remap",
   "notes": "all states share one canvas so swapping never shifts. Body bottom sits 13px above y600 (feet ~y587 on the ledge top) with a baked contact shadow. listening is lifted 2px with a honey glow (optional). sprouted has the flap opened and a seedling. Code labels go below at y610-650."
  },
  "buttons": {
@@ -452,14 +459,5 @@
   "packet-*.png (bottom y600)",
   "code labels y610-650",
   "buttons y658-702"
- ],
- "css_snippet": "export/camera-check.css (also inside the zip as renderer/camera-check.css suggestion)",
- "integration": [
-  "Mirror the video in CSS (scaleX(-1)); the art is symmetric enough except ivy top-left on the frame.",
-  "Backdrop is opaque; the wall behind 360,56,560,420 is plain planks so a not-yet-started camera still looks fine.",
-  "Window wood overlaps the video 10px each side; visible video is 370,66,540,400.",
-  "Packets: one 110x150 canvas per state, swap images without moving; listening state is optional.",
-  "Labels are code text at y610-650; backdrop has a soft lighter band there for legibility.",
-  "Buttons: Skip bottom-left (40,658), Start bottom-right (right 40, top 658), 44px tall."
  ]
 }

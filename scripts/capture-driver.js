@@ -40,35 +40,20 @@ async function assertLighting(wc, expected) {
     if (!list.includes(lit)) throw new Error(`expected lighting ${list.join('|')}, got ${lit}`);
 }
 
-async function waitNeedsCard(wc) {
+async function waitTendStrip(wc, opts) {
+    const want = (opts && opts.plant) || '';
     const meta = await wc.executeJavaScript(`(() => {
-        const el = document.getElementById('needs-card');
-        const bg = document.getElementById('needs-card-bg');
-        const name = document.getElementById('needs-plant-name')?.textContent || '';
+        const el = document.getElementById('tend-strip');
+        const name = document.getElementById('tend-name')?.textContent || '';
         return {
             visible: el && !el.hidden,
-            bgReady: bg && !bg.hidden && bg.naturalWidth > 0,
             name,
             lit: document.body.dataset.lighting || '',
         };
     })()`, true);
-    if (!meta.visible) throw new Error('needs card hidden');
-    if (!/tomato/i.test(meta.name)) throw new Error(`needs card plant wrong: ${meta.name}`);
-    const buf = await wc.capturePage();
-    const { w, h, data } = probeBitmap(buf);
-    const sx = Math.round((w / 1280) * 1000);
-    const sy = Math.round((h / 720) * 200);
-    let cardPx = 0;
-    for (let dy = -24; dy <= 24; dy++) {
-        for (let dx = -24; dx <= 24; dx++) {
-            const [r, g, b] = sampleRgb(data, w, h, sx + dx, sy + dy);
-            const dayCream = r > 195 && g > 175 && b > 140 && r - b < 90;
-            const nightCard = r > 55 && r < 120 && g > 45 && g < 100 && b > 75 && b < 130;
-            if (dayCream || nightCard) cardPx++;
-        }
-    }
-    if (cardPx < 40 && !meta.bgReady) throw new Error(`needs card art weak (px=${cardPx}, bg=${meta.bgReady})`);
-    return { cardPx, name: meta.name, lit: meta.lit };
+    if (!meta.visible) throw new Error('tend strip hidden');
+    if (want && !new RegExp(want, 'i').test(meta.name)) throw new Error(`tend strip plant wrong: ${meta.name}`);
+    return meta;
 }
 
 async function waitPlantSprite(wc, ax, ay, minPlanted) {
@@ -304,7 +289,7 @@ async function runTagsArt(win, outDir) {
     await G(`g.applyTagGardenDemo('partial')`);
   await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
     await sleep(900);
-    await waitNeedsCard(wc);
+    await waitTendStrip(wc, { plant: 'tomato' });
     await shot('needs-card-tomato-partial-day.png');
 
     await G(`g.clearCaptureVisit()`);
@@ -339,7 +324,7 @@ async function runTagsArt(win, outDir) {
     await G(`g.clearCaptureVisit()`);
     await js(`window.__smileGarden.setNeedsCardDemo(2, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
     await sleep(900);
-    await waitNeedsCard(wc);
+    await waitTendStrip(wc, { plant: 'tomato' });
     await assertLighting(wc, 'night');
     await shot('needs-card-tomato-partial-night.png');
 
@@ -354,6 +339,39 @@ async function runTagsArt(win, outDir) {
     await waitTagFacePaint(wc, 'bed3', { minPainted: 8 });
     await waitTagFacePaint(wc, 'bed1', { minPainted: 8 });
     await shot('needs-garden-tags-midday.png', { uniqueTag: true });
+}
+
+async function runPlantsClean(win, outDir) {
+    fs.mkdirSync(outDir, { recursive: true });
+    const wc = win.webContents;
+    const js = (code) => wc.executeJavaScript(code, true);
+    const G = (expr) => js(`(() => { const g = window.__smileGarden; return ${expr}; })()`);
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const shot = async (name) => {
+        await sleep(500);
+        await G('g.captureRedraw()');
+        const img = await wc.capturePage();
+        fs.writeFileSync(path.join(outDir, name), img.toPNG());
+        console.log('[capture] wrote', name, img.getSize());
+    };
+    const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(1400); };
+    const t0 = Date.now();
+    while (Date.now() - t0 < 60000) {
+        const ready = await js("document.body.dataset.ready === '1'");
+        if (ready) break;
+        await sleep(120);
+    }
+    await G('g.reset()');
+    await js(`(() => { const c = document.getElementById('chk-adult'); c.checked = true; c.dispatchEvent(new Event('change')); document.getElementById('btn-wellness-ok').click(); })()`);
+    await sleep(700);
+    await lightingTo('midday');
+    await G('g.unlockSeedsForCapture()');
+    await G('g.primeMaturePlantsForCapture()');
+    await sleep(1600);
+    await shot('plants-clean-mature-garden.png');
+    await G('g.primePickedSpritesForCapture()');
+    await sleep(1600);
+    await shot('plants-clean-picked-garden.png');
 }
 
 async function runStakeArt(win, outDir) {
@@ -429,6 +447,11 @@ async function run(win, outDir) {
         app.quit();
         return;
     }
+    if (process.env.SMILE_GARDEN_PLANTS_CLEAN === '1') {
+        await runPlantsClean(win, outDir);
+        app.quit();
+        return;
+    }
     if (process.env.SMILE_GARDEN_STAKE_SHOTS === '1') {
         await runStakeArt(win, outDir);
         app.quit();
@@ -453,11 +476,46 @@ async function run(win, outDir) {
         }
         throw new Error(`timeout waiting for ${desc}`);
     }
-    async function shot(name) {
+    async function shot(name, opts) {
+        const o = opts || {};
+        if (!o.keepPip) await G('g.prepareDomForScreenshot()');
         await sleep(200);
         const img = await wc.capturePage();
         fs.writeFileSync(path.join(outDir, name), img.toPNG());
         console.log('[capture] wrote', name, img.getSize());
+    }
+    async function captureSignalPanel(mode, opts) {
+        const o = opts || {};
+        await js('window.__smileGarden.setMockPipForCapture(false)');
+        await G('g.setChartForCapture(true)');
+        if (o.channel) await G(`g.setTendStripActiveForCapture(${JSON.stringify(o.channel)})`);
+        await G(`g.setSignalPanelDemoForCapture("${mode}")`);
+        if (o.channel) await waitTendStrip(wc);
+        await sleep(200);
+        await G('g.captureRedraw()');
+        await sleep(350);
+        await shot(`signal-panel-${mode}.png`);
+    }
+    async function prepCareDocShot(spec) {
+        const { panel, channel, progress, mockPhase, idle } = spec || {};
+        if (progress) await G(`g.setCareHubProgressForCapture(4, ${JSON.stringify(progress)})`);
+        await G('g.setSelectedPlot(4)');
+        if (mockPhase) {
+            await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('${mockPhase}'); return true; })()`);
+        }
+        await G('g.setChartForCapture(true)');
+        if (idle) {
+            await G(`g.setSignalPanelDemoForCapture('idle')`);
+            await G('g.setTendStripActiveForCapture(null)');
+        } else {
+            await G(`g.setSignalPanelDemoForCapture('${panel}')`);
+            if (channel) await G(`g.setTendStripActiveForCapture(${JSON.stringify(channel)})`);
+            else await G('g.setTendStripActiveForCapture(null)');
+        }
+        await waitTendStrip(wc);
+        await sleep(200);
+        await G('g.captureRedraw()');
+        await sleep(200);
     }
     async function breathUiShot(name, mode, countDone) {
         await G(`g.setBreathHudDemo(${JSON.stringify(mode)}, ${countDone})`);
@@ -538,6 +596,13 @@ async function run(win, outDir) {
     }
     await G('g.finishCameraCheck()');
     await sleep(800);
+    await G('g.prepCaptureGarden()');
+    await sleep(400);
+    await captureSignalPanel('idle');
+    await G('g.clearSignalPanelDemoForCapture()');
+    await js('window.__smileGarden.setMockPipForCapture(false)');
+    await G('g.clearCaptureVisit()');
+    await sleep(400);
     await shot('02-garden-idle-dawn.png');
 
     await G('g.openPicker(4)');
@@ -551,69 +616,104 @@ async function run(win, outDir) {
 
     // --- a full visit at midday ---
     await lightingTo('midday');
+    await js('window.__smileGarden.setMockPipForCapture(false)');
     await G('g.begin()');
     await waitFor('care hub', (d) => d.step === 'care-hub', 10000);
+    await G('g.setChartForCapture(true)');
     await sleep(800);
     await shot('03b-selection-ring-visit.png');
-    await G(`g.startCare('sun')`);
-    await waitFor('care sun', (d) => d.step === 'care-sun', 20000);
-    await sleep(1200);
-    await shot('04-care-sun-midday.png');
-    await G(`g.completeCareNeedForCapture('sun')`);
-    await waitFor('back to hub sun', (d) => d.step === 'care-hub', 8000);
-    await G(`g.startCare('water')`);
-    await waitFor('care water', (d) => d.step === 'care-water', 8000);
-    await sleep(800);
-    await shot('05-care-water.png');
-    await G(`g.completeCareNeedForCapture('water')`);
-    await waitFor('hub after water', (d) => d.step === 'care-hub', 8000);
+    await G(`g.setCareHubProgressForCapture(4, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
+    await captureSignalPanel('smile', { channel: 'water' });
+    await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
+    await captureSignalPanel('talk', { channel: 'fertilizer' });
+    await G('g.setSelectedPlot(4)');
+    await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 2, fertilizer: 0, stake: true })`);
+    await captureSignalPanel('stretch', { channel: 'stake' });
+    const daySmileProgress = { sun: 2, water: 1, fertilizer: 0, stake: false };
+    const dayIdleProgress = { sun: 2, water: 2, fertilizer: 0, stake: false };
+    await prepCareDocShot({
+        panel: 'smile',
+        channel: 'water',
+        progress: daySmileProgress,
+        mockPhase: 'care-hub-smile',
+    });
+    await shot('04-care-smile-midday.png');
+    await prepCareDocShot({
+        panel: 'smile',
+        channel: 'water',
+        progress: daySmileProgress,
+        mockPhase: 'care-hub-smile',
+    });
+    await shot('tend-strip-active-glow.png');
+    await js('window.__smileGarden.setMockPipForCapture(true, { stream: false })');
+    await prepCareDocShot({
+        panel: 'smile',
+        channel: 'water',
+        progress: daySmileProgress,
+        mockPhase: 'care-hub-smile',
+    });
+    await sleep(200);
+    await G('g.captureRedraw()');
+    await shot('visit-camera-preview-clear.png', { keepPip: true });
+    await js('window.__smileGarden.setMockPipForCapture(false)');
+    await G('g.prepareDomForScreenshot()');
+    await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
+    await G(`g.setSignalPanelDemoForCapture('talk')`);
+    await G(`g.setTendStripActiveForCapture('fertilizer')`);
+    await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-talk'); return true; })()`);
     await sleep(500);
-    await shot('06-needs-card-partial.png');
+    await shot('05-care-talk.png');
+    await prepCareDocShot({ idle: true, progress: dayIdleProgress });
+    await shot('tend-strip-day.png');
     await G('g.setSelectedPlot(1)');
-    await G(`g.startCare('stake')`);
-    await waitFor('stretch offer', (d) => d.step === 'stretch-offer', 8000);
-    await sleep(500);
-    await shot('07d-stretch-offer.png');
-    await js(`document.getElementById('btn-stretch-start').click()`);
-    await waitFor('stretch step', (d) => d.step === 'stretch', 8000);
-    await G(`g.setStretchHudDemo('left-hold')`);
-    await sleep(450);
+    await G('g.setStretchHudDemo("left-hold")');
+    await G(`g.setSignalPanelDemoForCapture('stretch')`);
+    await G(`g.setTendStripActiveForCapture('stake')`);
+    await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-stretch'); return true; })()`);
+    await sleep(700);
     await shot('07e-stretch-left-hold.png');
     await shot('stake-guide-tilted.png');
-    await shot('stake-ring-midfill.png');
-    await G(`g.setStretchHudDemo('right-hold')`);
-    await sleep(450);
-    await shot('07f-stretch-right-hold.png');
-    await G(`g.setStretchHudDemo('done')`);
-    await sleep(450);
-    await shot('07g-stretch-complete.png');
+    await G('g.setStretchHudDemo("done")');
     await G('g.clearStretchHudDemo()');
-    await G('g.skipStretchCare()');
-    await waitFor('hub after stake', (d) => d.step === 'care-hub', 8000);
-    await G(`g.startCare('fertilizer')`);
-    await waitFor('care breathe', (d) => d.step === 'care-breathe', 8000);
-    await breathUiShot('07a-breath-rate-warming.png', 'warming', 0);
-    await breathUiShot('07b-breath-rate-settling.png', 'settling', 2);
-    await breathUiShot('07c-breath-rate-stable.png', 'stable', 3);
-    await shotBreathHudCrop('07-breath-pill-count-2x.png');
-    await G('g.clearBreathHudDemo()');
-    await sleep(4000);
-    await shot('07-care-breathe.png');
-    await G(`g.completeCareNeedForCapture('fertilizer')`);
-    await waitFor('hub after fert', (d) => d.step === 'care-hub', 8000);
+    await G('g.setSelectedPlot(4)');
+    await G(`g.setCareHubProgressForCapture(4, { sun: 3, water: 2, fertilizer: 1, stake: true })`);
+    await G('g.setSelectedPlot(4)');
+    await G('g.primeCareHarvestForCapture(4)');
+    await captureSignalPanel('breathe', { channel: 'harvest' });
+    await G(`g.setTendStripActiveForCapture('harvest')`);
+    await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-breathe'); return true; })()`);
+    await sleep(900);
+    await G('g.captureRedraw()');
+    await shot('07-care-harvest.png');
+    await waitTendStrip(wc, { plant: 'cucumber' });
+    await sleep(400);
+    await shot('tend-strip-harvest.png');
+    await lightingTo('night');
+    await G(`g.setCareHubProgressForCapture(4, { sun: 0, water: 1, fertilizer: 0, stake: false })`);
+    await G(`g.setSignalPanelDemoForCapture('idle')`);
+    await G('g.setTendStripActiveForCapture(null)');
+    await sleep(600);
+    await shot('tend-strip-night.png');
+    await G('g.clearSignalPanelDemoForCapture()');
     await G('g.finishVisitForCapture()');
     await waitFor('visit end', (d) => d.screen === 'idle' || d.screen === 'summary', 25000);
     await sleep(600);
     if ((await ds()).screen === 'summary') {
         await waitFor('revealed', (d) => d.revealed === '1', 15000);
-        await shot('08-summary-growth.png');
+        await G(`g.previewSummaryDay({ grew: [{ plot: 4, plantId: 'cucumber', name: 'Cucumber', from: 3, to: 4, mature: false }], careStats: { sunDots: 3, waterDots: 2, fertilizerDots: 1, stakes: 0, harvests: 1 }, weekly: 2 })`);
+        await sleep(800);
+        await shot('08-summary-growth-day.png');
         await js(`document.getElementById('btn-sum-done').click()`);
     } else {
-        await G('g.previewMorningCard()');
+        await G(`g.previewSummaryDay({ grew: [{ plot: 4, plantId: 'cucumber', name: 'Cucumber', from: 3, to: 4, mature: false }], careStats: { sunDots: 3, waterDots: 2, fertilizerDots: 1, stakes: 0, harvests: 1 }, weekly: 2 })`);
         await sleep(1200);
-        await shot('08-summary-growth.png');
+        await shot('08-summary-growth-day.png');
         await G(`g.show('idle')`);
     }
+    await G('g.previewSummaryNightQuiet()');
+    await sleep(1200);
+    await shot('08b-summary-quiet-night.png');
+    await G(`g.show('idle')`);
 
     // --- a few days later, golden hour ---
     await G('g.simulateDays(2)');
@@ -641,21 +741,21 @@ async function run(win, outDir) {
     await shot('critters-midday-garden.png');
 
     // --- a night visit: poor reading -> "turn on a light" ---
-    await G('g.nextDay()');
     await lightingTo('night');
+    await G('g.setGardenTime(1320)');
     await G(`g.show('greeting')`);
     await sleep(800);
     await shot('10-greeting-night.png');
     await G('g.begin()');
     await waitFor('night care hub', (d) => d.step === 'care-hub', 10000);
-    await G(`g.startCare('sun')`);
+    await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-smile'); return true; })()`);
     await waitFor('night light hint', (d) => d.hint === 'night-light', 20000);
     await sleep(500);
     await shot('11-night-light-hint.png');
     for (let i = 0; i < 30; i++) {
         const d = await ds();
         if (d.screen === 'summary' || d.step === 'summary') break;
-        if (d.step === 'care-hub') await G(`(() => { window.__smileGarden.session.finishCareHub(); window.__smileGarden.show('visit'); return true; })()`);
+        if (d.step === 'care-hub') await G(`(() => { const g = window.__smileGarden; if (g.session) g.session.finishCareHub(); return true; })()`);
         else if (d.step === 'pick') await G('g.confirmPick()');
         else await G('g.skip()');
         await sleep(280);

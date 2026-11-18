@@ -9,8 +9,10 @@
     <link rel="stylesheet" href="./styles.css">
     <link rel="stylesheet" href="./breath-ui.css">
     <link rel="stylesheet" href="./stretch-ui.css">
-    <link rel="stylesheet" href="./needs-ui.css">
+    <link rel="stylesheet" href="./tend-strip-ui.css">
+    <link rel="stylesheet" href="./signal-panel-ui.css">
     <link rel="stylesheet" href="./camera-check-ui.css">
+    <link rel="stylesheet" href="./summary-ui.css">
 </head>
 <body data-screen="loading" data-ready="0">
 <div id="app" class="app">
@@ -40,10 +42,39 @@
         </div>
     </header>
 
-    <!-- Live smile chart (G) -->
-    <section id="chart-panel" class="chart-panel parchment-soft" hidden>
-        <div class="chart-head"><span>Smile signal</span><span id="chart-live" class="chart-live">–</span><span class="kbd">G</span></div>
-        <canvas id="smile-chart" width="250" height="84"></canvas>
+    <!-- Adaptive signal panel (G) — see assets/ui/signal/signal-manifest.json -->
+    <section id="chart-panel" class="signal-panel" data-state="idle" hidden>
+        <div class="signal-head">
+            <span class="signal-icon" aria-hidden="true">
+                <i class="signal-glow" data-for="smile"></i>
+                <i class="signal-glow" data-for="talk"></i>
+                <i class="signal-glow" data-for="stretch"></i>
+                <i class="signal-glow" data-for="breathe"></i>
+                <i class="signal-glow" data-for="idle"></i>
+                <i class="signal-ico" data-for="smile"></i>
+                <i class="signal-ico" data-for="talk"></i>
+                <i class="signal-ico" data-for="stretch"></i>
+                <i class="signal-ico" data-for="breathe"></i>
+                <i class="signal-ico" data-for="idle"></i>
+            </span>
+            <span class="signal-labels" aria-live="polite">
+                <span class="signal-label" data-for="smile">Watering</span>
+                <span class="signal-label" data-for="talk">Fertilizing</span>
+                <span class="signal-label" data-for="stretch">Staking</span>
+                <span class="signal-label" data-for="breathe">Harvesting</span>
+                <span class="signal-label" data-for="idle"><span class="day-only">Waiting for you</span><span class="night-only">Resting</span></span>
+            </span>
+            <span id="chart-live" class="signal-live"></span>
+            <span class="kbd">G</span>
+        </div>
+        <div class="signal-chart">
+            <i class="signal-bg" data-for="smile" aria-hidden="true"></i>
+            <i class="signal-bg" data-for="talk" aria-hidden="true"></i>
+            <i class="signal-bg" data-for="stretch" aria-hidden="true"></i>
+            <i class="signal-bg" data-for="breathe" aria-hidden="true"></i>
+            <i class="signal-bg" data-for="idle" aria-hidden="true"></i>
+            <canvas id="smile-chart" width="250" height="84"></canvas>
+        </div>
     </section>
 
     <!-- Camera preview (real mode) / demo badge (mock) -->
@@ -73,7 +104,7 @@
     <!-- Step panel (during a visit) -------------------------------------- -->
     <section id="step-panel" class="step-panel parchment" hidden>
         <div class="step-track" id="step-track">
-            <span data-step="harvest">🧺 Pick</span><span data-step="smile">☀ Smile</span><span data-step="talk">💧 Talk</span><span data-step="breathe">🍃 Breathe</span><span data-step="stretch">🌻 Stretch</span><span data-step="summary">❀ Done</span>
+            <span data-step="harvest">🧺 Harvest</span><span data-step="smile">💧 Water</span><span data-step="talk">🍃 Fertilize</span><span data-step="breathe">🧺 Harvest</span><span data-step="stretch">🌻 Stake</span><span data-step="summary">❀ Done</span>
         </div>
         <div class="step-body">
             <div class="ring-wrap">
@@ -95,17 +126,21 @@
     </section>
 
     <!-- Standalone stretch / stake care (not chained to smile/talk/breath) -->
-    <section id="needs-card" class="needs-card" hidden aria-label="Plant needs">
-        <img id="needs-card-bg" class="needs-card-bg" width="360" height="280" alt="" hidden>
-        <div id="needs-card-fallback" class="needs-card-fallback parchment" aria-hidden="true"></div>
-        <div class="needs-card-body">
-            <span id="needs-plant-name" class="needs-plant-name"></span>
-            <img id="needs-bloom-stamp" class="needs-bloom" width="64" height="64" alt="All needs met today" hidden>
-            <img id="needs-resting-stamp" class="needs-resting" width="32" height="32" alt="Resting until today's needs are met" hidden>
-            <span id="needs-resting-fallback" class="needs-resting-fallback" aria-hidden="true" hidden>🌿</span>
-            <div id="needs-rows" class="needs-rows"></div>
+    <section id="tend-strip" class="tend-strip" role="status" aria-live="polite" aria-label="Tending" hidden>
+        <div class="tend-head">
+            <span id="tend-name" class="tend-name"></span>
+            <img id="tend-stamp" class="tend-stamp" alt="" hidden>
         </div>
-        <button id="btn-needs-done" class="btn btn-primary btn-small needs-done" type="button">Done tending for now</button>
+        <div id="tend-row" class="tend-row"></div>
+        <div id="tend-harvest" class="tend-harvest">
+            <div id="tend-harvest-icon" class="tend-harvest-icon">
+                <img id="tend-harvest-img" alt="">
+            </div>
+            <div>
+                <b>Ready to harvest</b>
+                <span>Breathe slowly to pick it</span>
+            </div>
+        </div>
     </section>
 
     <section id="stretch-care-panel" class="stretch-care-panel parchment" hidden aria-label="Neck stretch care">
@@ -174,14 +209,14 @@
                 <img id="cc-sill" class="cc-sill" alt="">
                 <aside id="cc-howto" class="cc-howto" aria-label="Warm-up instructions">
                     <h2 class="cc-howto-title">Camera warm-up</h2>
-                    <p class="cc-howto-lead">Tap each seed packet and hold the action for a couple of seconds so the camera can see it. These are the same care moves you will use in the garden.</p>
+                    <p class="cc-howto-lead">Tap each seed packet and hold the action for a couple of seconds so the camera can see it. In the garden, <em>daylight fills sun needs by itself</em> while you pick one plant and the camera tends it from your smile, voice, breath, and stretch.</p>
                     <ul class="cc-howto-list">
-                        <li><strong>Smile</strong> — pours <em>sunlight</em> on your beds</li>
-                        <li><strong>Talk</strong> — fills the <em>watering can</em></li>
-                        <li><strong>Breathe</strong> — optional <em>fertilizer</em></li>
+                        <li><strong>Smile</strong> — <em>waters</em> the bed</li>
+                        <li><strong>Talk</strong> — <em>fertilizes</em></li>
+                        <li><strong>Breathe</strong> — slow breath <em>harvests</em> a fully grown crop</li>
                         <li><strong>Neck stretch</strong> — <em>stakes</em> tall plants</li>
                     </ul>
-                    <p class="cc-howto-tip">Right-click a packet to skip it.</p>
+                    <p class="cc-howto-tip">Right-click a packet to skip it. When tending, press Esc or go idle to stop.</p>
                 </aside>
                 <p id="cc-prompt" class="cc-prompt" hidden></p>
                 <div id="cc-packets" class="cc-packets"></div>
@@ -215,10 +250,11 @@
             <h1 id="greet-title">Good morning, gardener</h1>
             <p id="greet-status" class="lead"></p>
             <ol class="visit-plan">
-                <li><span class="dot dot-sun"></span><b>Sun dots</b> — smile (~10 s each)</li>
-                <li><span class="dot dot-water"></span><b>Water dots</b> — talk (~10 s each)</li>
-                <li><span class="dot dot-fert"></span><b>Fertilizer dots</b> — guided breath (~15 s each)</li>
-                <li><span class="dot dot-stretch"></span><b>Stake</b> — one neck stretch on tall climbers (once until harvest)</li>
+                <li><span class="dot dot-sun"></span><b>Sun</b> — fills by itself in daylight (pauses at night)</li>
+                <li><span class="dot dot-water"></span><b>Water</b> — smile at your plant</li>
+                <li><span class="dot dot-fert"></span><b>Fertilizer</b> — talk to your plant</li>
+                <li><span class="dot dot-harvest"></span><b>Harvest</b> — breathe when the plant is fully grown</li>
+                <li><span class="dot dot-stretch"></span><b>Stake</b> — neck stretch on tall climbers (once until harvest)</li>
             </ol>
             <p id="greet-note" class="note"></p>
             <div class="actions">
@@ -243,23 +279,7 @@
 
     <!-- Summary ----------------------------------------------------------- -->
     <section id="screen-summary" class="overlay overlay-right" hidden>
-        <div class="card parchment summary" id="sum-card">
-            <div id="sum-card-art" class="sum-card-art" hidden></div>
-            <div class="eyebrow" id="sum-date"></div>
-            <h1 id="sum-title">Your garden grew overnight</h1>
-            <div class="sum-stats">
-                <div><span class="dot dot-sun"></span><b id="sum-sun">0 h</b><small>sunlight</small></div>
-                <div><span class="dot dot-water"></span><b id="sum-water">0%</b><small>water</small></div>
-                <div><span class="dot dot-fert"></span><b id="sum-fert">–</b><small>fertilizer</small></div>
-            </div>
-            <ul id="sum-grew" class="sum-list"></ul>
-            <ul id="sum-wait" class="sum-list sum-wait"></ul>
-            <p id="sum-week" class="note"></p>
-            <div class="actions">
-                <button id="btn-sum-journal" class="btn btn-soft" type="button">📖 Journal</button>
-                <button id="btn-sum-done" class="btn btn-primary" type="button">Back to the garden</button>
-            </div>
-        </div>
+        <div id="sum-card"></div>
     </section>
 
     <!-- Journal ----------------------------------------------------------- -->
@@ -338,16 +358,20 @@
 <script src="../game/clock-layout.js"></script>
 <script src="../game/hud-layout.js"></script>
 <script src="../game/care-needs.js"></script>
+<script src="../game/signal-panel.js"></script>
 <script src="../game/visit.js"></script>
 <script src="../game/critters.js"></script>
 <script src="../game/season-particles.js"></script>
 <script src="../game/stretch.js"></script>
 <script src="../game/camera-check.js"></script>
+<script src="../game/summary-data.js"></script>
 <script src="./art.js"></script>
+<script src="./summary-render.js"></script>
 <script src="./camera-check-ui.js"></script>
 <script src="./mock-source.js"></script>
 <script src="./scene.js"></script>
 <script src="./smile-chart.js"></script>
+<script src="./tend-strip-ui.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>

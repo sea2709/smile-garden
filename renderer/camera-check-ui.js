@@ -11,21 +11,22 @@
         stretch: 'Neck stretch',
     });
 
-    const PACKET_PURPOSES = Object.freeze({
-        smile: 'for sunlight',
-        talk: 'for water',
-        breath: 'for fertilizer',
-        stretch: 'for staking',
+    /** Care action each camera check packet trains (Heily repaints packet art to match). */
+    const PACKET_CARE = Object.freeze({
+        smile: 'Water',
+        talk: 'Fertilize',
+        breath: 'Harvest',
+        stretch: 'Stake',
     });
 
     const ACTIVE_PROMPTS = Object.freeze({
-        smile: 'Hold a natural smile — this is how you pour sunlight on your beds.',
-        talk: 'Say a few words aloud — talking fills the watering can.',
-        breath: 'Breathe softly through your nose — optional fertilizer for faster growth.',
+        smile: 'Hold a natural smile — in the garden this waters your plant.',
+        talk: 'Say a few words aloud — talking fertilizes the bed.',
+        breath: 'Breathe slowly and steadily — calm breath harvests a fully grown crop.',
         stretch: 'Tip each ear toward a shoulder — this stakes plants that need support.',
     });
 
-    const IDLE_PROMPT = 'Tap a seed packet to try an action. Each one maps to garden care.';
+    const IDLE_PROMPT = 'Tap a seed packet and hold the gesture so the camera learns you. Daylight fills sun needs by itself; when you tend, the camera applies smile, talk, breath, and stretch for you. Press Esc or go idle to stop.';
 
     const FALLBACK_ICON = Object.freeze({ smile: '☀', talk: '💬', breath: '🍃', stretch: '🌻' });
 
@@ -110,12 +111,12 @@
         const name = document.createElement('strong');
         name.className = 'cc-packet-name';
         name.textContent = title;
-        const purpose = document.createElement('span');
-        purpose.className = 'cc-packet-purpose';
-        purpose.textContent = PACKET_PURPOSES[key] || '';
+        const care = document.createElement('span');
+        care.className = 'cc-packet-care';
+        care.textContent = PACKET_CARE[key] || '';
         const line = document.createElement('small');
         line.className = 'cc-packet-status';
-        lab.append(name, purpose, line);
+        lab.append(name, care, line);
         if (active === key && !denied && !(snap.passed && snap.passed[key]) && (key === 'smile' || key === 'talk')) {
             line.textContent = 'listening…';
             const frac = key === 'smile' ? snap.smileMeter : snap.talkMeter;
@@ -199,8 +200,9 @@
 
     window.SmileCameraCheckUI = Object.freeze({
         CHECKS,
-        PACKET_PURPOSES,
+        PACKET_CARE,
         ACTIVE_PROMPTS,
+        IDLE_PROMPT,
         mountPackets,
         renderPackets,
         renderStatus,

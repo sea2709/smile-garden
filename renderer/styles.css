@@ -286,20 +286,33 @@ body[data-step="breathe"] .ring-fg, body[data-step="breathe-offer"] .ring-fg { s
 body[data-lighting="night"] .hint { background: rgba(240, 236, 214, 0.95); border: 1px solid rgba(250, 230, 150, 0.7); box-shadow: 0 0 40px rgba(250, 230, 150, 0.35), var(--shadow); }
 
 /* ---------- chart, pip, badge ---------- */
-.chart-panel { position: absolute; left: 18px; top: 66px; z-index: 18; padding: 10px 12px 8px; }
-.chart-head { display: flex; gap: 8px; align-items: center; font-size: 12px; font-weight: 800; color: var(--ink-soft); margin-bottom: 4px; }
-.chart-live { flex: 1; text-align: right; color: var(--honey); }
-#smile-chart { width: 250px; height: 84px; display: block; }
-.pip { position: absolute; right: 18px; top: 66px; z-index: 18; width: 200px; height: 150px; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); border: 3px solid rgba(251, 245, 230, 0.9); }
+/* Left signal panel: renderer/signal-panel-ui.css (Heily adaptive panel). */
+.pip { position: absolute; right: 18px; top: 66px; z-index: 18; width: 200px; height: 150px; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); border: 3px solid rgba(251, 245, 230, 0.9); contain: layout paint; }
 .pip .mirror-video,
-video.mirror-video {
+#pip video.mirror-video {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
     transform: scaleX(-1);
     transform-origin: center;
 }
+body:not([data-screen="camera-check"]) #screen-camera-check { display: none !important; }
+body:not([data-screen="camera-check"]) #cc-preview-wrap,
+body:not([data-screen="camera-check"]) #cc-preview-wrap video { display: none !important; }
+body[data-screen="visit"] #breath-guide[hidden],
+body[data-screen="idle"] #breath-guide { display: none !important; }
 .pip-label { position: absolute; left: 8px; bottom: 6px; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
+.pip.pip-mock-capture {
+    background: linear-gradient(180deg, #7a9cb8 0%, #c8d8e6 100%);
+}
+.pip.pip-mock-capture .mirror-video { opacity: 0; display: none !important; }
+.pip.pip-mock-capture::after {
+    content: ''; position: absolute; inset: 18% 28%;
+    border-radius: 50%; background: rgba(255, 235, 210, 0.9);
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
+}
 .mock-badge { position: absolute; right: 18px; top: 66px; z-index: 18; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--ink-soft);
     background: rgba(251, 245, 230, 0.86); border-radius: 14px; padding: 8px 12px; box-shadow: var(--shadow); }
 .mock-badge b { color: var(--ink); font-size: 12.5px; }
