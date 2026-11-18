@@ -27,8 +27,10 @@ Game key `breath` → filename stem **`breathe`**.
 
 | Button | Position (display px) | Asset |
 |--------|----------------------|--------|
-| Skip for now | **40, 658**, min width ~200 | `btn-secondary.png` + hover |
-| Start my garden | **right 40, top 658**, min width ~200 | `btn-primary.png` + hover |
+| Skip for now / Back without testing | **40, 658**, min width ~200 | `btn-secondary.png` + hover |
+| Start my garden / Back to the garden | **right 40, top 658**, min width ~200 | `btn-primary.png` + hover |
+
+When the warm-up is reopened from the garden (top-bar **Camera**, key **C**, or Journal → Settings), the primary CTA reads **Back to the garden** and returns to idle after the check.
 
 Text colours: primary **#3f5a2a**, secondary **#7a6652**.
 

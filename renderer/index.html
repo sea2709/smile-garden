@@ -34,6 +34,7 @@
             <span id="basket-chip" class="chip chip-basket" title="Harvest basket (fills during a visit)" hidden><img id="basket-icon" class="basket-icon" src="../assets/ui/basket.png" alt="" width="22" height="22"><span id="basket-count">0</span></span>
         </div>
         <div class="top-actions">
+            <button id="btn-camera-check" class="btn btn-soft btn-small" type="button" title="Camera warm-up (C)">Camera</button>
             <button id="btn-journal" class="btn btn-soft btn-small" type="button" title="Garden journal (J)">📖 Journal</button>
             <button id="btn-dev" class="btn btn-soft btn-small" type="button" title="Demo tools (D)">⚙︎ Demo</button>
         </div>
@@ -274,7 +275,11 @@
                     <button class="tab" data-tab="library" type="button">Seed library</button>
                     <button class="tab" data-tab="settings" type="button">Settings</button>
                 </div>
-                <button id="btn-journal-close" class="btn btn-ghost btn-small" type="button">Close</button>
+                <button id="btn-journal-close" class="btn btn-ghost btn-small btn-icon" type="button" title="Close" aria-label="Close">
+                    <svg class="icon-close" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+                        <path d="M2.2 2.2l9.6 9.6M11.8 2.2L2.2 11.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                    </svg>
+                </button>
             </div>
             <div id="journal-body" class="journal-body"></div>
         </div>
@@ -284,7 +289,11 @@
     <aside id="dev-drawer" class="dev-drawer parchment-soft" hidden>
         <div class="dev-drawer-head">
             <h3>Demo tools</h3>
-            <button id="btn-dev-close" class="btn btn-ghost btn-small" type="button" title="Close">Close</button>
+            <button id="btn-dev-close" class="btn btn-ghost btn-small btn-icon" type="button" title="Close" aria-label="Close">
+                <svg class="icon-close" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true" focusable="false">
+                    <path d="M2.2 2.2l9.6 9.6M11.8 2.2L2.2 11.8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+                </svg>
+            </button>
         </div>
         <div class="dev-row"><button id="dev-next-day" class="btn btn-soft btn-small" type="button">⏭ Next day</button>
             <span id="dev-day" class="note"></span></div>

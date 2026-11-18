@@ -15,7 +15,7 @@
     const STORE_KEY = 'smile-garden.v3';
     const $ = (id) => document.getElementById(id);
     const els = {};
-    for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-live',
+    for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-camera-check', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-live',
         'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
@@ -256,8 +256,10 @@
     function closeJournal() { show(journalReturn === 'journal' || journalReturn === 'loading' ? 'idle' : journalReturn); }
 
     // ------------------------------------------------------------------
-    // Camera check (pre-garden setup)
+    // Camera check (pre-garden setup + reopen from garden)
     // ------------------------------------------------------------------
+    let cameraCheckReturn = 'idle';
+    let cameraCheckReturnToGarden = false;
     let cameraCheckGridMounted = false;
     function mountCameraCheckGrid() {
         if (cameraCheckGridMounted || !CCUI || !els.ccPackets) return;
@@ -403,14 +405,35 @@
         });
     }
 
-    async function openCameraCheck() {
+    function gardenDestFrom(name) {
+        if (name === 'greeting' || name === 'idle' || name === 'summary') return name;
+        return state.version >= 5 ? 'idle' : 'greeting';
+    }
+
+    function syncCameraCheckCtas() {
+        if (els.btnCcStart) {
+            els.btnCcStart.textContent = cameraCheckReturnToGarden ? 'Back to the garden' : 'Start my garden';
+        }
+        if (els.btnCcSkipNow) {
+            els.btnCcSkipNow.textContent = cameraCheckReturnToGarden ? 'Back without testing' : 'Skip for now';
+        }
+    }
+
+    async function openCameraCheck(opts) {
+        if (screen === 'visit' || screen === 'camera-check') return;
+        const options = opts || {};
+        const fromScreen = screen === 'journal' ? journalReturn : screen;
+        cameraCheckReturn = gardenDestFrom(fromScreen);
+        // Reopen from garden/settings once setup is done (vs first-launch warm-up).
+        cameraCheckReturnToGarden = options.reopen === true
+            || (options.reopen !== false && !!state.setupDone && screen !== 'wellness' && screen !== 'loading');
+        syncCameraCheckCtas();
         mountCameraCheckGrid();
         cameraCheckDemoLock = false;
         cameraCheckSession = CC.createCameraCheckSession({
             smileOn: L.DEFAULTS.smileOn,
             Stretch: window.SmileStretch,
         });
-        journalReturn = screen === 'journal' ? journalReturn : screen;
         placePipForCameraCheck();
         show('camera-check');
         try {
@@ -454,20 +477,28 @@
     }
 
     async function finishCameraCheckFlow() {
+        const returnToGarden = cameraCheckReturnToGarden;
+        const dest = returnToGarden ? cameraCheckReturn : gardenDestFrom('idle');
         CC.finishCameraSetup(state);
         save();
         cameraCheckSession = null;
         lastCameraCheckSnap = null;
         cameraDeniedDemo = false;
+        cameraCheckReturnToGarden = false;
         els.breathGuide.hidden = true;
         els.stretchGuide.hidden = true;
         restorePipHome();
         if (source && source.setPhase) source.setPhase('idle');
-        // Keep the warm-up session running into the visit. Stopping here and
-        // calling start() again was racing the SDK/OS camera release and
-        // threw "Camera could not start". beginVisit is idempotent via
-        // sourceReady / startCamera().
-        show(state.version >= 5 ? 'idle' : 'greeting');
+        if (returnToGarden) {
+            // Free the camera after a mid-session check; next visit starts fresh.
+            await stopCamera();
+            els.pip.hidden = true;
+        }
+        // First-launch warm-up keeps the session alive into the next visit so a
+        // stop→start race does not throw "Camera could not start". beginVisit is
+        // idempotent via sourceReady / startCamera().
+        show(dest);
+        syncCameraCheckCtas();
     }
 
     function updateCameraCheckScreen(dt) {
@@ -1946,7 +1977,7 @@
             btn.addEventListener('click', () => {
                 closeJournal();
                 state.cameraCheckNote = null;
-                openCameraCheck();
+                void openCameraCheck({ reopen: true });
             });
             row.appendChild(btn);
             body.appendChild(row);
@@ -2235,9 +2266,16 @@
     els.chkAdult.addEventListener('change', () => { els.btnWellnessOk.disabled = !els.chkAdult.checked; });
     els.btnWellnessOk.addEventListener('click', ackWellness);
     function ackWellness() { state.wellnessAck = true; save(); afterWellnessOrResume(); }
-    if (els.btnCcStart) els.btnCcStart.addEventListener('click', finishCameraCheckFlow);
-    if (els.btnCcSkipNow) els.btnCcSkipNow.addEventListener('click', finishCameraCheckFlow);
+    if (els.btnCcStart) els.btnCcStart.addEventListener('click', () => { void finishCameraCheckFlow(); });
+    if (els.btnCcSkipNow) els.btnCcSkipNow.addEventListener('click', () => { void finishCameraCheckFlow(); });
     if (els.btnCcRetry) els.btnCcRetry.addEventListener('click', () => { void retryCameraCheck(); });
+    if (els.btnCameraCheck) {
+        els.btnCameraCheck.addEventListener('click', () => {
+            if (screen === 'visit' || screen === 'camera-check' || screen === 'wellness') return;
+            state.cameraCheckNote = null;
+            void openCameraCheck({ reopen: true });
+        });
+    }
     els.btnGreetPlant.addEventListener('click', () => openPicker());
     els.btnBegin.addEventListener('click', beginVisit);
     els.btnPickerClose.addEventListener('click', closePicker);
@@ -2345,9 +2383,20 @@
         const k = e.key.toLowerCase();
         if (k === 'g') { state.settings.chart = !state.settings.chart; save(); toast(state.settings.chart ? 'Smile chart on (shows during visits)' : 'Smile chart hidden'); return; }
         if (k === 'j') { screen === 'journal' ? closeJournal() : openJournal('diary'); return; }
+        if (k === 'c' && screen !== 'visit' && screen !== 'camera-check' && screen !== 'wellness') {
+            state.cameraCheckNote = null;
+            void openCameraCheck({ reopen: true });
+            return;
+        }
         if (k === 'd') { toggleDev(); return; }
         if (k === 'n' && devOpen) { nextDay(); return; }
-        if (k === 'escape') { if (screen === 'journal') closeJournal(); else if (screen === 'picker') closePicker(); toggleDev(false); return; }
+        if (k === 'escape') {
+            if (screen === 'journal') closeJournal();
+            else if (screen === 'picker') closePicker();
+            else if (screen === 'camera-check' && cameraCheckReturnToGarden) void finishCameraCheckFlow();
+            toggleDev(false);
+            return;
+        }
         if (screen === 'visit' && session) {
             if (k === 'enter' || k === ' ') {
                 e.preventDefault();
@@ -2498,7 +2547,7 @@
         get scene() { return scene; },
         get stretchDemoSnap() { return stretchDemoSnap; },
         clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness: () => ackWellness(),
-        openCameraCheck: () => openCameraCheck(),
+        openCameraCheck: (opts) => openCameraCheck(opts),
         retryCameraCheck: () => retryCameraCheck(),
         finishCameraCheck: () => finishCameraCheckFlow(),
         selectCameraCheck(key) {

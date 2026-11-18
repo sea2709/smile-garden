@@ -154,6 +154,11 @@ body[data-painted-clock="1"] .chip-day #day-chip-text { position: absolute; widt
 .week-dots i.on { background: radial-gradient(circle at 35% 35%, #f6d77c, var(--honey)); }
 .week-dots i.today { outline: 1.5px solid rgba(125, 154, 91, 0.8); outline-offset: 1px; }
 .top-actions { display: flex; gap: 8px; }
+/* Warm-up reopen is for garden screens, not during a live visit / overlays that own the camera. */
+body[data-screen="visit"] #btn-camera-check,
+body[data-screen="camera-check"] #btn-camera-check,
+body[data-screen="wellness"] #btn-camera-check,
+body[data-screen="loading"] #btn-camera-check { display: none; }
 
 /* ---------- buttons ---------- */
 .btn {
@@ -168,6 +173,11 @@ body[data-painted-clock="1"] .chip-day #day-chip-text { position: absolute; widt
 .btn-soft { background: rgba(251, 245, 230, 0.95); border: 1px solid rgba(190, 160, 110, 0.4); }
 .btn-ghost { background: transparent; box-shadow: none; color: var(--ink-soft); border: 1px dashed rgba(150, 120, 80, 0.45); }
 .btn-small { padding: 6px 13px; font-size: 13px; }
+.btn-icon {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 32px; height: 32px; padding: 0; line-height: 0;
+}
+.btn-icon .icon-close { display: block; }
 .kbd { display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 5px; border: 1px solid rgba(150, 120, 80, 0.45); font-size: 11px; font-weight: 800; text-align: center; background: rgba(255, 255, 255, 0.5); }
 
 /* ---------- overlays & cards ---------- */
