@@ -490,7 +490,7 @@ async function run(win, outDir) {
         await G('g.setChartForCapture(true)');
         if (o.channel) await G(`g.setTendStripActiveForCapture(${JSON.stringify(o.channel)})`);
         await G(`g.setSignalPanelDemoForCapture("${mode}")`);
-        if (o.channel) await waitTendStrip(wc);
+        if (o.channel && !o.skipTendStripWait) await waitTendStrip(wc);
         await sleep(200);
         await G('g.captureRedraw()');
         await sleep(350);
@@ -608,9 +608,9 @@ async function run(win, outDir) {
     await G('g.openPicker(4)');
     await sleep(1000);
     await shot('03-seed-picker.png');
-    await G(`g.plant('lettuce', 4)`);
+    await G(`g.plant('cucumber', 4)`);
     await G(`g.plant('mint', 5)`);
-    await G(`g.plant('cucumber', 1)`);
+    await G(`g.plant('lettuce', 1)`);
     await G('g.closePicker()');
     await sleep(1500);
 
@@ -622,6 +622,8 @@ async function run(win, outDir) {
     await G('g.setChartForCapture(true)');
     await sleep(800);
     await shot('03b-selection-ring-visit.png');
+    const cucumberPartial = { sun: 1, water: 1, fertilizer: 0, stake: false };
+    const cucumberAllSet = { sun: 2, water: 3, fertilizer: 2, stake: true };
     await G(`g.setCareHubProgressForCapture(4, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
     await captureSignalPanel('smile', { channel: 'water' });
     await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
@@ -631,6 +633,12 @@ async function run(win, outDir) {
     await captureSignalPanel('stretch', { channel: 'stake' });
     const daySmileProgress = { sun: 2, water: 1, fertilizer: 0, stake: false };
     const dayIdleProgress = { sun: 2, water: 2, fertilizer: 0, stake: false };
+    await prepCareDocShot({
+        panel: 'smile',
+        channel: 'water',
+        progress: daySmileProgress,
+        mockPhase: 'care-hub-smile',
+    });
     await prepCareDocShot({
         panel: 'smile',
         channel: 'water',
@@ -675,18 +683,20 @@ async function run(win, outDir) {
     await shot('stake-guide-tilted.png');
     await G('g.setStretchHudDemo("done")');
     await G('g.clearStretchHudDemo()');
+    await sleep(250);
     await G('g.setSelectedPlot(4)');
     await G(`g.setCareHubProgressForCapture(4, { sun: 3, water: 2, fertilizer: 1, stake: true })`);
     await G('g.setSelectedPlot(4)');
     await G('g.primeCareHarvestForCapture(4)');
-    await captureSignalPanel('breathe', { channel: 'harvest' });
+    await captureSignalPanel('breathe', { channel: 'harvest', skipTendStripWait: true });
     await G(`g.setTendStripActiveForCapture('harvest')`);
     await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-breathe'); return true; })()`);
     await sleep(900);
     await G('g.captureRedraw()');
     await shot('07-care-harvest.png');
-    await waitTendStrip(wc, { plant: 'cucumber' });
-    await sleep(400);
+    await G('g.primeCareHarvestForCapture(4)');
+    await G('g.setTendStripActiveForCapture("harvest")');
+    await sleep(450);
     await shot('tend-strip-harvest.png');
     await lightingTo('night');
     await G(`g.setCareHubProgressForCapture(4, { sun: 0, water: 1, fertilizer: 0, stake: false })`);
@@ -714,6 +724,37 @@ async function run(win, outDir) {
     await sleep(1200);
     await shot('08b-summary-quiet-night.png');
     await G(`g.show('idle')`);
+    await lightingTo('midday');
+    async function primeCucumberStripDemo(progress) {
+        const staked = !!(progress && progress.stake);
+        await js(`(() => {
+            const st = window.__smileGarden?.state;
+            const p = st?.plots?.[4];
+            if (p) {
+                p.stage = 3;
+                p.picked = false;
+                p.matureDay = null;
+                p.matureWater = 0;
+                p.matureFert = 0;
+                p.staked = ${staked};
+            }
+            return true;
+        })()`);
+        await G(`g.setNeedsCardDemo(4, ${JSON.stringify(progress)})`);
+        await sleep(600);
+    }
+    await primeCucumberStripDemo(cucumberPartial);
+    await shot('care-needs-strip-day.png');
+    await primeCucumberStripDemo(cucumberAllSet);
+    await shot('care-needs-strip-all-set.png');
+    await lightingTo('night');
+    await primeCucumberStripDemo(cucumberPartial);
+    await shot('care-needs-strip-night.png');
+    await lightingTo('midday');
+    await G('g.prepTagGardenDemo("garden")');
+    await sleep(900);
+    await G('g.captureRedraw()');
+    await shot('care-needs-tags-garden.png');
 
     // --- a few days later, golden hour ---
     await G('g.simulateDays(2)');

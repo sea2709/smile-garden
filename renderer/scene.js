@@ -171,6 +171,20 @@
             needsFaceImgs['dot-on-night'] = loadImage(resolveArt(ART.needsDotSrc(true, 'night')));
             needsFaceImgs['dot-off-night'] = loadImage(resolveArt(ART.needsDotSrc(false, 'night')));
         }
+        const tagWreathImgs = { day: null, night: null };
+        const tagPipImgs = {};
+        if (window.SmileCareNeedsDisplay) {
+            const pipPaths = window.SmileCareNeedsDisplay;
+            tagWreathImgs.day = loadImage(resolveArt('../assets/ui/tag/tag-tended-wreath.png'));
+            tagWreathImgs.night = loadImage(resolveArt('../assets/ui/tag/tag-tended-wreath-night.png'));
+            for (const key of ['sun', 'water', 'fertilizer', 'stake']) {
+                for (const kind of ['day', 'night']) {
+                    const lit = kind === 'night' ? 'night' : 'midday';
+                    tagPipImgs[`${key}-filled-${kind}`] = loadImage(resolveArt(pipPaths.pipSrc(key, true, lit)));
+                    tagPipImgs[`${key}-empty-${kind}`] = loadImage(resolveArt(pipPaths.pipSrc(key, false, lit)));
+                }
+            }
+        }
         const soilFadeT0 = new Array(8).fill(null);
         const sunGlowBlend = new Array(8).fill(null);
 
@@ -1345,7 +1359,18 @@
                 }
                 return;
             }
-            if (allMet) {
+            const D = window.SmileCareNeedsDisplay;
+            const pipFilledAt = (pipKey, pipIndex) => {
+                if (pipKey === 'stake') return Care.stakeNeedMet(prog, pl.staked);
+                const req = Care.dotsForNeed(needs, pipKey);
+                const raw = Number(prog[pipKey]) || 0;
+                const got = Math.min(req, Math.floor(raw + 1e-6));
+                return pipIndex < got;
+            };
+            if (allMet && D) {
+                const wreath = tagWreathImgs[kind];
+                const box = D.tagWreathBox([ax, ay], sc);
+                if (ready(wreath)) ctx.drawImage(wreath, box.x, box.y, box.w, box.h);
                 const im = needsFaceImgs[`bloom-${kind}`];
                 if (ready(im)) {
                     const bw = ART.needs.bloomDisplay[0];
@@ -1361,36 +1386,18 @@
                     const rh = ART.needs.restingDisplay[1] * sc;
                     ctx.drawImage(im, fx0 + (fw - rw) / 2, fy0 + (fh - rh) / 2, rw, rh);
                 }
-                return;
             }
-            const keys = ['sun', 'water', 'fertilizer', 'stake'].filter((k) => Care.dotsForNeed(needs, k) > 0);
-            const iconPx = (ART.needs.tagFaceIconPx || 48) * sf;
-            const gap = keys.length > 1 ? (fw - keys.length * iconPx) / (keys.length + 1) : (fw - iconPx) / 2;
-            const sunLvl = sunGlowLevel(prog, needs, pl.isDaylight !== false);
-            keys.forEach((key, idx) => {
-                const ix = fx0 + gap + idx * (iconPx + gap);
-                const iy = fy0 + 4 * sf;
-                if (key === 'sun') {
-                    drawSunGlowIcon(ix, iy, iconPx, sunLvl, kind, nowSec, i);
-                    return;
+            if (D && tagPipImgs[`water-empty-${kind}`]) {
+                const layout = D.tagPipLayout(needs, sc);
+                for (let p = 0; p < layout.length; p++) {
+                    const pip = layout[p];
+                    const filled = pipFilledAt(pip.key, pip.index);
+                    const im = tagPipImgs[`${pip.key}-${filled ? 'filled' : 'empty'}-${kind}`];
+                    if (!ready(im)) continue;
+                    const px = pip.pip;
+                    ctx.drawImage(im, ax + pip.ox - px / 2, ay + pip.oy - px / 2, px, px);
                 }
-                const im = needsFaceImgs[`${key}-${kind}`];
-                if (ready(im)) ctx.drawImage(im, ix, iy, iconPx, iconPx);
-                const req = Care.dotsForNeed(needs, key);
-                const got = key === 'stake'
-                    ? (Care.stakeNeedMet(prog, pl.staked) ? 1 : 0)
-                    : Math.min(req, Math.floor((Number(prog[key]) || 0) + 1e-6));
-                const dotPx = (ART.needs.tagFaceDotPx || 16) * sf;
-                const dotY = iy + iconPx + 3 * sf;
-                const dotGap = dotPx * 1.15;
-                const dotsW = req * dotGap - (dotGap - dotPx);
-                let dx0 = ix + (iconPx - dotsW) / 2;
-                for (let d = 0; d < req; d++) {
-                    const dotIm = needsFaceImgs[`dot-${d < got ? 'on' : 'off'}-${kind}`];
-                    if (ready(dotIm)) ctx.drawImage(dotIm, dx0, dotY, dotPx, dotPx);
-                    dx0 += dotGap;
-                }
-            });
+            }
         }
 
         function drawTendedSoils() {

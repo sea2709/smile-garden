@@ -307,8 +307,12 @@
         setCareHubProgressForCapture(plot, partial) {
             if (!session) return null;
             const i = Number(plot);
-            if (session.selectedPlot !== i) session.selectedPlot = i;
+            session.go('care-hub');
+            session.selectedPlot = i;
             session.setCareProgress(i, Object.assign(C.emptyProgress(), partial));
+            show('visit');
+            onStep('care-hub');
+            if (els.tendStrip) els.tendStrip.hidden = false;
             renderNeedsCard();
             plotsForScene({ instant: true });
             return session.careProgressFor(i);
@@ -433,10 +437,11 @@
             } else if (mode === 'partial') {
                 setBed(2, { allMet: false, progress: { sun: 1, water: 0, fertilizer: 0, stake: false } });
             } else if (mode === 'garden') {
-                setBed(0, { allMet: false, progress: { sun: 2, water: 1, fertilizer: 0, stake: false } });
-                setBed(1, { allMet: false, progress: { sun: 0, water: 2, fertilizer: 0, stake: false } });
+                setBed(0, { allMet: false, progress: { sun: 1, water: 2, fertilizer: 0, stake: false } });
+                setBed(1, { allMet: false, progress: { sun: 2, water: 0, fertilizer: 1, stake: false } });
                 setBed(2, { allMet: true, staked: true, resting: false });
-                setBed(6, { allMet: false, progress: { sun: 3, water: 2, fertilizer: 1, stake: false } });
+                setBed(4, { allMet: false, progress: { sun: 1, water: 1, fertilizer: 0, stake: false } });
+                setBed(6, { allMet: false, progress: { sun: 2, water: 1, fertilizer: 0, stake: true } });
             }
             save();
             show('idle');
@@ -519,6 +524,7 @@
             if (L.plantNeedsStake(p.plantId)) p.staked = true;
             if (!session) return false;
             const needs = L.plantNeeds(p.plantId);
+            session.go('care-hub');
             session.setCareProgress(i, {
                 sun: needs.sun,
                 water: needs.water,
@@ -527,6 +533,9 @@
             });
             session.selectedPlot = i;
             session.activeCareChannel = 'harvest';
+            show('visit');
+            onStep('care-hub');
+            if (els.tendStrip) els.tendStrip.hidden = false;
             plotsForScene({ instant: true });
             renderNeedsCard();
             renderHud();
@@ -663,8 +672,12 @@
             if (els.stretchGuide) els.stretchGuide.hidden = true;
             document.body.dataset.stretchCare = '0';
             document.body.dataset.step = '';
-            if (session) onStep(session.step);
-            else show('idle');
+            if (session) {
+                session.go('care-hub');
+                onStep('care-hub');
+                show('visit');
+                renderNeedsCard();
+            } else show('idle');
         },
         setStakedBed(plot, staked) {
             const p = state.plots[plot];

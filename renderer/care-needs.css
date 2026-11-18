@@ -1,0 +1,126 @@
+/* Clearer tending strip (Heily, 11-18) — icon-shaped slots + plain-words remaining.
+   Replaces the 10px dots under each icon. Care is still automatic; nothing here is tappable.
+   Art: assets/ui/tend/* (paper, row glows), assets/ui/care/slot-*-{empty,filled}(-night).png,
+        assets/ui/care/care-check(-night).png, existing sun-glow / harvest / stamps.
+   Placement: docked bottom-centre, 16px above the window edge. The camera .pip
+   (200×150 at right:18 top:66) is never covered.
+   Size: 320×160 CSS px for a plant that needs a stake (cucumber/tomato/…).
+         Auto-height: ~126 without a stake, ~112 in the harvest state.
+         320×160 = 51,200 px², about 43% of the old 360×332 needs card, and 40px
+         wider / 48px taller than the first compact strip (280×112). Centre of
+         the 1280-wide window: x480–800, pip starts at x1062. */
+
+.tend-strip {
+    position: fixed;
+    left: 50%;
+    bottom: max(16px, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: 320px;
+    height: auto;
+    min-height: 112px;
+    box-sizing: border-box;
+    padding: 12px 18px 12px 18px;
+    z-index: 28;
+    pointer-events: none;
+    user-select: none;
+    border: 0;
+    border-image: url('../assets/ui/tend/tend-strip-9s.png') 64 fill / 32px / 0 round;
+    filter: drop-shadow(0 6px 14px rgba(40, 28, 12, 0.16));
+    color: #3E2A1A;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    animation: tend-rise 0.35s ease;
+}
+body[data-lighting='night'] .tend-strip {
+    border-image-source: url('../assets/ui/tend/tend-strip-9s-night.png');
+}
+/* Fixed-size fallback (one image, 320×160):
+   background: url('../assets/ui/tend/tend-strip.png') 0 0 / 100% 100%; border-image: none; */
+@keyframes tend-rise { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+
+.tend-head { display: flex; align-items: center; gap: 8px; min-height: 28px; min-width: 0; }
+.tend-name { font-family: var(--serif); font-weight: 600; font-size: 18px; line-height: 22px; color: #3E2A1A; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tend-name small { font-family: var(--sans); font-weight: 700; font-size: 13px; line-height: 16px; color: #6B4F36; margin-left: 6px; }
+.tend-sun { display: flex; align-items: center; gap: 5px; margin-left: auto; flex: 0 0 auto; }
+.tend-sun-icon { width: 28px; height: 28px; object-fit: contain; }
+.tend-sun-verb { font-family: var(--sans); font-size: 13px; line-height: 16px; font-weight: 700; font-style: italic; color: #6B4F36; }
+.tend-stamp { width: 20px; height: 20px; object-fit: contain; flex: 0 0 auto; }
+
+.tend-row { display: flex; flex-direction: column; gap: 4px; }
+.tend-care {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+    padding: 0 0 0 2px;
+}
+.tend-slots {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: calc(32px * 3 + 5px * 2);
+    position: relative;
+    z-index: 1;
+    flex: 0 0 auto;
+}
+.tend-slot-pip { width: 32px; height: 32px; object-fit: contain; display: block; }
+.tend-remain {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 22px;
+    color: #3E2A1A;
+    position: relative;
+    z-index: 1;
+    white-space: nowrap;
+}
+.tend-care--done .tend-remain { color: #6B4F36; font-weight: 700; }
+.tend-check { width: 20px; height: 20px; object-fit: contain; position: relative; z-index: 1; flex: 0 0 auto; }
+
+/* ACTIVE: camera sees this action. Add .is-active to .tend-care (or .tend-harvest-icon);
+   remove it ~400ms after the signal drops. */
+.tend-care::before, .tend-harvest-icon::before {
+    content: '';
+    position: absolute;
+    left: -12px; top: -10px;
+    width: 140px; height: 52px;
+    z-index: 0;
+    background: center / contain no-repeat;
+    opacity: 0;
+    transform: scale(0.92);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+    pointer-events: none;
+}
+.tend-harvest-icon::before { left: -10px; top: -10px; width: 72px; height: 72px; }
+.tend-care.is-active::before, .tend-harvest-icon.is-active::before {
+    opacity: 1; transform: scale(1);
+    animation: tend-breathe 2.4s ease-in-out 0.35s infinite;
+}
+.tend-care.is-active .tend-slot-pip { transform: translateY(-1px); }
+.tend-care.is-active .tend-remain { color: #3E2A1A; }
+.tend-care[data-need='water']::before      { background-image: url('../assets/ui/tend/tend-glow-water-row.png'); }
+.tend-care[data-need='fertilizer']::before { background-image: url('../assets/ui/tend/tend-glow-fertilizer-row.png'); }
+.tend-care[data-need='stake']::before      { background-image: url('../assets/ui/tend/tend-glow-stake-row.png'); }
+.tend-harvest-icon::before                 { background-image: url('../assets/ui/tend/tend-glow-harvest.png'); }
+body[data-lighting='night'] .tend-care[data-need='water']::before      { background-image: url('../assets/ui/tend/tend-glow-water-row-night.png'); }
+body[data-lighting='night'] .tend-care[data-need='fertilizer']::before { background-image: url('../assets/ui/tend/tend-glow-fertilizer-row-night.png'); }
+body[data-lighting='night'] .tend-care[data-need='stake']::before      { background-image: url('../assets/ui/tend/tend-glow-stake-row-night.png'); }
+body[data-lighting='night'] .tend-harvest-icon::before                 { background-image: url('../assets/ui/tend/tend-glow-harvest-night.png'); }
+@keyframes tend-breathe { 50% { opacity: 0.6; transform: scale(0.96); } }
+@media (prefers-reduced-motion: reduce) {
+    .tend-care.is-active::before, .tend-harvest-icon.is-active::before { animation: none; }
+}
+
+.tend-harvest { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 2px 0 4px; }
+.tend-harvest-icon { position: relative; width: 52px; height: 52px; flex: 0 0 auto; }
+.tend-harvest-icon img { position: relative; z-index: 1; width: 52px; height: 52px; object-fit: contain; }
+.tend-harvest b { display: block; font-family: var(--serif); font-weight: 600; font-size: 20px; line-height: 24px; color: #3E2A1A; }
+.tend-harvest span { display: block; font-family: var(--sans); font-size: 18px; line-height: 22px; color: #6B4F36; font-weight: 700; }
+.tend-strip--harvest .tend-row { display: none; }
+.tend-strip:not(.tend-strip--harvest) .tend-harvest { display: none; }
+.tend-strip--harvest .tend-sun { display: none; }
+
+body[data-tend-strip='1'] #hint,
+body[data-tend-strip='1'] #toast { visibility: hidden !important; pointer-events: none; }

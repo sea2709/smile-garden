@@ -1,4 +1,4 @@
-// Compact tending status strip (replaces the painted needs card during care visits).
+// Clearer tending strip + tag pip layout (Heily). Same SmileTendStrip.render contract.
 (function (global) {
     'use strict';
 
@@ -11,6 +11,9 @@
         stake: 'stake',
         harvest: 'harvest',
     };
+
+    const display = () => global.SmileCareNeedsDisplay;
+    const disp = (fn, ...args) => display()[fn](...args);
 
     function resetActiveHold() {
         for (const k of Object.keys(lastActiveAt)) lastActiveAt[k] = 0;
@@ -49,15 +52,9 @@
         img.src = artUrl(src);
     }
 
-    /**
-     * @param {object} opts
-     * @param {HTMLElement} opts.strip
-     * @param {HTMLElement} opts.nameEl
-     * @param {HTMLElement} opts.stampEl
-     * @param {HTMLElement} opts.rowEl
-     * @param {HTMLElement} opts.harvestIconEl
-     * @param {HTMLElement} opts.harvestImgEl
-     */
+  /**
+   * @param {object} opts same contract as the previous SmileTendStrip.render
+   */
     function render(opts) {
         const {
             strip, nameEl, stampEl, rowEl, harvestIconEl, harvestImgEl,
@@ -66,18 +63,18 @@
         if (!strip || !C) return;
         strip.hidden = !show || plot == null;
         document.body.dataset.tendStrip = show && plot != null ? '1' : '0';
-        if (!show || plot == null) return;
+        if (!show || plot == null || !display()) return;
 
         const pl = state.plots[plot];
         if (!pl) return;
         const needs = L.plantNeeds(pl.plantId);
         const prog = session.careProgressFor(plot);
         const kind = L.plantById(pl.plantId);
-        const cardCareLight = 'midday';
         const allMet = C.allNeedsMet(prog, needs, pl.staked);
         const showResting = !!pl.tagResting && !allMet;
         const activeCh = session.activeCareChannel;
         const harvestReady = session.canCareHarvest && session.canCareHarvest(plot);
+        const cardLight = lighting === 'night' ? 'night' : 'midday';
 
         nameEl.textContent = '';
         const nameSpan = document.createElement('span');
@@ -85,6 +82,23 @@
         const bedSmall = document.createElement('small');
         bedSmall.textContent = `bed ${plot + 1}`;
         nameEl.append(nameSpan, bedSmall);
+
+        let sunEl = opts.sunEl || strip.querySelector('.tend-sun');
+        if (!sunEl) {
+            sunEl = document.createElement('div');
+            sunEl.className = 'tend-sun';
+            sunEl.dataset.need = 'sun';
+            sunEl.innerHTML = '<img class="tend-sun-icon" alt=""><span class="tend-sun-verb"></span>';
+            const head = strip.querySelector('.tend-head') || nameEl.parentElement;
+            if (stampEl && stampEl.parentElement === head) head.insertBefore(sunEl, stampEl);
+            else head.appendChild(sunEl);
+        }
+        const sunImg = sunEl.querySelector('.tend-sun-icon');
+        const sunVerb = sunEl.querySelector('.tend-sun-verb');
+        const lvl = sunGlowLevel(prog, needs, lighting);
+        sunImg.alt = lighting === 'night' ? 'Resting until daylight' : `Daylight ${lvl} of 3`;
+        bindImg(sunImg, sunIconSrc(ART, lvl, lighting), artUrl, '☀');
+        sunVerb.textContent = lighting === 'night' ? 'resting' : 'daylight';
 
         if (stampEl) {
             if (allMet) {
@@ -105,77 +119,66 @@
         if (harvestReady) {
             const harvestActive = slotIsActive('harvest', activeCh, nowMs);
             harvestIconEl.classList.toggle('is-active', harvestActive);
-            bindImg(harvestImgEl, ART.needsIconSrc('harvest', cardCareLight), artUrl, '🧺');
-        } else {
+            bindImg(harvestImgEl, ART.needsIconSrc('harvest', 'midday'), artUrl, '🧺');
+        } else if (harvestIconEl) {
             harvestIconEl.classList.remove('is-active');
         }
 
         rowEl.textContent = '';
-
-        const sunSlot = document.createElement('div');
-        sunSlot.className = 'tend-slot tend-slot--sun';
-        sunSlot.dataset.need = 'sun';
-        const sunIcon = document.createElement('img');
-        sunIcon.className = 'tend-icon';
-        const lvl = sunGlowLevel(prog, needs, lighting);
-        sunIcon.alt = lighting === 'night' ? 'Resting until daylight' : `Daylight ${lvl} of 3`;
-        bindImg(sunIcon, sunIconSrc(ART, lvl, lighting), artUrl, '☀');
-        const sunVerb = document.createElement('span');
-        sunVerb.className = 'tend-verb';
-        sunVerb.textContent = lighting === 'night' ? 'resting' : 'daylight';
-        sunSlot.append(sunIcon, document.createElement('span'), sunVerb);
-        rowEl.appendChild(sunSlot);
-
-        const div = document.createElement('span');
-        div.className = 'tend-divider';
-        div.setAttribute('aria-hidden', 'true');
-        rowEl.appendChild(div);
-
         const careSlots = [
-            { key: 'water', verb: 'smile', channel: 'water' },
-            { key: 'fertilizer', verb: 'talk', channel: 'fertilizer' },
-            { key: 'stake', verb: 'stretch', channel: 'stake' },
+            { key: 'water', channel: 'water' },
+            { key: 'fertilizer', channel: 'fertilizer' },
+            { key: 'stake', channel: 'stake' },
         ];
-
         for (const spec of careSlots) {
-            const req = C.dotsForNeed(needs, spec.key);
-            if (req <= 0) continue;
-            const done = spec.key === 'stake'
-                ? C.stakeNeedMet(prog, pl.staked)
-                : C.fillFraction(prog, needs, spec.key, pl.staked) >= 1;
+            const stat = disp('filledAndLeft', C, prog, needs, spec.key, pl.staked);
+            if (stat.req <= 0) continue;
             const active = slotIsActive(spec.channel, activeCh, nowMs);
+            const row = document.createElement('div');
+            row.className = 'tend-care' + (stat.done ? ' tend-care--done' : '') + (active ? ' is-active' : '');
+            row.dataset.need = spec.key;
 
-            const slot = document.createElement('div');
-            slot.className = 'tend-slot' + (done ? ' tend-slot--done' : '') + (active ? ' is-active' : '');
-            slot.dataset.need = spec.key;
+            const slots = document.createElement('span');
+            slots.className = 'tend-slots';
+            for (let d = 0; d < stat.req; d++) {
+                const pip = document.createElement('img');
+                pip.className = 'tend-slot-pip' + (d < stat.got ? ' is-filled' : '');
+                pip.alt = '';
+                bindImg(pip, disp('slotSrc', spec.key, d < stat.got, cardLight), artUrl, null);
+                slots.appendChild(pip);
+            }
+            row.appendChild(slots);
 
-            const icon = document.createElement('img');
-            icon.className = 'tend-icon';
-            icon.alt = `${spec.key} ${done ? 'done' : 'in progress'}`;
-            bindImg(icon, ART.needsIconSrc(spec.key, cardCareLight), artUrl, '•');
-
-            const dotsWrap = document.createElement('span');
-            dotsWrap.className = 'tend-dots';
-            if (spec.key !== 'stake' || req > 0) {
-                const got = spec.key === 'stake'
-                    ? (C.stakeNeedMet(prog, pl.staked) ? 1 : 0)
-                    : Math.min(req, Math.floor((Number(prog[spec.key]) || 0) + 1e-6));
-                for (let d = 0; d < req; d++) {
-                    const dot = document.createElement('img');
-                    dot.alt = '';
-                    bindImg(dot, ART.needsDotSrc(d < got, cardCareLight), artUrl, null);
-                    dotsWrap.appendChild(dot);
-                }
+            if (stat.done) {
+                const chk = document.createElement('img');
+                chk.className = 'tend-check';
+                chk.alt = '';
+                const checkSrc = cardLight === 'night'
+                    ? '../assets/ui/care/care-check-night.png'
+                    : '../assets/ui/care/care-check.png';
+                bindImg(chk, checkSrc, artUrl, null);
+                row.appendChild(chk);
             }
 
-            const verb = document.createElement('span');
-            verb.className = 'tend-verb';
-            verb.textContent = spec.verb;
-
-            slot.append(icon, dotsWrap, verb);
-            rowEl.appendChild(slot);
+            const remain = document.createElement('span');
+            remain.className = 'tend-remain';
+            remain.textContent = disp('remainingLabel', spec.key, stat.left);
+            row.appendChild(remain);
+            rowEl.appendChild(row);
         }
     }
 
-    global.SmileTendStrip = { render, resetActiveHold, primeActiveHold, HOLD_MS };
+    const d = display();
+    global.SmileTendStrip = {
+        render,
+        resetActiveHold,
+        primeActiveHold,
+        HOLD_MS,
+        remainingLabel: d ? d.remainingLabel : undefined,
+        filledAndLeft: d ? d.filledAndLeft : undefined,
+        tagPipLayout: d ? d.tagPipLayout : undefined,
+        tagWreathBox: d ? d.tagWreathBox : undefined,
+        pipSrc: d ? d.pipSrc : undefined,
+        slotSrc: d ? d.slotSrc : undefined,
+    };
 }(window));
