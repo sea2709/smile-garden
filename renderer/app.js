@@ -24,7 +24,7 @@
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
-        'btn-sum-done', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
+        'btn-sum-done', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'btn-dev-close', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
         'dev-ready', 'dev-fill', 'dev-reset', 'basket-chip', 'basket-count', 'screen-unlock', 'unlock-title', 'unlock-body', 'unlock-art', 'btn-unlock-ok',
         'brand-logo-day', 'brand-logo-night', 'brand-fallback',
         'error-banner', 'error-title', 'error-message', 'btn-error-keyboard', 'btn-error-dismiss']) {
@@ -72,6 +72,9 @@
     let session = null;
     let source = null;
     let sourceReady = false;
+    // Keep start/stop ordered across warm-up, visit, and retry so a second
+    // sdk.start() never races a still-running session.
+    let cameraGate = Promise.resolve();
     let lastResult = null;
     let pickerTarget = null;
     let currentDay = clock.today();
@@ -374,6 +377,32 @@
         if (config.mock) els.pip.hidden = true;
     }
 
+    function enqueueCamera(fn) {
+        const run = cameraGate.then(fn, fn);
+        cameraGate = run.catch(() => {});
+        return run;
+    }
+
+    async function startCamera() {
+        return enqueueCamera(async () => {
+            if (!(await ensureSource())) throw new Error('Camera source unavailable');
+            if (sourceReady) return;
+            await source.start();
+            sourceReady = true;
+        });
+    }
+
+    async function stopCamera() {
+        return enqueueCamera(async () => {
+            if (!source) {
+                sourceReady = false;
+                return;
+            }
+            try { await source.stop(); } catch { /* ignore */ }
+            sourceReady = false;
+        });
+    }
+
     async function openCameraCheck() {
         mountCameraCheckGrid();
         cameraCheckDemoLock = false;
@@ -384,18 +413,13 @@
         journalReturn = screen === 'journal' ? journalReturn : screen;
         placePipForCameraCheck();
         show('camera-check');
-        const ok = await ensureSource();
-        if (!ok) {
-            cameraDeniedDemo = !config.mock;
-            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-            return;
-        }
-        if (!sourceReady) {
-            try {
-                await source.start();
-                sourceReady = true;
-                state.cameraCheckNote = null;
-            } catch (e) {
+        try {
+            await startCamera();
+            state.cameraCheckNote = null;
+        } catch (e) {
+            if (!source) {
+                cameraDeniedDemo = !config.mock;
+            } else {
                 CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
                 save();
             }
@@ -410,25 +434,21 @@
         cameraCheckDemoLock = false;
         signal.validation = 'Ok';
         signal.faceGoneAt = 0;
-        const ok = await ensureSource();
-        if (!ok) {
-            cameraDeniedDemo = !config.mock;
-            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-            return;
-        }
         try {
-            if (!sourceReady) {
-                await source.start();
-                sourceReady = true;
-            }
+            await stopCamera();
+            await startCamera();
             state.cameraCheckNote = null;
             if (source.setPhase && cameraCheckSession.active) {
                 source.setPhase(`camera-check-${cameraCheckSession.active}`);
             }
             renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
         } catch (e) {
-            CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
-            save();
+            if (!source) {
+                cameraDeniedDemo = !config.mock;
+            } else {
+                CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
+                save();
+            }
             renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
         }
     }
@@ -443,10 +463,10 @@
         els.stretchGuide.hidden = true;
         restorePipHome();
         if (source && source.setPhase) source.setPhase('idle');
-        // Release the camera between warm-up and the visit. Leaving it running
-        // made beginVisit's second sdk.start() throw "Camera could not start".
-        if (source) { try { await source.stop(); } catch { /* ignore */ } }
-        sourceReady = false;
+        // Keep the warm-up session running into the visit. Stopping here and
+        // calling start() again was racing the SDK/OS camera release and
+        // threw "Camera could not start". beginVisit is idempotent via
+        // sourceReady / startCamera().
         show(state.version >= 5 ? 'idle' : 'greeting');
     }
 
@@ -1066,10 +1086,7 @@
         show('visit');
         onStep(session.step);
         try {
-            if (!sourceReady) {
-                await source.start();
-                sourceReady = true;
-            }
+            await startCamera();
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
         }
@@ -1087,10 +1104,7 @@
         session.begin();
         onStep(session.step);
         try {
-            if (!sourceReady) {
-                await source.start();
-                sourceReady = true;
-            }
+            await startCamera();
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
             CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
@@ -1632,8 +1646,7 @@
         out.decorUnlocks = unlocks.decor;
         lastResult = Object.assign({}, out);
         save();
-        if (source) { try { await source.stop(); } catch { /* ignore */ } }
-        sourceReady = false;
+        await stopCamera();
         session = null;
         scene.setEffects({ sun: 0, water: 0, fert: 0 });
         plotsForScene();
@@ -1660,8 +1673,7 @@
         out.decorUnlocks = unlocks.decor;
         lastResult = Object.assign({}, out);
         save();
-        if (source) { try { await source.stop(); } catch { /* ignore */ } }
-        sourceReady = false;
+        await stopCamera();
         session = null;
         scene.setEffects({ sun: 0, water: 0, fert: 0 });
         document.body.dataset.step = 'summary';
@@ -2239,6 +2251,7 @@
     els.btnBed.addEventListener('click', () => goToBed());
     els.btnPlantIdle.addEventListener('click', () => openPicker());
     els.btnDev.addEventListener('click', () => toggleDev());
+    els.btnDevClose.addEventListener('click', () => toggleDev(false));
     els.btnErrorDismiss.addEventListener('click', () => { els.errorBanner.hidden = true; });
     els.btnErrorKeyboard.addEventListener('click', () => {
         els.errorBanner.hidden = true;
@@ -2249,10 +2262,8 @@
         els.btnBegin.disabled = false;
         toast('Keyboard mode: hold S to smile, T to talk.');
         if (session) {
-            ensureSource().then((ok) => {
-                if (!ok) return;
-                source.setPhase(session.step);
-                return source.start();
+            startCamera().then(() => {
+                if (source && source.setPhase) source.setPhase(session.step);
             }).catch(() => {});
         }
     });
