@@ -496,6 +496,27 @@ async function run(win, outDir) {
         await sleep(350);
         await shot(`signal-panel-${mode}.png`);
     }
+    async function prepCareDocShot(spec) {
+        const { panel, channel, progress, mockPhase, idle } = spec || {};
+        if (progress) await G(`g.setCareHubProgressForCapture(4, ${JSON.stringify(progress)})`);
+        await G('g.setSelectedPlot(4)');
+        if (mockPhase) {
+            await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('${mockPhase}'); return true; })()`);
+        }
+        await G('g.setChartForCapture(true)');
+        if (idle) {
+            await G(`g.setSignalPanelDemoForCapture('idle')`);
+            await G('g.setTendStripActiveForCapture(null)');
+        } else {
+            await G(`g.setSignalPanelDemoForCapture('${panel}')`);
+            if (channel) await G(`g.setTendStripActiveForCapture(${JSON.stringify(channel)})`);
+            else await G('g.setTendStripActiveForCapture(null)');
+        }
+        await waitTendStrip(wc);
+        await sleep(200);
+        await G('g.captureRedraw()');
+        await sleep(200);
+    }
     async function breathUiShot(name, mode, countDone) {
         await G(`g.setBreathHudDemo(${JSON.stringify(mode)}, ${countDone})`);
         await sleep(450);
@@ -608,15 +629,30 @@ async function run(win, outDir) {
     await G('g.setSelectedPlot(4)');
     await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 2, fertilizer: 0, stake: true })`);
     await captureSignalPanel('stretch', { channel: 'stake' });
-    await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-smile'); return true; })()`);
-    await G(`g.setTendStripActiveForCapture('water')`);
-    await waitTendStrip(wc);
-    await sleep(500);
+    const daySmileProgress = { sun: 2, water: 1, fertilizer: 0, stake: false };
+    const dayIdleProgress = { sun: 2, water: 2, fertilizer: 0, stake: false };
+    await prepCareDocShot({
+        panel: 'smile',
+        channel: 'water',
+        progress: daySmileProgress,
+        mockPhase: 'care-hub-smile',
+    });
     await shot('04-care-smile-midday.png');
-    await shot('tend-strip-day.png');
+    await prepCareDocShot({
+        panel: 'smile',
+        channel: 'water',
+        progress: daySmileProgress,
+        mockPhase: 'care-hub-smile',
+    });
     await shot('tend-strip-active-glow.png');
     await js('window.__smileGarden.setMockPipForCapture(true, { stream: false })');
-    await sleep(400);
+    await prepCareDocShot({
+        panel: 'smile',
+        channel: 'water',
+        progress: daySmileProgress,
+        mockPhase: 'care-hub-smile',
+    });
+    await sleep(200);
     await G('g.captureRedraw()');
     await shot('visit-camera-preview-clear.png', { keepPip: true });
     await js('window.__smileGarden.setMockPipForCapture(false)');
@@ -627,8 +663,7 @@ async function run(win, outDir) {
     await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-talk'); return true; })()`);
     await sleep(500);
     await shot('05-care-talk.png');
-    await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 2, fertilizer: 0, stake: false })`);
-    await sleep(400);
+    await prepCareDocShot({ idle: true, progress: dayIdleProgress });
     await shot('tend-strip-day.png');
     await G('g.setSelectedPlot(1)');
     await G('g.setStretchHudDemo("left-hold")');

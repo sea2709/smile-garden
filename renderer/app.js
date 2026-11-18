@@ -2815,6 +2815,12 @@
             signalPanelDemoLock = null;
             stretchDemoSnap = null;
             if (session) session.activeCareChannel = null;
+            if (signalSwitcher && signalSwitcher.reset) signalSwitcher.reset();
+            if (els.chartPanel) els.chartPanel.dataset.state = 'idle';
+            if (window.SmileTendStrip && window.SmileTendStrip.resetActiveHold) {
+                window.SmileTendStrip.resetActiveHold();
+            }
+            redrawSignalPanel(performance.now() / 1000);
         },
         async ensureSourceForCapture() {
             return ensureSource();
@@ -2877,8 +2883,12 @@
         setTendStripActiveForCapture(channel) {
             if (!session) return null;
             session.activeCareChannel = channel || null;
-            if (window.SmileTendStrip && window.SmileTendStrip.primeActiveHold) {
-                window.SmileTendStrip.primeActiveHold(channel);
+            if (window.SmileTendStrip) {
+                if (channel && window.SmileTendStrip.primeActiveHold) {
+                    window.SmileTendStrip.primeActiveHold(channel);
+                } else if (window.SmileTendStrip.resetActiveHold) {
+                    window.SmileTendStrip.resetActiveHold();
+                }
             }
             renderNeedsCard();
             return channel;
