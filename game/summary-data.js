@@ -138,10 +138,11 @@ function buildSummaryData(ctx) {
             num: grew.length,
             text: grew.length === 1 ? 'plant grew a stage' : 'plants grew a stage',
         };
+    } else if (night) {
+        hero = { art: 'morning-hero.png' };
     } else {
-        hero = { icon: 'resting-leaf', text: night ? 'plants resting until you tend them' : 'a quiet day in the garden' };
+        hero = { icon: 'resting-leaf', text: 'a quiet day in the garden' };
     }
-    if (night) hero.art = 'morning-hero.png';
 
     const garden = [];
     const plantSrc = ctx.plantSrc;

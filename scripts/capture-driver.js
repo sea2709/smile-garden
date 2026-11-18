@@ -476,7 +476,9 @@ async function run(win, outDir) {
         }
         throw new Error(`timeout waiting for ${desc}`);
     }
-    async function shot(name) {
+    async function shot(name, opts) {
+        const o = opts || {};
+        if (!o.keepPip) await G('g.prepareDomForScreenshot()');
         await sleep(200);
         const img = await wc.capturePage();
         fs.writeFileSync(path.join(outDir, name), img.toPNG());
@@ -609,8 +611,9 @@ async function run(win, outDir) {
     await js('window.__smileGarden.setMockPipForCapture(true, { stream: false })');
     await sleep(400);
     await G('g.captureRedraw()');
-    await shot('visit-camera-preview-clear.png');
+    await shot('visit-camera-preview-clear.png', { keepPip: true });
     await js('window.__smileGarden.setMockPipForCapture(false)');
+    await G('g.prepareDomForScreenshot()');
     await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
     await G(`g.setSignalPanelDemoForCapture('talk')`);
     await G(`g.setTendStripActiveForCapture('fertilizer')`);
@@ -631,7 +634,7 @@ async function run(win, outDir) {
     await G('g.setStretchHudDemo("done")');
     await G('g.clearStretchHudDemo()');
     await G('g.setSelectedPlot(4)');
-    await G(`g.setCareHubProgressForCapture(4, { sun: 3, water: 2, fertilizer: 1, stake: false })`);
+    await G(`g.setCareHubProgressForCapture(4, { sun: 3, water: 2, fertilizer: 1, stake: true })`);
     await G('g.setSelectedPlot(4)');
     await G('g.primeCareHarvestForCapture(4)');
     await G(`g.setSignalPanelDemoForCapture('breathe')`);

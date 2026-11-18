@@ -299,13 +299,15 @@ body[data-lighting="night"] .hint { background: rgba(240, 236, 214, 0.95); borde
     transform-origin: center;
 }
 body:not([data-screen="camera-check"]) #screen-camera-check { display: none !important; }
+body:not([data-screen="camera-check"]) #cc-preview-wrap,
+body:not([data-screen="camera-check"]) #cc-preview-wrap video { display: none !important; }
 body[data-screen="visit"] #breath-guide[hidden],
 body[data-screen="idle"] #breath-guide { display: none !important; }
 .pip-label { position: absolute; left: 8px; bottom: 6px; font-size: 11px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.5); }
 .pip.pip-mock-capture {
     background: linear-gradient(180deg, #7a9cb8 0%, #c8d8e6 100%);
 }
-.pip.pip-mock-capture .mirror-video { opacity: 0; }
+.pip.pip-mock-capture .mirror-video { opacity: 0; display: none !important; }
 .pip.pip-mock-capture::after {
     content: ''; position: absolute; inset: 18% 28%;
     border-radius: 50%; background: rgba(255, 235, 210, 0.9);

@@ -104,6 +104,8 @@
     let cameraCheckDemoLock = false;
     let pipHome = null;
     let mockPipCapture = false;
+    let mockPipWantStream = false;
+    if (els.pip && els.pip.parentElement) pipHome = els.pip.parentElement;
 
     /** Friendly copy for SmartSpectra ValidationCode (leading k stripped). */
     function faceGuidance(code, sdkHint) {
@@ -172,6 +174,7 @@
             document.body.dataset.step = '';
         }
         if (name !== 'visit' && name !== 'camera-check' && els.stretchGuide) els.stretchGuide.hidden = true;
+        if (name !== 'visit' && name !== 'camera-check') restorePipHome();
         if (name === 'wellness') els.screenWellness.hidden = false;
         if (name === 'camera-check') els.screenCameraCheck.hidden = false;
         if (name === 'greeting') { renderGreeting(); els.screenGreeting.hidden = false; }
@@ -184,6 +187,7 @@
         if (name !== 'visit') scene.setTendSelection(null);
         els.plotTip.hidden = true;
         if (name !== 'visit') els.basketChip.hidden = true;
+        syncPipVisibility();
     }
 
   function gardenTodayKey() {
@@ -405,11 +409,34 @@
         }
     }
 
+    function pipShouldShow() {
+        if (mockPipCapture) return true;
+        if (screen === 'camera-check') return true;
+        if (screen === 'visit' && sourceReady) return true;
+        return false;
+    }
+
+    function syncPipVisibility() {
+        if (!els.pip) return;
+        const show = pipShouldShow();
+        els.pip.hidden = !show;
+        if (els.preview) {
+            if (show) {
+                els.preview.style.removeProperty('visibility');
+            } else {
+                els.preview.pause();
+                els.preview.style.visibility = 'hidden';
+            }
+        }
+        if (!show) els.pip.classList.remove('pip-mock-capture');
+    }
+
     function placePipForCameraCheck() {
         if (!els.ccPreviewWrap || !els.pip) return;
         if (!pipHome) pipHome = els.pip.parentElement;
         els.ccPreviewWrap.insertBefore(els.pip, els.ccPreviewWrap.firstChild);
         els.pip.hidden = false;
+        if (els.preview) els.preview.style.removeProperty('visibility');
         if (els.ccMockSlot) els.ccMockSlot.hidden = !config.mock;
     }
 
@@ -417,7 +444,7 @@
         if (pipHome && els.pip && els.pip.parentElement !== pipHome) {
             pipHome.appendChild(els.pip);
         }
-        if (config.mock && !mockPipCapture) els.pip.hidden = true;
+        syncPipVisibility();
     }
 
     function enqueueCamera(fn) {
@@ -533,8 +560,9 @@
         if (returnToGarden) {
             // Free the camera after a mid-session check; next visit starts fresh.
             await stopCamera();
-            els.pip.hidden = true;
+            if (els.preview) els.preview.srcObject = null;
         }
+        syncPipVisibility();
         // First-launch warm-up keeps the session alive into the next visit so a
         // stop→start race does not throw "Camera could not start". beginVisit is
         // idempotent via sourceReady / startCamera().
@@ -1022,7 +1050,7 @@
         trace.clear();
         const t1 = Number(now) || performance.now() / 1000;
         for (let i = 0; i < 80; i++) {
-            const t = t1 - 9.5 + (i / 47) * 9.5;
+            const t = t1 - 9.5 + (i / 79) * 9.5;
             const phase = Math.sin(t * 1.8);
             trace.push({
                 t,
@@ -1038,7 +1066,7 @@
         }
     }
 
-    function redrawSignalPanel(t) {
+    function redrawSignalPanel(t, extraOpts) {
         const chartOn = state.settings.chart && (screen === 'visit' || !!signalPanelDemoLock);
         if (!chartOn || !els.chartPanel || !window.SmileChart.drawSignalPanel) return;
         const mode = signalPanelDemoLock || (signalSwitcher ? signalSwitcher.mode : 'idle');
@@ -1048,10 +1076,12 @@
         let breathPillState = 'warming';
         if (freshBreath) breathPillState = signal.breathing.stable ? 'stable' : 'settling';
         const snap = stretchDemoSnap || (session && session.stretchSnap);
+        const captureChart = !!(extraOpts && extraOpts.captureRedraw);
         window.SmileChart.drawSignalPanel(els.smileChart, trace, t, els.chartLive, {
             mode,
             night: lighting === 'night',
-            reducedMotion: reduceMotion,
+            reducedMotion: reduceMotion || captureChart,
+            captureRedraw: captureChart,
             breathPillState,
             breathDotsDone: session && session.breathsDone ? session.breathsDone : 0,
             breathDotsTotal: session && session.pacer ? session.pacer.breaths : state.settings.breaths,
@@ -1096,10 +1126,27 @@
         source.on('status', (s) => { document.body.dataset.status = s; });
         source.on('error', (e) => showError('SmartSpectra error', `${e.name}: ${e.message || ''}`, !config.mock));
         source.on('stream', (stream) => {
+            if (mockPipCapture) {
+                if (mockPipWantStream && stream) {
+                    els.preview.srcObject = stream;
+                    els.preview.removeAttribute('hidden');
+                    if (els.preview.style) els.preview.style.removeProperty('visibility');
+                } else if (els.preview) {
+                    els.preview.pause();
+                    els.preview.srcObject = null;
+                    els.preview.setAttribute('hidden', '');
+                }
+                els.pip.classList.toggle('pip-mock-capture', !mockPipWantStream || !els.preview.srcObject);
+                syncPipVisibility();
+                return;
+            }
             els.preview.srcObject = stream || null;
-            const show = !!stream || mockPipCapture;
-            els.pip.hidden = !show;
-            els.pip.classList.toggle('pip-mock-capture', mockPipCapture && !stream);
+            if (stream && els.preview) {
+                els.preview.removeAttribute('hidden');
+                if (els.preview.style) els.preview.style.removeProperty('visibility');
+            }
+            els.pip.classList.toggle('pip-mock-capture', false);
+            syncPipVisibility();
         });
         source.on('landmarks', (lm) => {
             if (!lm || !lm.points) return;
@@ -2713,10 +2760,11 @@
         },
         captureRedraw() {
             const t = performance.now() / 1000;
+            if (signalPanelDemoLock) primeSignalTraceForCapture(signalPanelDemoLock, t);
             plotsForScene({ instant: true });
             renderHud();
             renderNeedsCard();
-            redrawSignalPanel(t);
+            redrawSignalPanel(t, { captureRedraw: true });
             try {
                 scene.draw(t);
             } catch (e) {
@@ -2773,26 +2821,48 @@
         async setMockPipForCapture(on, opts) {
             const o = opts || {};
             mockPipCapture = !!on;
+            mockPipWantStream = !!(on && o.stream !== false);
             restorePipHome();
             if (els.screenCameraCheck) els.screenCameraCheck.hidden = screen !== 'camera-check';
             if (mockPipCapture) {
-                const wantStream = o.stream !== false;
-                if (wantStream) {
+                if (mockPipWantStream) {
                     await ensureSource();
                     if (source && source.start && !sourceReady) await startCamera();
-                    els.pip.hidden = false;
-                    els.pip.classList.toggle('pip-mock-capture', !els.preview.srcObject);
-                } else {
-                    els.pip.hidden = false;
-                    els.pip.classList.add('pip-mock-capture');
-                    if (els.preview) els.preview.srcObject = null;
                 }
+                if (els.preview) {
+                    if (mockPipWantStream) {
+                        els.preview.removeAttribute('hidden');
+                        els.preview.style.removeProperty('visibility');
+                    } else {
+                        try { els.preview.pause(); } catch { /* ignore */ }
+                        els.preview.srcObject = null;
+                        els.preview.setAttribute('hidden', '');
+                    }
+                }
+                els.pip.classList.toggle('pip-mock-capture', !mockPipWantStream);
             } else {
-                els.pip.hidden = true;
+                mockPipWantStream = false;
                 els.pip.classList.remove('pip-mock-capture');
-                if (els.preview) els.preview.srcObject = null;
+                if (els.preview) {
+                    try { els.preview.pause(); } catch { /* ignore */ }
+                    els.preview.srcObject = null;
+                }
             }
+            syncPipVisibility();
             return mockPipCapture;
+        },
+        prepareDomForScreenshot(opts) {
+            const o = opts || {};
+            if (!o.keepPip) {
+                restorePipHome();
+                if (els.preview) {
+                    try { els.preview.pause(); } catch { /* ignore */ }
+                    els.preview.style.visibility = 'hidden';
+                }
+                if (els.pip) els.pip.hidden = true;
+            }
+            if (els.smileChart) els.smileChart.classList.remove('is-swapping');
+            return true;
         },
         setCareHubProgressForCapture(plot, partial) {
             if (!session) return null;
@@ -3002,6 +3072,7 @@
             p.matureDay = p.matureDay || V.calendarKey(state, clock.now());
             p.matureWater = 1;
             p.matureFert = 1;
+            if (L.plantNeedsStake(p.plantId)) p.staked = true;
             if (!session) return false;
             const needs = L.plantNeeds(p.plantId);
             session.setCareProgress(i, {
@@ -3011,6 +3082,7 @@
                 stake: needs.stake ? !!p.staked : false,
             });
             session.selectedPlot = i;
+            session.activeCareChannel = 'harvest';
             plotsForScene({ instant: true });
             renderNeedsCard();
             renderHud();

@@ -305,7 +305,7 @@
         const mode = o.mode || 'idle';
         const night = !!(o.night || (document.body && document.body.dataset.lighting === 'night'));
 
-        if (mode !== lastDrawnMode && !o.reducedMotion) {
+        if (mode !== lastDrawnMode && !o.reducedMotion && !o.captureRedraw) {
             canvas.classList.add('is-swapping');
             setTimeout(() => canvas.classList.remove('is-swapping'), 150);
         }
