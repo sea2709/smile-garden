@@ -35,11 +35,23 @@ test('hud rects in the logo+chip and top-actions columns do not intersect keep-o
     assert.ok(hudRects[2].rect.left >= keep.right - 0.5, 'actions must start after clock band');
 });
 
-test('mock badge below top-actions does not intersect keep-out', () => {
+test('mock badge at bottom-left does not intersect clock keep-out', () => {
     const cssW = 1280;
     const keep = H.clockKeepOutClientRect(cssW, viewH);
-    const badge = { id: 'mock-badge', rect: { left: cssW - 240, top: 128, right: cssW - 18, bottom: 160, width: 222, height: 32 } };
+    const badgeW = 320;
+    const badgeH = 44;
+    const badge = {
+        id: 'mock-badge',
+        rect: {
+            left: 18,
+            top: viewH - 120 - badgeH,
+            right: 18 + badgeW,
+            bottom: viewH - 120,
+            width: badgeW,
+            height: badgeH,
+        },
+    };
     const out = H.findClockOverlaps(cssW, viewH, [badge]);
     assert.equal(out.ok, true);
-    assert.ok(badge.rect.top >= keep.bottom - 0.5, 'badge sits below clock band');
+    assert.ok(badge.rect.top > keep.bottom, 'bottom badge stays under the clock band');
 });

@@ -129,9 +129,6 @@ body[data-painted-clock="1"] .top-actions {
     justify-self: end;
     align-self: start;
 }
-body[data-painted-clock="1"] .mock-badge {
-    top: 128px;
-}
 @media (max-width: 1100px) {
     body[data-painted-clock="1"] .chips {
         grid-column: 1 / 3;
@@ -319,9 +316,33 @@ body[data-screen="idle"] #breath-guide { display: none !important; }
     border-radius: 50%; background: rgba(255, 235, 210, 0.9);
     box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
 }
-.mock-badge { position: absolute; right: 18px; top: 66px; z-index: 18; display: flex; flex-direction: column; gap: 3px; font-size: 11.5px; color: var(--ink-soft);
-    background: rgba(251, 245, 230, 0.86); border-radius: 14px; padding: 8px 12px; box-shadow: var(--shadow); }
+/* Bottom-left, above the meter strip — clears the top-right camera PiP
+   and the right-side visit / idle bars. */
+.mock-badge {
+    position: absolute;
+    left: 18px;
+    bottom: 120px;
+    top: auto;
+    right: auto;
+    z-index: 28;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-width: min(360px, calc(100vw - 520px));
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    background: rgba(251, 245, 230, 0.92);
+    border-radius: 14px;
+    padding: 8px 14px;
+    box-shadow: var(--shadow);
+    text-align: left;
+}
 .mock-badge b { color: var(--ink); font-size: 12.5px; }
+/* Care-hub hides meters — sit closer to the bottom edge. */
+body[data-screen="visit"][data-step="care-hub"] .mock-badge,
+body[data-screen="visit"][data-step^="care-"] .mock-badge {
+    bottom: 18px;
+}
 
 /* ---------- seed picker ---------- */
 .picker { width: min(1180px, 96vw); animation: rise 0.5s ease; }

@@ -1151,7 +1151,23 @@
         if (session.activeCareChannel === 'harvest' || session.canCareHarvest(session.selectedPlot)) {
             return 'care-hub-breathe';
         }
-        if (session.activeCareChannel === 'stake') return 'stretch';
+        if (session.activeCareChannel === 'stake') return 'care-hub-stretch';
+        // Point the mock auto-player at an open need. Keyboard mode ignores phase
+        // and follows held S / T / [ ] keys instead.
+        if (session.selectedPlot != null && C) {
+            const p = state.plots[session.selectedPlot];
+            if (p && p.plantId) {
+                const needs = L.plantNeeds(p.plantId);
+                const prog = session.careProgressFor(session.selectedPlot);
+                if (needs.water > 0 && C.needStillOpen(prog, needs, p.staked, 'water')) {
+                    return 'care-hub-smile';
+                }
+                if (needs.fertilizer > 0 && C.needStillOpen(prog, needs, p.staked, 'fertilizer')) {
+                    return 'care-hub-talk';
+                }
+                if (needs.stake && !C.stakeNeedMet(prog, p.staked)) return 'care-hub-stretch';
+            }
+        }
         return 'care-hub';
     }
     function setSourcePhase(phase) {
@@ -2329,15 +2345,25 @@
     els.btnErrorDismiss.addEventListener('click', () => { els.errorBanner.hidden = true; });
     els.btnErrorKeyboard.addEventListener('click', () => {
         els.errorBanner.hidden = true;
-        if (source) { try { source.destroy(); } catch { /* ignore */ } source = null; }
+        // Tear down the real SDK fully — including sourceReady — so startCamera()
+        // actually starts the mock tick loop (otherwise S/T appear dead).
+        if (source) { try { source.destroy(); } catch { /* ignore */ } }
+        source = null;
+        sourceReady = false;
         config.keyboard = true;
         els.mockBadge.hidden = false;
         els.mockMode.textContent = 'Keyboard player';
         els.btnBegin.disabled = false;
-        toast('Keyboard mode: hold S to smile, T to talk.');
-        if (session) {
+        toast('Keyboard mode: hold S to smile, T to talk, [ / ] to stretch.');
+        const resume = screen === 'visit' || screen === 'camera-check';
+        if (resume) {
             startCamera().then(() => {
-                if (source && source.setPhase) source.setPhase(session.step);
+                if (!source || !source.setPhase) return;
+                if (screen === 'visit' && session) {
+                    source.setPhase(session.step === 'care-hub' ? careHubMockPhase() : session.step);
+                } else if (screen === 'camera-check') {
+                    source.setPhase('camera-check-smile');
+                }
             }).catch(() => {});
         }
     });
