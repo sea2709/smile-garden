@@ -95,6 +95,8 @@ npm install
 npm run start:mock        # demo mode: simulated player, no SDK / key / camera (45 s smile, 30 s talk)
 npm run start:mock:fast   # demo mode with short 14 s / 10 s steps (breathing keeps its real pace)
 npm start                 # real SmartSpectra mode (builds the bundles first; needs SMARTSPECTRA_API_KEY)
+npm run pack              # unpackaged electron-builder output under release/ (host platform)
+npm run dist              # installers / archives under release/ (host platform)
 npm test                  # node:test: game logic, daily visit, persistence, time of day, breathing, art manifest
 npm run check             # node --check on every first-party .js file
 xvfb-run -a npm run screenshots   # regenerate docs/*.png (headless Linux; plain `npm run screenshots` with a display)
@@ -137,7 +139,9 @@ or export `SMARTSPECTRA_API_KEY` in your shell. Values already set in the enviro
 ## How it works
 
 * `main.js`: the Electron main process owns the native SmartSpectra pipeline (`bindSmartSpectraIpc`), grants
-  camera-only permission to our own page, and hands config to the renderer. `contextIsolation` and `sandbox` are on.
+  camera-only permission to our own `renderer/index.html`, and hands config to the renderer. The API key is
+  delivered once via `takeApiKey` (not kept on the config object). `contextIsolation` and `sandbox` are on;
+  real mode fails closed if `dist/preload-sdk.bundle.js` is missing.
 * `renderer/sdk-source.js`: the SDK adapter (bundled by esbuild), emitting `expression` (HAPPY 0–1), `talking`,
   `breathing` (rate) and `validation` events. `renderer/mock-source.js` emits the same events from a simulated or keyboard player.
 * `game/logic.js`: the plant table with real sun hours and sources, smile smoothing and hysteresis, `SmileTrace`.
@@ -166,11 +170,22 @@ or export `SMARTSPECTRA_API_KEY` in your shell. Values already set in the enviro
 ## Camera permission
 
 * **macOS:** allow the camera in System Settings → Privacy & Security → Camera. When you run
-  from a terminal, the prompt may name your terminal app. Packaged apps need
-  `NSCameraUsageDescription`.
+  from a terminal, the prompt may name your terminal app. Packaged builds set
+  `NSCameraUsageDescription` and the camera entitlement (`build/entitlements.mac.plist`).
 * **Windows:** Settings → Privacy & security → Camera → allow desktop apps.
 * **Linux:** your user needs access to `/dev/video*` (usually through the `video` group).
 * Close other apps that are using the webcam first.
+
+## Packaging
+
+```bash
+npm run pack   # release/<platform>-unpacked/ for local smoke-testing
+npm run dist   # platform installer/archive under release/
+```
+
+`electron-builder.config.js` copies the host `@smartspectra/node-sdk-<platform>-<arch>` closure into
+`resources/smartspectra/`. `main.js` points `SMARTSPECTRA_CAPI_PATH` there when `app.isPackaged`.
+Code signing and notarization are not configured yet — add your Apple/Windows credentials before shipping.
 
 ## Privacy and telemetry
 
@@ -196,12 +211,16 @@ or export `SMARTSPECTRA_API_KEY` in your shell. Values already set in the enviro
 ## Project layout
 
 ```
-main.js                    Electron main: window, permissions, config IPC, bindSmartSpectraIpc
+main.js                    Electron main: window, permissions, config/API-key IPC, bindSmartSpectraIpc
 preload.js / preload-sdk.js   contextBridge API (+ SDK preload bundle entry)
+electron-builder.config.js Packaged app + SmartSpectra native extraResources
+build/entitlements.mac.plist  macOS camera + hardened-runtime entitlements
 game/logic.js              plants (real sun hours + sources), smile detection, SmileTrace (UMD)
 game/visit.js              daily visit loop, persistence, time of day, breathing pacer (UMD)
 renderer/index.html        screens + HUD (strict CSP)
-renderer/app.js            flow, HUD, picker, summary, journal, demo tools, keyboard
+renderer/app.js            flow, HUD, picker, summary, journal, keyboard (orchestration)
+renderer/camera-check-controller.js  camera warm-up flow (with camera-check-ui.js)
+renderer/dev-hooks.js      mock/capture automation (`window.__smileGarden`)
 renderer/scene.js          painted garden + code-driven motion (canvas)
 renderer/art.js            art manifest: backdrops, plot geometry, sprite baselines, meter dots
 renderer/smile-chart.js    live smile chart (G)
@@ -223,8 +242,10 @@ docs/                      screenshots
   them on real cameras.
 * The SDK `TODO(sdk)` questions from v0.2 still apply for key authorization and the meaning of
   `Expression.stable`.
+* The renderer SDK still needs the API key in-process once (via `takeApiKey`); treat keys as rotatable.
 * No reminder notifications yet, and no seasons; the "Visit again" path lets you visit more than once a day,
   but plants still grow at most once.
 * The v0.2 calm check (pulse/HRV) and flower crown were removed in favour of the daily loop
   (they are in git history and `/workspace/smile-garden-backup-v0.2`).
 * Phone layout isn't done: this is a 1280×800 desktop Electron prototype.
+* Packaged builds are unsigned; add notarization / Windows signing before public distribution.

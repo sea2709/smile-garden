@@ -20,12 +20,13 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { pathToFileURL, fileURLToPath } = require('url');
 
 // Load repo-root `.env` before any process.env reads. Existing shell env wins
 // over values in the file (dotenv's default). Never commit `.env`.
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
-const { app, BrowserWindow, ipcMain, session, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, session } = require('electron');
 
 const MOCK = process.argv.includes('--mock') || process.env.SMILE_GARDEN_MOCK === '1';
 const FAST = MOCK && (process.argv.includes('--fast') || process.env.SMILE_GARDEN_FAST === '1');
@@ -53,6 +54,8 @@ const ENABLE_TELEMETRY = process.env.SMARTSPECTRA_TELEMETRY !== '0';
 
 // Read the key from the environment / `.env`. Never hardcode it.
 const API_KEY = (process.env.SMARTSPECTRA_API_KEY || '').trim();
+// One-shot handoff to the renderer SDK constructor — never re-sent after take.
+let apiKeyConsumed = false;
 
 let bindSmartSpectraIpc = null;
 let sdkLoadError = null;
@@ -79,21 +82,43 @@ if (!MOCK) {
     }
 }
 
+const OWN_PAGE_PATH = path.normalize(path.join(__dirname, 'renderer', 'index.html'));
+const OWN_PAGE_URL = pathToFileURL(OWN_PAGE_PATH).href;
+
 function resolvePreload() {
     if (MOCK) return path.join(__dirname, 'preload.js');
     // A sandboxed preload can only require('electron'), so `npm run build`
     // bundles preload.js + `@smartspectra/node-sdk/preload` with esbuild.
     const bundled = path.join(__dirname, 'dist', 'preload-sdk.bundle.js');
     if (!fs.existsSync(bundled)) {
-        sdkLoadError = sdkLoadError ||
-            'dist/preload-sdk.bundle.js is missing. Run `npm run build` (or `npm start`, which builds first).';
-        return path.join(__dirname, 'preload.js');
+        throw new Error(
+            'dist/preload-sdk.bundle.js is missing. Run `npm run build` (or `npm start`, which builds first).'
+        );
     }
     return bundled;
 }
 
+/** Only our bundled renderer/index.html — not any other file:// URL. */
 function isOwnPage(url) {
-    return typeof url === 'string' && url.startsWith('file://');
+    if (typeof url !== 'string' || !url) return false;
+    try {
+        const parsed = new URL(url);
+        if (parsed.protocol !== 'file:') return false;
+        return path.normalize(fileURLToPath(parsed)) === OWN_PAGE_PATH;
+    } catch {
+        // Fall back to exact href match (covers odd file URL forms).
+        return url === OWN_PAGE_URL || url.split('#')[0].split('?')[0] === OWN_PAGE_URL;
+    }
+}
+
+function allowCameraMedia(permission, mediaTypes, url) {
+    if (!isOwnPage(url)) return false;
+    if (permission === 'media') {
+        return Array.isArray(mediaTypes) && mediaTypes.length === 1 && mediaTypes[0] === 'video';
+    }
+    // Chromium also queries discrete media permissions in some Electron versions.
+    if (permission === 'mediaVideo' || permission === 'camera') return true;
+    return false;
 }
 
 let mainWindow = null;
@@ -146,9 +171,8 @@ function createWindow() {
     return win;
 }
 
-// Config for the renderer. The renderer-side SDK constructor takes `apiKey`
-// directly (RendererSmartSpectraOptions), so in real mode the key has to
-// reach the renderer. Handed over at runtime, only to our own file:// page.
+// Config for the renderer. The API key is NOT included here — the renderer
+// takes it once via smile-garden:take-api-key when constructing the SDK.
 ipcMain.handle('smile-garden:get-config', (event) => {
     const frameUrl = event.senderFrame ? event.senderFrame.url : '';
     if (!isOwnPage(frameUrl)) throw new Error('config requested from unexpected origin');
@@ -157,7 +181,6 @@ ipcMain.handle('smile-garden:get-config', (event) => {
         fast: FAST,
         sessionSeconds: SESSION_SECONDS,
         capture: !!CAPTURE_DIR,
-        apiKey: MOCK ? '' : API_KEY,
         hasApiKey: API_KEY.length > 0,
         enableTelemetry: ENABLE_TELEMETRY,
         sdkLoadError,
@@ -166,59 +189,50 @@ ipcMain.handle('smile-garden:get-config', (event) => {
     };
 });
 
-// "Save garden snapshot": the renderer sends a PNG data URL; main validates it
-// and writes it where the user picks (default: ~/Pictures). Nothing is uploaded.
-const MAX_SNAPSHOT_BYTES = 25 * 1024 * 1024;
-const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
-
-function defaultSnapshotName() {
-    const d = new Date();
-    const p = (n) => String(n).padStart(2, '0');
-    return `smile-garden-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}.png`;
-}
-
-ipcMain.handle('smile-garden:save-snapshot', async (event, dataUrl) => {
+// One-shot API key handoff for SmartSpectraSDK. Empty after first successful take
+// (and always empty in mock mode) so the key does not linger on the config object.
+ipcMain.handle('smile-garden:take-api-key', (event) => {
     const frameUrl = event.senderFrame ? event.senderFrame.url : '';
-    if (!isOwnPage(frameUrl)) throw new Error('snapshot from unexpected origin');
-    const prefix = 'data:image/png;base64,';
-    if (typeof dataUrl !== 'string' || !dataUrl.startsWith(prefix)) throw new Error('expected a PNG data URL');
-    if (dataUrl.length > MAX_SNAPSHOT_BYTES * 1.4) throw new Error('snapshot too large');
-    const buf = Buffer.from(dataUrl.slice(prefix.length), 'base64');
-    if (buf.length < 64 || !buf.subarray(0, 8).equals(PNG_MAGIC)) throw new Error('not a PNG image');
-
-    let target;
-    if (CAPTURE_DIR) {
-        // Scripted capture: no dialog, write next to the screenshots.
-        target = path.join(CAPTURE_DIR, 'garden-snapshot.png');
-    } else {
-        let dir = os.homedir();
-        try { dir = app.getPath('pictures'); } catch { /* fall back to home */ }
-        const res = await dialog.showSaveDialog(mainWindow || undefined, {
-            title: 'Save garden snapshot',
-            defaultPath: path.join(dir, defaultSnapshotName()),
-            filters: [{ name: 'PNG image', extensions: ['png'] }],
-        });
-        if (res.canceled || !res.filePath) return { saved: false };
-        target = res.filePath.toLowerCase().endsWith('.png') ? res.filePath : res.filePath + '.png';
-    }
-    await fs.promises.mkdir(path.dirname(target), { recursive: true });
-    await fs.promises.writeFile(target, buf);
-    return { saved: true, path: target };
+    if (!isOwnPage(frameUrl)) throw new Error('api key requested from unexpected origin');
+    if (MOCK || !API_KEY) return '';
+    if (apiKeyConsumed) return '';
+    apiKeyConsumed = true;
+    return API_KEY;
 });
 
 app.whenReady().then(() => {
-    // Grant the camera (video only, no microphone) to our own page only.
-    // Same policy as the official electron-quickstart.
+    // Deny-by-default permissions. Grant camera (video only) to our own page.
+    // Both handlers are required: sync checks can otherwise report granted.
     session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
         const url = (details && details.requestingUrl) || (wc && wc.getURL()) || '';
         const mediaTypes = (details && details.mediaTypes) || [];
-        const cameraOnly = mediaTypes.length === 1 && mediaTypes[0] === 'video';
-        callback(permission === 'media' && cameraOnly && isOwnPage(url));
+        callback(allowCameraMedia(permission, mediaTypes, url));
+    });
+    session.defaultSession.setPermissionCheckHandler((wc, permission, requestingOrigin, details) => {
+        const url = requestingOrigin || (wc && wc.getURL()) || '';
+        if (permission === 'media') {
+            const mediaType = details && details.mediaType;
+            // mediaType is 'video' | 'audio' | 'unknown' on the check path.
+            if (mediaType && mediaType !== 'video') return false;
+            return isOwnPage(url);
+        }
+        return allowCameraMedia(permission, ['video'], url);
     });
 
-    createWindow();
+    try {
+        createWindow();
+    } catch (err) {
+        console.error('[smile-garden] Failed to start:', err && err.message || err);
+        app.exit(1);
+        return;
+    }
     app.on('activate', () => {
-        if (BrowserWindow.getAllWindows().length === 0) createWindow();
+        if (BrowserWindow.getAllWindows().length === 0) {
+            try { createWindow(); } catch (err) {
+                console.error('[smile-garden] Failed to recreate window:', err && err.message || err);
+                app.exit(1);
+            }
+        }
     });
 });
 

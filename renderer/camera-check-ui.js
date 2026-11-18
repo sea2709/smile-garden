@@ -170,28 +170,39 @@
         });
     }
 
+    function setStatusRow(el, className, label) {
+        el.hidden = false;
+        el.className = className;
+        el.replaceChildren();
+        const dot = document.createElement('span');
+        dot.className = 'dot';
+        const text = document.createElement('span');
+        text.textContent = String(label || '');
+        el.append(dot, text);
+    }
+
     function renderStatus(faceEl, lightEl, camEl, snap, opts) {
         const denied = !!(opts && opts.denied) || !!(snap && snap.cameraDenied);
         const noCamera = denied || !!(snap && snap.noCamera);
         if (noCamera) {
-            faceEl.hidden = false;
-            faceEl.className = 'cc-status-row bad';
-            faceEl.innerHTML = '<span class="dot"></span><span>No camera</span>';
+            setStatusRow(faceEl, 'cc-status-row bad', 'No camera');
             lightEl.hidden = true;
             lightEl.textContent = '';
         } else {
-            faceEl.hidden = false;
-            lightEl.hidden = false;
-            faceEl.className = 'cc-status-row' + (snap.faceFound ? ' ok' : ' bad');
-            faceEl.innerHTML = '<span class="dot"></span><span>Face found</span>';
-            lightEl.className = 'cc-status-row' + (snap.lightingOk ? ' ok' : (snap.faceFound ? ' warn' : ''));
-            lightEl.innerHTML = '<span class="dot"></span><span>Lighting OK</span>';
+            setStatusRow(faceEl, 'cc-status-row' + (snap.faceFound ? ' ok' : ' bad'), 'Face found');
+            setStatusRow(
+                lightEl,
+                'cc-status-row' + (snap.lightingOk ? ' ok' : (snap.faceFound ? ' warn' : '')),
+                'Lighting OK'
+            );
         }
         const msg = snap.cameraMessage;
         if (msg && msg.text) {
-            camEl.hidden = false;
-            camEl.className = 'cc-status-row ' + (msg.level === 'error' ? 'bad' : 'warn');
-            camEl.innerHTML = `<span class="dot"></span><span>${msg.text}</span>`;
+            setStatusRow(
+                camEl,
+                'cc-status-row ' + (msg.level === 'error' ? 'bad' : 'warn'),
+                msg.text
+            );
         } else {
             camEl.hidden = true;
             camEl.textContent = '';

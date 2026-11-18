@@ -98,14 +98,12 @@
     let breathHudDemoLock = false;
     let stretchHudDemoLock = false;
     let stretchDemoSnap = null;
-    let cameraCheckSession = null;
-    let lastCameraCheckSnap = null;
-    let cameraDeniedDemo = false;
-    let cameraCheckDemoLock = false;
     let pipHome = null;
     let mockPipCapture = false;
     let mockPipWantStream = false;
     if (els.pip && els.pip.parentElement) pipHome = els.pip.parentElement;
+    /** @type {ReturnType<typeof window.SmileCameraCheckController.create>|null} */
+    let cameraCheck = null;
 
     /** Friendly copy for SmartSpectra ValidationCode (leading k stripped). */
     function faceGuidance(code, sdkHint) {
@@ -308,113 +306,8 @@
     }
 
     // ------------------------------------------------------------------
-    // Camera check (pre-garden setup + reopen from garden)
+    // Camera (shared PiP + start/stop). Warm-up flow lives in camera-check-controller.js
     // ------------------------------------------------------------------
-    let cameraCheckReturn = 'idle';
-    let cameraCheckReturnToGarden = false;
-    let cameraCheckGridMounted = false;
-    function mountCameraCheckGrid() {
-        if (cameraCheckGridMounted || !CCUI || !els.ccPackets) return;
-        const cc = ART.cameraCheck || {};
-        CCUI.mountPackets(els.ccPackets, ART, artUrl, {
-            onSelect(key) {
-                if (!cameraCheckSession) return;
-                cameraCheckSession.select(key);
-                if (source && source.setPhase) source.setPhase(`camera-check-${key}`);
-                renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-            },
-            onSkip(key) {
-                if (!cameraCheckSession) return;
-                cameraCheckSession.skip(key);
-                renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-            },
-        });
-        if (els.ccBackdrop && cc.backdrop) {
-            els.ccBackdrop.src = artUrl(cc.backdrop);
-            els.ccBackdrop.onerror = () => { els.ccBackdrop.dataset.fallback = '1'; };
-        }
-        if (els.ccWindowFrame && cc.windowFrame) {
-            els.ccWindowFrame.src = artUrl(cc.windowFrame);
-            els.ccWindowFrame.onerror = () => { els.ccWindowFrame.hidden = true; };
-        }
-        if (els.ccSill && cc.sill) {
-            els.ccSill.src = artUrl(cc.sill);
-            els.ccSill.onerror = () => { els.ccSill.dataset.fallback = '1'; };
-        }
-        if (els.ccFaceOutline && cc.faceOutline) {
-            els.ccFaceOutline.src = artUrl(cc.faceOutline);
-            els.ccFaceOutline.hidden = false;
-            els.ccFaceOutline.onerror = () => { els.ccFaceOutline.dataset.fallback = '1'; };
-        }
-        if (els.ccTiltLeft && cc.tiltLeft) {
-            els.ccTiltLeft.src = artUrl(cc.tiltLeft);
-            els.ccTiltLeft.hidden = false;
-        }
-        if (els.ccTiltRight && cc.tiltRight) {
-            els.ccTiltRight.src = artUrl(cc.tiltRight);
-            els.ccTiltRight.hidden = false;
-        }
-        cameraCheckGridMounted = true;
-    }
-
-    function buildCameraCheckInput() {
-        const input = currentInput();
-        input.validation = signal.validation;
-        input.landmarksStable = signal.landmarksStable;
-        const now = performance.now();
-        input.breathing = signal.breathing && now - signal.breathing.at < 2500
-            ? Object.assign({}, signal.breathing, { fresh: true })
-            : null;
-        input.stretch = stretchSample();
-        input.cameraDenied = cameraDeniedDemo;
-        input.noCamera = signal.validation === 'NoCamera';
-        if (state.cameraCheckNote && screen === 'camera-check') {
-            input.sourceError = state.cameraCheckNote;
-        }
-        return input;
-    }
-
-    function renderCameraCheckUI(snap) {
-        if (!snap) return;
-        lastCameraCheckSnap = snap;
-        if (els.ccNote) {
-            const note = state.cameraCheckNote;
-            if (note && screen === 'camera-check') {
-                els.ccNote.hidden = false;
-                els.ccNote.textContent = note;
-            } else {
-                els.ccNote.hidden = true;
-            }
-        }
-        const active = cameraCheckSession && cameraCheckSession.active;
-        if (CCUI) {
-            els.breathGuide.hidden = active !== 'breath';
-            els.stretchGuide.hidden = active !== 'stretch';
-            if (active === 'breath') renderBreathRate();
-            if (active === 'stretch') renderStretchHud();
-            CCUI.renderStatus(els.ccStatusFace, els.ccStatusLight, els.ccStatusCamera, snap, {
-                denied: cameraDeniedDemo || !!snap.cameraDenied || !!snap.noCamera,
-            });
-            CCUI.renderPackets(els.ccPackets, snap, active, ART, artUrl, { denied: cameraDeniedDemo });
-            CCUI.renderPrompt(els.ccPrompt, snap, active, {
-                denied: cameraDeniedDemo || !!snap.cameraDenied || !!snap.noCamera,
-            });
-            // Always offer a restart — frozen streams are not "denied" / "no camera".
-            if (els.btnCcRetry) els.btnCcRetry.hidden = false;
-        }
-        if (els.ccFaceOutline) {
-            els.ccFaceOutline.classList.toggle('found', !!snap.faceFound);
-        }
-        const stretch = snap.stretchSnap || {};
-        const tiltOn = active === 'stretch' && !stretch.complete;
-        if (els.ccTiltLeft) {
-            els.ccTiltLeft.classList.toggle('on', tiltOn && stretch.activeSide === 'left');
-        }
-        if (els.ccTiltRight) {
-            els.ccTiltRight.classList.toggle('on', tiltOn && stretch.activeSide === 'right');
-        }
-    }
-
     function pipShouldShow() {
         if (mockPipCapture) return true;
         if (screen === 'camera-check') return true;
@@ -495,18 +388,15 @@
         });
     }
 
-    function gardenDestFrom(name) {
-        if (name === 'greeting' || name === 'idle' || name === 'summary') return name;
-        return state.version >= 5 ? 'idle' : 'greeting';
-    }
-
-    function syncCameraCheckCtas() {
-        if (els.btnCcStart) {
-            els.btnCcStart.textContent = cameraCheckReturnToGarden ? 'Back to the garden' : 'Start my garden';
-        }
-        if (els.btnCcSkipNow) {
-            els.btnCcSkipNow.textContent = cameraCheckReturnToGarden ? 'Back without testing' : 'Skip for now';
-        }
+    function renderStretchHudFromSnap(snap) {
+        const s = snap || {};
+        const ringSide = s.activeSide === 'right' ? 'right' : 'left';
+        const ringProg = ringSide === 'right' ? s.rightProgress : s.leftProgress;
+        const ringDone = ringSide === 'right' ? s.rightDone : s.leftDone;
+        drawStretchRing(els.stretchRing, ringProg, ringDone);
+        const roll = s.rollDeg || 0;
+        const pivot = els.stretchFlowerPivot || document.getElementById('stretch-flower-pivot');
+        if (pivot) pivot.style.transform = `rotate(${(-roll * 0.85).toFixed(2)}deg)`;
     }
 
     /** Drop an in-progress visit without applying tends so warm-up can reclaim the camera. */
@@ -533,136 +423,32 @@
         toast('Left the visit to check the camera.');
     }
 
-    async function openCameraCheck(opts) {
-        // Wellness / startup may still be on data-screen=loading; allow that so the
-        // warm-up is not skipped and the garden is not left stuck unable to click beds.
-        if (screen === 'camera-check') return;
-        const options = opts || {};
-        const fromStartup = screen === 'loading' || options.fromStartup === true;
-        const fromVisit = screen === 'visit';
-        if (fromVisit) await leaveVisitForCameraCheck();
-        const fromScreen = fromStartup
-            ? (state.version >= 5 ? 'idle' : 'greeting')
-            : (screen === 'journal' ? journalReturn : (fromVisit ? 'idle' : screen));
-        cameraCheckReturn = gardenDestFrom(fromScreen);
-        // First-launch / every-startup warm-up vs reopen from garden (Camera button).
-        cameraCheckReturnToGarden = !fromStartup && (
-            options.reopen === true
-            || fromVisit
-            || (options.reopen !== false && !!state.setupDone && screen !== 'wellness')
-        );
-        syncCameraCheckCtas();
-        mountCameraCheckGrid();
-        cameraCheckDemoLock = false;
-        cameraCheckSession = CC.createCameraCheckSession({
-            smileOn: L.DEFAULTS.smileOn,
-            Stretch: window.SmileStretch,
+    if (!window.SmileCameraCheckController) {
+        console.error('[smile-garden] SmileCameraCheckController module missing');
+    } else {
+        cameraCheck = window.SmileCameraCheckController.create({
+            els, ART, CC, CCUI, L, artUrl,
+            getConfig: () => config,
+            getState: () => state,
+            getScreen: () => screen,
+            getSource: () => source,
+            getSignal: () => signal,
+            getJournalReturn: () => journalReturn,
+            isSourceReady: () => sourceReady,
+            show, save, toast, currentInput, stretchSample,
+            renderBreathRate, renderStretchHud,
+            placePipForCameraCheck, restorePipHome, syncPipVisibility,
+            startCamera, stopCamera,
+            abandonVisit: leaveVisitForCameraCheck,
         });
-        placePipForCameraCheck();
-        show('camera-check');
-        try {
-            // Reopen (and leave-visit) must stop→start so a frozen stream recovers;
-            // startCamera alone is a no-op while sourceReady is still true.
-            if (cameraCheckReturnToGarden || sourceReady) {
-                await stopCamera();
-                if (els.preview) els.preview.srcObject = null;
-            }
-            await startCamera();
-            state.cameraCheckNote = null;
-        } catch (e) {
-            if (!source) {
-                cameraDeniedDemo = !config.mock;
-            } else {
-                CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
-                save();
-            }
-        }
-        if (source && source.setPhase) source.setPhase('camera-check-smile');
-        renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
     }
-
-    async function retryCameraCheck() {
-        if (!cameraCheckSession) return;
-        cameraDeniedDemo = false;
-        cameraCheckDemoLock = false;
-        signal.validation = 'Ok';
-        signal.faceGoneAt = 0;
-        try {
-            await stopCamera();
-            await startCamera();
-            state.cameraCheckNote = null;
-            if (source.setPhase && cameraCheckSession.active) {
-                source.setPhase(`camera-check-${cameraCheckSession.active}`);
-            }
-            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-        } catch (e) {
-            if (!source) {
-                cameraDeniedDemo = !config.mock;
-            } else {
-                CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
-                save();
-            }
-            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-        }
-    }
-
-    async function finishCameraCheckFlow() {
-        const returnToGarden = cameraCheckReturnToGarden;
-        const dest = returnToGarden ? cameraCheckReturn : gardenDestFrom('idle');
-        CC.finishCameraSetup(state);
-        save();
-        cameraCheckSession = null;
-        lastCameraCheckSnap = null;
-        cameraDeniedDemo = false;
-        cameraCheckReturnToGarden = false;
-        els.breathGuide.hidden = true;
-        els.stretchGuide.hidden = true;
-        restorePipHome();
-        if (source && source.setPhase) source.setPhase('idle');
-        if (returnToGarden) {
-            // Free the camera after a mid-session check; next visit starts fresh.
-            await stopCamera();
-            if (els.preview) els.preview.srcObject = null;
-        }
-        syncPipVisibility();
-        // First-launch warm-up keeps the session alive into the next visit so a
-        // stop→start race does not throw "Camera could not start". beginVisit is
-        // idempotent via sourceReady / startCamera().
-        show(dest);
-        syncCameraCheckCtas();
-    }
-
-    function updateCameraCheckScreen(dt) {
-        if (!cameraCheckSession) return;
-        if (cameraCheckDemoLock) {
-            renderCameraCheckUI(lastCameraCheckSnap);
-            return;
-        }
-        const snap = cameraCheckSession.update(dt, buildCameraCheckInput());
-        if (cameraCheckSession.active && source && source.setPhase) {
-            source.setPhase(`camera-check-${cameraCheckSession.active}`);
-        }
-        renderCameraCheckUI(snap);
-    }
-
-    function renderStretchHudFromSnap(snap) {
-        const s = snap || {};
-        const ringSide = s.activeSide === 'right' ? 'right' : 'left';
-        const ringProg = ringSide === 'right' ? s.rightProgress : s.leftProgress;
-        const ringDone = ringSide === 'right' ? s.rightDone : s.leftDone;
-        drawStretchRing(els.stretchRing, ringProg, ringDone);
-        const roll = s.rollDeg || 0;
-        const pivot = els.stretchFlowerPivot || document.getElementById('stretch-flower-pivot');
-        if (pivot) pivot.style.transform = `rotate(${(-roll * 0.85).toFixed(2)}deg)`;
-    }
-
+    function openCameraCheck(opts) { return cameraCheck ? cameraCheck.open(opts) : undefined; }
+    function retryCameraCheck() { return cameraCheck ? cameraCheck.retry() : undefined; }
+    function finishCameraCheckFlow() { return cameraCheck ? cameraCheck.finish() : undefined; }
+    function updateCameraCheckScreen(dt) { if (cameraCheck) cameraCheck.update(dt); }
+    function mountCameraCheckGrid() { if (cameraCheck) cameraCheck.mountGrid(); }
     function afterWellnessOrResume() {
-        if (!CC) {
-            console.error('[smile-garden] SmileCameraCheck module missing');
-            show(state.version >= 5 ? 'idle' : 'greeting');
-            return;
-        }
-        if (CC.shouldShowCameraCheck(state)) void openCameraCheck({ fromStartup: true });
+        if (cameraCheck) cameraCheck.afterWellnessOrResume();
         else show(state.version >= 5 ? 'idle' : 'greeting');
     }
 
@@ -1164,7 +950,14 @@
             if (config.mock || config.keyboard) {
                 source = window.SmileSources.createMockSource({ auto: !config.keyboard });
             } else {
-                source = window.SmileSources.createSdkSource({ apiKey: config.apiKey, enableTelemetry: config.enableTelemetry, calmCheck: false });
+                const apiKey = window.smileGarden.takeApiKey
+                    ? await window.smileGarden.takeApiKey()
+                    : '';
+                source = window.SmileSources.createSdkSource({
+                    apiKey,
+                    enableTelemetry: config.enableTelemetry,
+                    calmCheck: false,
+                });
             }
         } catch (e) {
             showError('Could not start the camera reading', String(e && e.message || e), true);
@@ -1654,12 +1447,12 @@
     }
 
     function renderStretchHud() {
-        const ccStretch = screen === 'camera-check' && cameraCheckSession && cameraCheckSession.active === 'stretch';
+        const ccStretch = screen === 'camera-check' && cameraCheck && cameraCheck.session && cameraCheck.session.active === 'stretch';
         if (!stretchHudDemoLock && !ccStretch && (!session || session.step !== 'stretch')) return;
         const snap = stretchHudDemoLock && stretchDemoSnap
             ? stretchDemoSnap
-            : ccStretch && lastCameraCheckSnap
-                ? (lastCameraCheckSnap.stretchSnap || {})
+            : ccStretch && cameraCheck.lastSnap
+                ? (cameraCheck.lastSnap.stretchSnap || {})
                 : (session && session.stretchSnap) || {};
         const roll = snap.rollDeg || 0;
         const s = ART.stretch;
@@ -2636,7 +2429,7 @@
         if (k === 'escape') {
             if (screen === 'journal') closeJournal();
             else if (screen === 'picker') closePicker();
-            else if (screen === 'camera-check' && cameraCheckReturnToGarden) void finishCameraCheckFlow();
+            else if (screen === 'camera-check' && cameraCheck && cameraCheck.returnToGarden) void finishCameraCheckFlow();
             toggleDev(false);
             return;
         }
@@ -2695,7 +2488,7 @@
         const dt = Math.min(0.1, t - lastT);
         lastT = t;
         if (session && screen === 'visit') updateVisit(dt, t);
-        if (screen === 'camera-check') updateCameraCheckScreen(dt);
+        if (screen === 'camera-check' && cameraCheck) updateCameraCheckScreen(dt);
         if (state.version >= 5) syncGardenClockHud();
         if (state.version >= 5 && document.visibilityState === 'visible' && screen !== 'wellness') {
             gardenClock.tick(dt * 1000);
@@ -2787,706 +2580,57 @@
             scene.setSeason(state.season);
             refreshLighting();
         }
+        // Capture / mock automation only — never expose in real production sessions.
+        if (config.mock || config.capture) {
+            window.__smileGarden = __smileGardenHooks;
+        }
         document.body.dataset.ready = '1';
         window.addEventListener('resize', syncHudChipClamp);
     }
 
-    // Dev/test hooks (used by scripts/capture-driver.js; harmless otherwise).
-    window.__smileGarden = {
-        get state() { return state; },
-        get session() { return session; },
-        get screen() { return screen; },
-        get scene() { return scene; },
-        get stretchDemoSnap() { return stretchDemoSnap; },
-        clock, gardenClock, nextDay, simulateDays, fillEmpty, setLightingOverride, openJournal, closeJournal, openPicker, closePicker, ackWellness: () => ackWellness(),
-        openCameraCheck: (opts) => openCameraCheck(opts),
-        retryCameraCheck: () => retryCameraCheck(),
-        finishCameraCheck: () => finishCameraCheckFlow(),
-        selectCameraCheck(key) {
-            if (!cameraCheckSession || !key) return;
-            cameraCheckDemoLock = false;
-            cameraCheckSession.select(key);
-            if (source && source.setPhase) source.setPhase(`camera-check-${key}`);
-            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-        },
-        skipCameraCheck(key) {
-            if (!cameraCheckSession || !key) return;
-            cameraCheckSession.skip(key);
-            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-        },
-        markAllCameraChecksPassed() {
-            if (!cameraCheckSession) return;
-            cameraCheckDemoLock = true;
-            for (const k of CC.CHECKS) cameraCheckSession.markPassed(k);
-            renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-        },
-        /** Capture/helper: fix packet visuals to match docs/camera-check-mockup.png */
-        setCameraCheckDemo(opts) {
-            const o = opts || {};
-            cameraDeniedDemo = false;
-            cameraCheckDemoLock = true;
-            signal.validation = 'Ok';
-            signal.breathing = null;
-            cameraCheckSession = CC.createCameraCheckSession({
-                smileOn: L.DEFAULTS.smileOn,
-                Stretch: window.SmileStretch,
-            });
-            for (const k of (o.passed || [])) cameraCheckSession.markPassed(k);
-            if (o.active) cameraCheckSession.select(o.active);
-            signal.h = 0.82;
-            signal.talking = o.active === 'talk';
-            signal.hAt = performance.now();
-            signal.talkAt = performance.now();
-            if (source && source.setPhase && o.active) source.setPhase(`camera-check-${o.active}`);
-            const input = buildCameraCheckInput();
-            input.breathing = null;
-            renderCameraCheckUI(cameraCheckSession.update(0, input));
-        },
-        setCameraDeniedDemo(on) {
-            cameraCheckDemoLock = on;
-            cameraDeniedDemo = !!on;
-            signal.validation = on ? 'CameraPermissionDenied' : 'Ok';
-            signal.faceGoneAt = on ? performance.now() : 0;
-            signal.hAt = 0;
-            signal.talking = false;
-            if (on && screen === 'camera-check') {
-                cameraCheckSession = CC.createCameraCheckSession({
-                    smileOn: L.DEFAULTS.smileOn,
-                    Stretch: window.SmileStretch,
-                });
-            }
-            if (screen === 'camera-check' && cameraCheckSession) {
-                renderCameraCheckUI(cameraCheckSession.update(0, buildCameraCheckInput()));
-            }
-        },
-        setSetupDone(done) {
-            if (done) CC.finishCameraSetup(state);
-            else {
-                state.setupDone = false;
-                state.cameraCheckNote = null;
-            }
-            save();
-        },
-        getCameraCheckSnap() { return lastCameraCheckSnap; },
-        plant: (id, plot) => plant(id, plot),
-        begin: () => (screen === 'greeting' || screen === 'idle' ? beginVisit() : null),
-        skip: () => {
-            if (!session) return null;
-            const step = session.skip();
-            onStep(step);
-            return step;
-        },
-        confirmPick: () => {
-            if (!session) return null;
-            const step = session.confirmPick();
-            onStep(step);
-            return step;
-        },
-        setSelectedPlot(plot) {
-            if (!session) return false;
-            const ok = session.setSelectedPlot(plot);
-            if (ok) { renderNeedsCard(); syncTendRing(); }
-            return ok;
-        },
-        startCare(needKey) {
-            if (!session) return null;
-            const step = session.startCare(needKey);
-            onStep(step);
-            return step;
-        },
-        fillCareDemo(plot) {
-            if (!session || plot == null) return;
-            const p = state.plots[plot];
-            if (!p) return;
-            const needs = L.plantNeeds(p.plantId);
-            session.setCareProgress(plot, {
-                sun: needs.sun,
-                water: needs.water,
-                fertilizer: needs.fertilizer,
-                stake: needs.stake ? !!p.staked : false,
-            });
-            if (needs.stake && !p.staked) session.setCareProgress(plot, Object.assign(session.careProgressFor(plot), { stake: true }));
-            renderNeedsCard();
-        },
-        /** Mock capture: fill one care meter then return to the hub without waiting on face input. */
-        setNeedsCardDemo(plot, progress) {
-            const i = Number(plot);
-            if (!(i >= 0 && i < state.plots.length)) return null;
-            if (!state.plots[i] || !state.plots[i].plantId) {
-                const res = V.plantSeed(state, i, 'lettuce', clock.now());
-                if (!res.ok) return null;
-                save();
-            }
-            if (!state.plots[i] || !state.plots[i].plantId) return null;
-            const planted = state.plots.map((p, idx) => (p ? idx : -1)).filter((idx) => idx >= 0);
-            if (!planted.includes(i)) planted.push(i);
-            session = new V.VisitSession({
-                fast: config.fast,
-                pace: state.settings.pace,
-                breaths: state.settings.breaths,
-                plots: state.plots,
-                today: gardenTodayKey(),
-                gardenDay: state.dayNumber,
-                dailyTends: state.dailyTends,
-                tendBeds: planted,
-            });
-            session.phase = 'tend';
-            session.plantRound = planted.indexOf(i);
-            session.go('care-hub');
-            session.selectedPlot = i;
-            session.setCareProgress(i, Object.assign(C.emptyProgress(), progress));
-            show('visit');
-            onStep('care-hub');
-            if (els.tendStrip) els.tendStrip.hidden = false;
-            renderNeedsCard();
-            refreshLighting();
-            renderHud();
-            plotsForScene({ instant: true });
-            return i;
-        },
-        clearCaptureVisit() {
-            session = null;
-            stretchHudDemoLock = false;
-            stretchDemoSnap = null;
-            if (els.breathGuide) els.breathGuide.hidden = true;
-            if (els.stretchGuide) els.stretchGuide.hidden = true;
-            syncTendRing();
-            plotsForScene({ instant: true });
-            show('idle');
-        },
-        captureRedraw() {
-            const t = performance.now() / 1000;
-            if (signalPanelDemoLock) primeSignalTraceForCapture(signalPanelDemoLock, t);
-            plotsForScene({ instant: true });
-            renderHud();
-            renderNeedsCard();
-            redrawSignalPanel(t, { captureRedraw: true });
-            try {
-                scene.draw(t);
-            } catch (e) {
-                console.error('[captureRedraw] scene.draw failed', e);
-            }
-            return document.body.dataset.planted;
-        },
-        setChartForCapture(on) {
-            state.settings.chart = !!on;
-            if (els.chartPanel) els.chartPanel.hidden = !on;
-            save();
-            return state.settings.chart;
-        },
-        setSignalPanelDemoForCapture(mode) {
-            const m = ['idle', 'smile', 'talk', 'breathe', 'stretch'].includes(mode) ? mode : 'idle';
-            const t = performance.now() / 1000;
-            signalPanelDemoLock = m;
-            state.settings.chart = true;
-            if (els.breathGuide) els.breathGuide.hidden = true;
-            if (els.chartPanel) {
-                els.chartPanel.hidden = false;
-                els.chartPanel.dataset.state = m;
-            }
-            if (signalSwitcher && signalSwitcher.forceMode) signalSwitcher.forceMode(m, t);
-            primeSignalTraceForCapture(m, t);
-            redrawSignalPanel(t);
-            if (m === 'stretch') {
-                stretchDemoSnap = { rollDeg: 18, leftProgress: 0.4, rightProgress: 0, leftDone: false, rightDone: false };
-            }
-            if (m === 'breathe') {
-                signal.breathing = { rate: 5.8, confidence: 72, stable: true, at: performance.now() };
-            } else if (m !== 'idle') {
-                signal.breathing = null;
-            }
-            if (session) {
-                if (m === 'smile') session.activeCareChannel = 'water';
-                else if (m === 'talk') session.activeCareChannel = 'fertilizer';
-                else if (m === 'stretch') session.activeCareChannel = 'stake';
-                else if (m === 'breathe') session.activeCareChannel = 'harvest';
-                else session.activeCareChannel = null;
-                renderNeedsCard();
-            }
-            return m;
-        },
-        primeSignalTraceForCapture,
-        clearSignalPanelDemoForCapture() {
-            signalPanelDemoLock = null;
-            stretchDemoSnap = null;
-            if (session) session.activeCareChannel = null;
-            if (signalSwitcher && signalSwitcher.reset) signalSwitcher.reset();
-            if (els.chartPanel) els.chartPanel.dataset.state = 'idle';
-            if (window.SmileTendStrip && window.SmileTendStrip.resetActiveHold) {
-                window.SmileTendStrip.resetActiveHold();
-            }
-            redrawSignalPanel(performance.now() / 1000);
-        },
-        async ensureSourceForCapture() {
-            return ensureSource();
-        },
-        async setMockPipForCapture(on, opts) {
-            const o = opts || {};
-            mockPipCapture = !!on;
-            mockPipWantStream = !!(on && o.stream !== false);
-            restorePipHome();
-            if (els.screenCameraCheck) els.screenCameraCheck.hidden = screen !== 'camera-check';
-            if (mockPipCapture) {
-                if (mockPipWantStream) {
-                    await ensureSource();
-                    if (source && source.start && !sourceReady) await startCamera();
-                }
-                if (els.preview) {
-                    if (mockPipWantStream) {
-                        els.preview.removeAttribute('hidden');
-                        els.preview.style.removeProperty('visibility');
-                    } else {
-                        try { els.preview.pause(); } catch { /* ignore */ }
-                        els.preview.srcObject = null;
-                        els.preview.setAttribute('hidden', '');
-                    }
-                }
-                els.pip.classList.toggle('pip-mock-capture', !mockPipWantStream);
-            } else {
-                mockPipWantStream = false;
-                els.pip.classList.remove('pip-mock-capture');
-                if (els.preview) {
-                    try { els.preview.pause(); } catch { /* ignore */ }
-                    els.preview.srcObject = null;
-                }
-            }
-            syncPipVisibility();
-            return mockPipCapture;
-        },
-        prepareDomForScreenshot(opts) {
-            const o = opts || {};
-            if (!o.keepPip) {
-                restorePipHome();
-                if (els.preview) {
-                    try { els.preview.pause(); } catch { /* ignore */ }
-                    els.preview.style.visibility = 'hidden';
-                }
-                if (els.pip) els.pip.hidden = true;
-            }
-            if (els.smileChart) els.smileChart.classList.remove('is-swapping');
-            return true;
-        },
-        setCareHubProgressForCapture(plot, partial) {
-            if (!session) return null;
-            const i = Number(plot);
-            if (session.selectedPlot !== i) session.selectedPlot = i;
-            session.setCareProgress(i, Object.assign(C.emptyProgress(), partial));
-            renderNeedsCard();
-            plotsForScene({ instant: true });
-            return session.careProgressFor(i);
-        },
-        setTendStripActiveForCapture(channel) {
-            if (!session) return null;
-            session.activeCareChannel = channel || null;
-            if (window.SmileTendStrip) {
-                if (channel && window.SmileTendStrip.primeActiveHold) {
-                    window.SmileTendStrip.primeActiveHold(channel);
-                } else if (window.SmileTendStrip.resetActiveHold) {
-                    window.SmileTendStrip.resetActiveHold();
-                }
-            }
-            renderNeedsCard();
-            return channel;
-        },
-        /** Mock capture: garden tag/soil states without a live visit session. */
-        unlockSeedsForCapture() {
-            if (!state.pantry) state.pantry = V.emptyPantry();
-            state.pantry.totalHarvests = Math.max(state.pantry.totalHarvests || 0, 12);
-            if (!state.visitDays) state.visitDays = [];
-            while (state.visitDays.length < 4) state.visitDays.push(gardenTodayKey());
-            save();
-        },
-        prepCaptureGarden() {
-            if (!state.pantry) state.pantry = V.emptyPantry();
-            state.pantry.totalHarvests = Math.max(state.pantry.totalHarvests || 0, 12);
-            if (!state.visitDays) state.visitDays = [];
-            while (state.visitDays.length < 4) state.visitDays.push(gardenTodayKey());
-            show('idle');
-            const beds = [
-                ['lettuce', 0, 2],
-                ['mint', 1, 2],
-                ['tomato', 2, 4],
-                ['cucumber', 4, 3],
-                ['sunflower', 6, 4],
-            ];
-            for (const [id, plot, stage] of beds) {
-                if (!state.plots[plot]) {
-                    const res = V.plantSeed(state, plot, id, clock.now());
-                    if (!res.ok) continue;
-                }
-                state.plots[plot].stage = stage;
-                state.plots[plot].tagResting = false;
-            }
-            save();
-            plotsForScene({ instant: true });
-            renderHud();
-            return state.plots.filter(Boolean).length;
-        },
-        primeMaturePlantsForCapture() {
-            forcePickedPlots = null;
-            session = null;
-            show('idle');
-            const beds = [
-                ['lettuce', 0],
-                ['mint', 1],
-                ['tomato', 2],
-                ['cucumber', 4],
-                ['sunflower', 6],
-                ['apple', 3],
-            ];
-            for (const [id, plot] of beds) {
-                if (!state.plots[plot]) {
-                    const res = V.plantSeed(state, plot, id, clock.now());
-                    if (!res.ok) continue;
-                }
-                const p = state.plots[plot];
-                p.stage = V.MAX_STAGE;
-                p.tagResting = false;
-                p.picked = false;
-                p.pickDay = null;
-            }
-            save();
-            plotsForScene({ instant: true });
-            renderHud();
-            return beds.length;
-        },
-        primePickedSpritesForCapture() {
-            forcePickedPlots = { 1: true, 2: true, 4: true };
-            session = null;
-            show('idle');
-            for (const [id, plot] of [['mint', 1], ['tomato', 2], ['cucumber', 4], ['apple', 3]]) {
-                if (!state.plots[plot]) V.plantSeed(state, plot, id, clock.now());
-                const p = state.plots[plot];
-                if (!p) continue;
-                p.stage = V.MAX_STAGE;
-                p.tagResting = false;
-            }
-            save();
-            plotsForScene({ instant: true });
-            renderHud();
-            return Object.keys(forcePickedPlots).length;
-        },
-        applyTagGardenDemo(mode) {
-            session = null;
-            document.body.dataset.captureTags = '1';
-            if (els.btnVisit) els.btnVisit.hidden = true;
-            const day = state.dayNumber;
-            if (!state.dailyTends) state.dailyTends = {};
-            const setBed = (plot, cfg) => {
-                const p = state.plots[plot];
-                if (!p || !p.plantId) return;
-                const needs = L.plantNeeds(p.plantId);
-                state.plots[plot].staked = !!cfg.staked;
-                state.plots[plot].tagResting = !!cfg.resting;
-                const prog = cfg.progress || {
-                    sun: cfg.allMet ? needs.sun : 0,
-                    water: cfg.allMet ? needs.water : 0,
-                    fertilizer: cfg.allMet ? needs.fertilizer : 0,
-                    stake: cfg.staked && needs.stake,
-                };
-                state.dailyTends[plot] = Object.assign({ day, allMet: !!cfg.allMet }, prog, {
-                    stake: !!cfg.staked || !!prog.stake,
-                });
-            };
-            if (mode === 'complete') {
-                setBed(2, { allMet: true, staked: true, resting: false });
-            } else if (mode === 'resting') {
-                setBed(2, { allMet: false, resting: true, progress: { sun: 0, water: 0, fertilizer: 0, stake: false } });
-            } else if (mode === 'partial') {
-                setBed(2, { allMet: false, progress: { sun: 1, water: 0, fertilizer: 0, stake: false } });
-            } else if (mode === 'garden') {
-                setBed(0, { allMet: false, progress: { sun: 2, water: 1, fertilizer: 0, stake: false } });
-                setBed(1, { allMet: false, progress: { sun: 0, water: 2, fertilizer: 0, stake: false } });
-                setBed(2, { allMet: true, staked: true, resting: false });
-                setBed(6, { allMet: false, progress: { sun: 3, water: 2, fertilizer: 1, stake: false } });
-            }
-            save();
-            show('idle');
-            plotsForScene({ instant: true });
-            renderHud();
-            return mode;
-        },
-        prepTagGardenDemo(mode) {
-            if (state.plots.filter(Boolean).length < 4) prepCaptureGarden();
-            return applyTagGardenDemo(mode);
-        },
-        prepStakedTomatoCapture() {
-            session = null;
-            stretchHudDemoLock = false;
-            stretchDemoSnap = null;
-            syncTendRing();
-            show('idle');
-            state.plots = new Array(state.plots.length).fill(null);
-            const res = V.plantSeed(state, 2, 'tomato', clock.now());
-            if (res.ok && state.plots[2]) {
-                state.plots[2].stage = 4;
-                state.plots[2].staked = true;
-                state.plots[2].tagResting = false;
-            }
-            if (!state.dailyTends) state.dailyTends = {};
-            state.dailyTends[2] = {
-                day: state.dayNumber,
-                sun: 2,
-                water: 1,
-                fertilizer: 0,
-                stake: true,
-                allMet: false,
-            };
-            save();
-            plotsForScene({ instant: true });
-            renderHud();
-        },
-        completeCareNeedForCapture(needKey) {
-            if (!session || session.selectedPlot == null) return null;
-            const plot = session.selectedPlot;
-            const p = state.plots[plot];
-            if (!p || !p.plantId) return null;
-            const needs = L.plantNeeds(p.plantId);
-            const prog = Object.assign({}, session.careProgressFor(plot));
-            if (needKey === 'sun') prog.sun = needs.sun;
-            else if (needKey === 'water') prog.water = needs.water;
-            else if (needKey === 'fertilizer') prog.fertilizer = needs.fertilizer;
-            else if (needKey === 'harvest') {
-                if (session.step === 'care-harvest' && session.pacer) {
-                    session.breathT = session.pacer.total;
-                    session.breathsDone = session.pacer.breaths;
-                    const step = session._completeCareHarvest();
-                    onStep(step);
-                    plotsForScene({ instant: true });
-                    renderHud();
-                    return step;
-                }
-                return session.step;
-            } else return null;
-            session.setCareProgress(plot, prog);
-            let step = session.step;
-            if (step === 'care-smile' || step === 'care-talk' || step === 'care-harvest') {
-                step = session.go('care-hub');
-            }
-            onStep(step);
-            plotsForScene({ instant: true });
-            renderNeedsCard();
-            return step;
-        },
-        primeCareHarvestForCapture(plot) {
-            const i = Number(plot);
-            const p = state.plots[i];
-            if (!p || !p.plantId) return false;
-            p.stage = V.MAX_STAGE;
-            p.picked = false;
-            p.pickDay = null;
-            p.matureDay = p.matureDay || V.calendarKey(state, clock.now());
-            p.matureWater = 1;
-            p.matureFert = 1;
-            if (L.plantNeedsStake(p.plantId)) p.staked = true;
-            if (!session) return false;
-            const needs = L.plantNeeds(p.plantId);
-            session.setCareProgress(i, {
-                sun: needs.sun,
-                water: needs.water,
-                fertilizer: needs.fertilizer,
-                stake: needs.stake ? !!p.staked : false,
-            });
-            session.selectedPlot = i;
-            session.activeCareChannel = 'harvest';
-            plotsForScene({ instant: true });
-            renderNeedsCard();
-            renderHud();
-            return session.canCareHarvest(i);
-        },
-        startBreathing: (o) => session && session.startBreathing(o || {}),
-        launchStretchCare(returnStep) {
-            if (!session) return null;
-            const step = session.launchStretchCare(returnStep || 'pick');
-            onStep(step);
-            return step;
-        },
-        skipStretchCare() {
-            if (!session) return null;
-            const step = session.skipStretchCare();
-            onStep(step);
-            return step;
-        },
-        show,
-        toggleDev,
-        makeAllReady: () => { V.makeAllReady(state); save(); plotsForScene({ instant: true }); renderHud(); },
-        reset() {
-            localStorage.removeItem(STORE_KEY);
-            hudSeasonOverride = false;
-            state = V.createState(new Date());
-            gardenClock.state = state;
-            clock.offsetDays = 0;
-            cameraCheckSession = null;
-            lastCameraCheckSnap = null;
-            cameraDeniedDemo = false;
-            cameraCheckGridMounted = false;
-            plotsForScene({ instant: true });
-            scene.setSeason(state.season);
-            refreshLighting();
-            renderHud();
-            document.body.dataset.gardenV = String(state.version >= 6 ? 6 : state.version >= 5 ? 5 : 4);
-            show(state.wellnessAck ? 'idle' : 'wellness');
-        },
-        setGardenTime(m) {
-            state.gardenMinutes = D.clampMinutes(m);
-            gardenClock.pause();
-            refreshLighting();
-            renderHud();
-        },
-        setSeason(season) {
-            if (!D.SEASONS.includes(season)) return;
-            hudSeasonOverride = true;
-            state.season = season;
-            state.seasonDay = Math.min(D.DAYS_PER_SEASON, Math.max(1, state.seasonDay || 1));
-            scene.setSeason(season);
-            refreshLighting();
-            renderHud();
-        },
-        clearSeasonOverride() { hudSeasonOverride = false; syncGardenSeasonFromDay(); renderHud(); },
-        waitForHudArt: (ms) => scene.waitForHudArt(ms),
-        probeClockSunToken() {
-            scene.draw(performance.now() / 1000);
-            return scene.probeClockSunToken();
-        },
-        probeClockMoonToken() {
-            scene.draw(performance.now() / 1000);
-            return scene.probeClockMoonToken();
-        },
-        syncHudChipClamp,
-        auditHudLayout() {
-            syncHudChipClamp();
-            const H = typeof window !== 'undefined' ? window.SmileHudLayout : null;
-            if (!H) return { ok: false, reason: 'missing-hud-layout' };
-            return H.auditHudLayoutInDocument();
-        },
-        setBreathHudDemo(mode, countDone) {
-            breathHudDemoLock = true;
-            els.breathGuide.hidden = false;
-            els.breathRate.hidden = false;
-            const done = Number(countDone) || 0;
-            if (mode === 'warming') {
-                signal.breathing = null;
-                els.breathRate.dataset.state = 'warming';
-                els.breathRate.textContent = 'Listening for your breath…';
-            } else if (mode === 'settling') {
-                signal.breathing = { rate: 5.8, stable: false, confidence: 42, at: performance.now() };
-                breathHudDemoLock = false;
-                renderBreathRate();
-                breathHudDemoLock = true;
-            } else if (mode === 'stable') {
-                signal.breathing = { rate: 6.1, stable: true, confidence: 88, at: performance.now() };
-                breathHudDemoLock = false;
-                renderBreathRate();
-                breathHudDemoLock = true;
-            }
-            const total = session && session.pacer ? session.pacer.breaths : state.settings.breaths;
-            els.breathCount.textContent = '';
-            for (let i = 0; i < total; i++) {
-                const d = document.createElement('i');
-                if (i < done) d.className = 'on';
-                els.breathCount.appendChild(d);
-            }
-        },
-        clearBreathHudDemo() {
-            breathHudDemoLock = false;
-            if (session && session.step === 'breathe') renderBreathRate();
-        },
-        setStretchHudDemo(mode) {
-            const modes = {
-                'tilted-guide': { leftProgress: 0.12, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -26, activeSide: 'left', ringFrame: 2, complete: false, needsFaceHint: false },
-                'ring-midfill': { leftProgress: 7 / 11, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -4, activeSide: 'left', ringFrame: 7, complete: false, needsFaceHint: false },
-                'left-hold': { leftProgress: 7 / 11, rightProgress: 0, leftDone: false, rightDone: false, rollDeg: -22, activeSide: 'left', complete: false, needsFaceHint: false },
-                'right-hold': { leftProgress: 1, rightProgress: 0.72, leftDone: true, rightDone: false, rollDeg: 19, activeSide: 'right', complete: false, needsFaceHint: false },
-                done: { leftProgress: 1, rightProgress: 1, leftDone: true, rightDone: true, rollDeg: 2, activeSide: null, complete: true, needsFaceHint: false },
-            };
-        stretchHudDemoLock = true;
-        stretchDemoSnap = modes[mode] || modes['left-hold'];
-        show('visit');
-        document.body.dataset.step = 'stretch';
-        document.body.dataset.stretchCare = '1';
-        els.stretchCarePanel.hidden = false;
-        els.stretchGuide.hidden = false;
-        els.stepPanel.hidden = true;
-        if (els.stretchCareLive) {
-            const snap = stretchDemoSnap;
-            els.stretchCareLive.textContent = snap.activeSide === 'left'
-                ? 'Hold toward your left shoulder and keep a gentle stretch.'
-                : 'Hold toward your right shoulder and keep a gentle stretch.';
-        }
-        const back = mkBtn('Back to needs', 'btn btn-ghost', () => clearStretchHudDemo());
-        if (els.stretchCareActions) {
-            els.stretchCareActions.textContent = '';
-            els.stretchCareActions.appendChild(back);
-        }
-        scene.setEffects({ plot: null, sun: 0, water: 0, fert: 0, stake: 0 });
-        return ensureStretchRingArt().then(() => renderStretchHud());
-        },
-        clearStretchHudDemo() {
-            stretchHudDemoLock = false;
-            stretchDemoSnap = null;
-            if (els.stretchCarePanel) els.stretchCarePanel.hidden = true;
-            if (els.stretchGuide) els.stretchGuide.hidden = true;
-            document.body.dataset.stretchCare = '0';
-            document.body.dataset.step = '';
-            if (session) onStep(session.step);
-            else show('idle');
-        },
-        setStakedBed(plot, staked) {
-            const p = state.plots[plot];
-            if (!p || !p.plantId) return;
-            p.staked = staked !== false;
-            save();
-            plotsForScene({ instant: true });
-            renderHud();
-        },
-        finishVisitForCapture() {
-            if (!session) return;
-            stretchHudDemoLock = false;
-            stretchDemoSnap = null;
-            let guard = 0;
-            while (session.step !== 'summary' && guard++ < 90) {
-                if (session.step === 'care-hub') onStep(session.finishCareHub());
-                else if (session.step === 'pick' || session.step === 'pick-harvest') onStep(session.confirmPick());
-                else onStep(session.skip());
-            }
-            if (session.step !== 'summary') onStep(session.go('summary'));
-            else finishVisit();
-        },
-        async previewBedtimeGlow() {
-            scene.setLighting('night');
-            document.body.dataset.lighting = 'night';
-            for (let i = 1; i <= 10; i++) {
-                scene.setBedtimeGlow(i / 10);
-                if (i > 6) scene.setBedtimeDark((i - 6) / 4);
-                await new Promise((r) => setTimeout(r, 40));
-            }
-        },
-        clearBedtimeLayers() { scene.setBedtimeGlow(0); scene.setBedtimeDark(0); refreshLighting(); },
-        previewSummaryDay(sample) {
-            const out = sample || {
-                grew: [{ plot: 0, plantId: 'lettuce', name: 'Lettuce', from: 2, to: 3, mature: false }],
-                careStats: { sunDots: 2.5, waterDots: 3, fertilizerDots: 1, stakes: 1, harvests: 0 },
-                weekly: 3,
-                harvested: [],
-            };
-            renderSummary(out, { night: false });
-            show('summary');
-        },
-        previewSummaryNightQuiet() {
-            renderMorningSummary({
-                grew: [],
-                careStats: { sunDots: 0, waterDots: 0, fertilizerDots: 0, stakes: 0, harvests: 0 },
-            });
-            show('summary');
-        },
-        async previewMorningCard() {
-            renderMorningSummary({
-                grew: [{ plot: 0, plantId: 'lettuce', name: 'Lettuce', from: 1, to: 2, mature: false }],
-                careStats: { sunDots: 1.5, waterDots: 2, fertilizerDots: 0, stakes: 0, harvests: 0 },
-            });
-            show('summary');
-        },
-    };
+    // Dev/test hooks (used by scripts/capture-driver.js). Installed only in mock/capture.
+    const __smileGardenHooks = window.SmileDevHooks.create({
+        getState: () => state,
+        setState: (v) => { state = v; },
+        getSession: () => session,
+        setSession: (v) => { session = v; },
+        getScreen: () => screen,
+        getScene: () => scene,
+        getStretchDemoSnap: () => stretchDemoSnap,
+        setStretchDemoSnap: (v) => { stretchDemoSnap = v; },
+        getForcePickedPlots: () => forcePickedPlots,
+        setForcePickedPlots: (v) => { forcePickedPlots = v; },
+        getSignalPanelDemoLock: () => signalPanelDemoLock,
+        setSignalPanelDemoLock: (v) => { signalPanelDemoLock = v; },
+        getBreathHudDemoLock: () => breathHudDemoLock,
+        setBreathHudDemoLock: (v) => { breathHudDemoLock = v; },
+        getStretchHudDemoLock: () => stretchHudDemoLock,
+        setStretchHudDemoLock: (v) => { stretchHudDemoLock = v; },
+        getHudSeasonOverride: () => hudSeasonOverride,
+        setHudSeasonOverride: (v) => { hudSeasonOverride = v; },
+        getMockPipCapture: () => mockPipCapture,
+        setMockPipCapture: (v) => { mockPipCapture = v; },
+        getMockPipWantStream: () => mockPipWantStream,
+        setMockPipWantStream: (v) => { mockPipWantStream = v; },
+        getSource: () => source,
+        getSourceReady: () => sourceReady,
+        getConfig: () => config,
+        getCameraCheck: () => cameraCheck,
+        clock, gardenClock, els, scene, signal, signalSwitcher, STORE_KEY,
+        L, V, C, CC, D,
+        nextDay, simulateDays, fillEmpty, setLightingOverride,
+        openJournal, closeJournal, openPicker, closePicker, ackWellness,
+        openCameraCheck, retryCameraCheck, finishCameraCheckFlow,
+        plant, beginVisit, onStep, renderNeedsCard, syncTendRing,
+        show, save, toast, mkBtn, gardenTodayKey,
+        refreshLighting, renderHud, plotsForScene, syncPipVisibility,
+        restorePipHome, startCamera, ensureSource,
+        primeSignalTraceForCapture, redrawSignalPanel,
+        renderBreathRate, renderStretchHud, ensureStretchRingArt,
+        renderSummary, renderMorningSummary, finishVisit,
+        syncGardenSeasonFromDay, syncHudChipClamp, toggleDev,
+    });
+
 
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') gardenClock.resume();

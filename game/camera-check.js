@@ -45,7 +45,8 @@ function cameraStatusMessage(sample) {
         };
     }
     if (s.sourceError) {
-        return { level: 'warn', text: s.sourceError };
+        const text = String(s.sourceError).slice(0, 240);
+        return { level: 'warn', text };
     }
     if (s.validation === 'NoFaceFound' || !s.faceVisible) {
         return { level: 'hint', text: 'Look toward the camera so we can find your face.' };

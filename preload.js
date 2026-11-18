@@ -8,8 +8,8 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('smileGarden', {
-    /** Returns { mock, fast, sessionSeconds, capture, apiKey, hasApiKey, enableTelemetry, sdkLoadError, platform, arch }. */
+    /** Returns { mock, fast, sessionSeconds, capture, hasApiKey, enableTelemetry, sdkLoadError, platform, arch }. */
     getConfig: () => ipcRenderer.invoke('smile-garden:get-config'),
-    /** Save a PNG data URL locally (save dialog). Resolves { saved, path }. */
-    saveSnapshot: (dataUrl) => ipcRenderer.invoke('smile-garden:save-snapshot', String(dataUrl)),
+    /** One-shot API key for SmartSpectraSDK. Empty after first take / in mock mode. */
+    takeApiKey: () => ipcRenderer.invoke('smile-garden:take-api-key'),
 });
