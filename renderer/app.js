@@ -20,7 +20,7 @@
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
         'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'needs-card', 'needs-card-bg', 'needs-card-fallback', 'needs-plant-name', 'needs-rows', 'needs-bloom-stamp', 'needs-resting-stamp', 'needs-resting-fallback', 'btn-needs-done', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
-        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
+        'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-prompt', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
         'screen-summary', 'sum-card', 'sum-card-art', 'sum-date', 'sum-title', 'sum-sun', 'sum-water', 'sum-fert', 'sum-grew', 'sum-wait', 'sum-week', 'btn-sum-journal',
@@ -336,6 +336,9 @@
                 denied: cameraDeniedDemo || !!snap.cameraDenied || !!snap.noCamera,
             });
             CCUI.renderPackets(els.ccPackets, snap, active, ART, artUrl, { denied: cameraDeniedDemo });
+            CCUI.renderPrompt(els.ccPrompt, snap, active, {
+                denied: cameraDeniedDemo || !!snap.cameraDenied || !!snap.noCamera,
+            });
             if (els.btnCcRetry) {
                 els.btnCcRetry.hidden = !(cameraDeniedDemo || snap.cameraDenied || snap.noCamera);
             }
@@ -427,7 +430,7 @@
         }
     }
 
-    function finishCameraCheckFlow() {
+    async function finishCameraCheckFlow() {
         CC.finishCameraSetup(state);
         save();
         cameraCheckSession = null;
@@ -437,6 +440,10 @@
         els.stretchGuide.hidden = true;
         restorePipHome();
         if (source && source.setPhase) source.setPhase('idle');
+        // Release the camera between warm-up and the visit. Leaving it running
+        // made beginVisit's second sdk.start() throw "Camera could not start".
+        if (source) { try { await source.stop(); } catch { /* ignore */ } }
+        sourceReady = false;
         show(state.version >= 5 ? 'idle' : 'greeting');
     }
 
@@ -1056,8 +1063,10 @@
         show('visit');
         onStep(session.step);
         try {
-            await source.start();
-            sourceReady = true;
+            if (!sourceReady) {
+                await source.start();
+                sourceReady = true;
+            }
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
         }
@@ -1075,8 +1084,10 @@
         session.begin();
         onStep(session.step);
         try {
-            await source.start();
-            sourceReady = true;
+            if (!sourceReady) {
+                await source.start();
+                sourceReady = true;
+            }
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
             CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);

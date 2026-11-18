@@ -34,6 +34,9 @@ Text colours: primary **#3f5a2a**, secondary **#7a6652**.
 
 ## Care UI during check
 
+- **Howto card** (left of window): explains each packet action and its garden purpose (sunlight / water / fertilizer / stake).
+- **Prompt pill** (lower window): idle tip, or a live how-to for the active check.
+- **Packet labels:** title + purpose (`for sunlight` …) + status (`ready` / `listening…` / `next`).
 - **Smile / talk:** meter under `listening…` on the active packet label.
 - **Breathe:** centre breath guide + pill text when active.
 - **Stretch:** stretch HUD + tilt hints; packet label `next` until selected.

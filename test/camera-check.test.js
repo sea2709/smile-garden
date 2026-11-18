@@ -80,12 +80,13 @@ test('checks are skippable in any order', () => {
     assert.equal(session.snapshot().allMarked, true);
 });
 
-test('setupDone gate and relaunch note', () => {
+test('warm-up / camera check always shows on start', () => {
     const state = V.createState(new Date());
     assert.equal(state.setupDone, false);
     assert.equal(CC.shouldShowCameraCheck(state), true);
     CC.finishCameraSetup(state);
-    assert.equal(CC.shouldShowCameraCheck(state), false);
+    assert.equal(state.setupDone, true);
+    assert.equal(CC.shouldShowCameraCheck(state), true);
     CC.markCameraCheckRequired(state, 'Camera could not start.');
     assert.equal(CC.shouldShowCameraCheck(state), true);
     assert.match(state.cameraCheckNote, /Camera/);

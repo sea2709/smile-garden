@@ -68,6 +68,7 @@ function createSdkSource(config) {
     const em = createEmitter();
     const withCardio = !!config.calmCheck;
     let sdk = null;
+    let running = false;
 
     function build() {
         sdk = new SmartSpectraSDK({
@@ -181,22 +182,34 @@ function createSdkSource(config) {
         calmCheck: withCardio,
         on: em.on.bind(em),
         async start() {
+            if (running) return;
             if (!sdk) build();
-            await sdk.start();
+            running = true;
+            try {
+                await sdk.start();
+            } catch (e) {
+                running = false;
+                throw e;
+            }
         },
         async stop() {
             if (!sdk) return;
-            try { await sdk.stop(); } finally { em.emit('stream', null); }
+            try { await sdk.stop(); } finally {
+                running = false;
+                em.emit('stream', null);
+            }
         },
         async reset() {
             if (!sdk) return;
             await sdk.reset(); // rebuild after kError; releases the camera
+            running = false;
             em.emit('stream', null);
         },
         destroy() {
             if (!sdk) return;
             try { sdk.destroy(); } catch { /* idempotent */ }
             sdk = null;
+            running = false;
         },
         setPhase() {},
     };

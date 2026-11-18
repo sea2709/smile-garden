@@ -53,12 +53,9 @@ function cameraStatusMessage(sample) {
     return null;
 }
 
-function shouldShowCameraCheck(state, opts) {
-    const o = opts || {};
-    if (o.force) return true;
-    if (!state || typeof state !== 'object') return true;
-    if (state.setupDone !== true) return true;
-    return typeof state.cameraCheckNote === 'string' && state.cameraCheckNote.length > 0;
+/** Always show the warm-up / camera-check screen when starting the game. */
+function shouldShowCameraCheck(_state, _opts) {
+    return true;
 }
 
 function markCameraCheckRequired(state, note) {

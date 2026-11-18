@@ -11,6 +11,22 @@
         stretch: 'Neck stretch',
     });
 
+    const PACKET_PURPOSES = Object.freeze({
+        smile: 'for sunlight',
+        talk: 'for water',
+        breath: 'for fertilizer',
+        stretch: 'for staking',
+    });
+
+    const ACTIVE_PROMPTS = Object.freeze({
+        smile: 'Hold a natural smile — this is how you pour sunlight on your beds.',
+        talk: 'Say a few words aloud — talking fills the watering can.',
+        breath: 'Breathe softly through your nose — optional fertilizer for faster growth.',
+        stretch: 'Tip each ear toward a shoulder — this stakes plants that need support.',
+    });
+
+    const IDLE_PROMPT = 'Tap a seed packet to try an action. Each one maps to garden care.';
+
     const FALLBACK_ICON = Object.freeze({ smile: '☀', talk: '💬', breath: '🍃', stretch: '🌻' });
 
     function firstOpenCheck(snap) {
@@ -94,9 +110,12 @@
         const name = document.createElement('strong');
         name.className = 'cc-packet-name';
         name.textContent = title;
+        const purpose = document.createElement('span');
+        purpose.className = 'cc-packet-purpose';
+        purpose.textContent = PACKET_PURPOSES[key] || '';
         const line = document.createElement('small');
         line.className = 'cc-packet-status';
-        lab.append(name, line);
+        lab.append(name, purpose, line);
         if (active === key && !denied && !(snap.passed && snap.passed[key]) && (key === 'smile' || key === 'talk')) {
             line.textContent = 'listening…';
             const frac = key === 'smile' ? snap.smileMeter : snap.talkMeter;
@@ -109,6 +128,21 @@
         } else {
             line.textContent = status;
         }
+    }
+
+    function renderPrompt(el, snap, active, opts) {
+        if (!el) return;
+        const denied = !!(opts && opts.denied) || !!(snap && (snap.cameraDenied || snap.noCamera));
+        el.hidden = false;
+        if (denied) {
+            el.textContent = 'Fix the camera tip above, or skip for now and start the garden.';
+            return;
+        }
+        if (active && ACTIVE_PROMPTS[active]) {
+            el.textContent = ACTIVE_PROMPTS[active];
+            return;
+        }
+        el.textContent = IDLE_PROMPT;
     }
 
     function renderPackets(container, snap, active, ART, artUrl, opts) {
@@ -165,8 +199,11 @@
 
     window.SmileCameraCheckUI = Object.freeze({
         CHECKS,
+        PACKET_PURPOSES,
+        ACTIVE_PROMPTS,
         mountPackets,
         renderPackets,
         renderStatus,
+        renderPrompt,
     });
 })();
