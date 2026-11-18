@@ -497,10 +497,22 @@
                 if (fxWasOn[k] && !on) playAbsorb(k, effectPlot);
                 fxWasOn[k] = on;
             }
-            if ('sun' in e) fx.sunTarget = clamp(e.sun);
-            if ('water' in e) fx.waterTarget = clamp(e.water);
-            if ('fert' in e) fx.fertTarget = clamp(e.fert);
-            if ('stake' in e) fx.stakeTarget = clamp(e.stake);
+            if ('sun' in e) {
+                fx.sunTarget = clamp(e.sun);
+                if (fx.sunTarget < 0.03) fx.sun = 0;
+            }
+            if ('water' in e) {
+                fx.waterTarget = clamp(e.water);
+                if (fx.waterTarget < 0.03) fx.water = 0;
+            }
+            if ('fert' in e) {
+                fx.fertTarget = clamp(e.fert);
+                if (fx.fertTarget < 0.03) fx.fert = 0;
+            }
+            if ('stake' in e) {
+                fx.stakeTarget = clamp(e.stake);
+                if (fx.stakeTarget < 0.03) fx.stake = 0;
+            }
             if ('breath' in e) fx.breath = clamp(e.breath);
         }
         const clamp = (x) => (x > 1 ? 1 : x < 0 || !Number.isFinite(x) ? 0 : x);
@@ -1044,6 +1056,7 @@
             const meta = id && ART.plants[id] ? ART.plants[id].stages[4] : null;
             const ax = H.frameW / 2;
             ctx.save();
+            clipToBed(i, 16);
             ctx.globalAlpha = Math.min(1, alpha);
             ctx.translate(p.x, p.y - 4);
             ctx.scale(s, s);
@@ -1393,6 +1406,7 @@
             if (!ready(img) || !off) return;
             const pulse = tendRingPulse ? 0.75 + 0.25 * (0.5 + 0.5 * Math.sin(t * Math.PI)) : 1;
             ctx.save();
+            clipToBed(i, 24);
             ctx.globalAlpha = pulse;
             ctx.drawImage(img, off[0], off[1]);
             ctx.restore();
@@ -1638,6 +1652,14 @@
 
         // Painted effect strips over each planted bed. Sun uses additive blending;
         // water and fertilizer stay normal so the damp patch darkens the soil.
+        function clipToBed(i, pad) {
+            const b = ART.plots[i].box;
+            const m = Number(pad) || 0;
+            ctx.beginPath();
+            ctx.rect(b[0] - m, b[1] - m - 40, b[2] - b[0] + m * 2, b[3] - b[1] + m * 2 + 48);
+            ctx.clip();
+        }
+
         function drawFxFrame(kind, mode, i, frame, alpha) {
             const E = ART.effects;
             const img = fxImgs[SPRITE_KINDS[kind] + '-' + (lighting === 'night' ? 'night' : 'day') + '-' + mode];
@@ -1645,6 +1667,7 @@
             const p = ART.plots[i];
             const s = p.w / 180;
             ctx.save();
+            clipToBed(i, 12);
             ctx.globalAlpha = Math.min(1, alpha);
             ctx.globalCompositeOperation = kind === 'sun' ? 'lighter' : 'source-over';
             ctx.translate(p.x, p.y - 4);

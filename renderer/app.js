@@ -1054,7 +1054,7 @@
             const phase = Math.sin(t * 1.8);
             trace.push({
                 t,
-                happiness: mode === 'smile' ? 0.74 + phase * 0.08 : 0.55,
+                happiness: mode === 'smile' ? 0.76 + phase * 0.14 : 0.55,
                 faceVisible: mode !== 'idle',
                 talking: mode === 'talk',
                 smiling: mode === 'smile',
@@ -1737,20 +1737,21 @@
         const stakeAmt = step === 'stretch'
             ? Math.max(stretchSnap.leftProgress || 0, stretchSnap.rightProgress || 0)
             : 0;
-        const waterFx = ((step === 'care-smile' || step === 'smile') && session.smiling)
-            || (step === 'talk' && session.talking) ? 1 : 0;
-        const fertFx = (step === 'care-talk' && session.talking) ? 1
-            : (step === 'breathe' || step === 'care-harvest') ? 0.9 : 0;
-        const sunFx = step === 'care-hub' && lighting !== 'night' ? 0.22 : smileAmt;
-        scene.setEffects({
-            plot: session.selectedPlot,
-            sun: sunFx,
-            water: waterFx,
-            fert: fertFx,
-            stake: stakeAmt,
-        });
         renderNeedsCard();
         renderMeters();
+        if (step !== 'care-hub') {
+            const waterFx = ((step === 'care-smile' || step === 'smile') && session.smiling)
+                || (step === 'talk' && session.talking) ? 1 : 0;
+            const fertFx = (step === 'care-talk' && session.talking) ? 1
+                : (step === 'breathe' || step === 'care-harvest') ? 0.9 : 0;
+            scene.setEffects({
+                plot: session.selectedPlot,
+                sun: smileAmt,
+                water: waterFx,
+                fert: fertFx,
+                stake: stakeAmt,
+            });
+        }
         syncTendRing();
 
         // hints

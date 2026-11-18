@@ -484,10 +484,13 @@ async function run(win, outDir) {
         fs.writeFileSync(path.join(outDir, name), img.toPNG());
         console.log('[capture] wrote', name, img.getSize());
     }
-    async function captureSignalPanel(mode) {
+    async function captureSignalPanel(mode, opts) {
+        const o = opts || {};
         await js('window.__smileGarden.setMockPipForCapture(false)');
         await G('g.setChartForCapture(true)');
+        if (o.channel) await G(`g.setTendStripActiveForCapture(${JSON.stringify(o.channel)})`);
         await G(`g.setSignalPanelDemoForCapture("${mode}")`);
+        if (o.channel) await waitTendStrip(wc);
         await sleep(200);
         await G('g.captureRedraw()');
         await sleep(350);
@@ -574,9 +577,7 @@ async function run(win, outDir) {
     await sleep(800);
     await G('g.prepCaptureGarden()');
     await sleep(400);
-    for (const m of ['idle', 'smile', 'talk', 'breathe', 'stretch']) {
-        await captureSignalPanel(m);
-    }
+    await captureSignalPanel('idle');
     await G('g.clearSignalPanelDemoForCapture()');
     await js('window.__smileGarden.setMockPipForCapture(false)');
     await G('g.clearCaptureVisit()');
@@ -601,7 +602,13 @@ async function run(win, outDir) {
     await sleep(800);
     await shot('03b-selection-ring-visit.png');
     await G(`g.setCareHubProgressForCapture(4, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
-    await G(`g.setSignalPanelDemoForCapture('smile')`);
+    await captureSignalPanel('smile', { channel: 'water' });
+    await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
+    await captureSignalPanel('talk', { channel: 'fertilizer' });
+    await G('g.setSelectedPlot(4)');
+    await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 2, fertilizer: 0, stake: true })`);
+    await captureSignalPanel('stretch', { channel: 'stake' });
+    await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-smile'); return true; })()`);
     await G(`g.setTendStripActiveForCapture('water')`);
     await waitTendStrip(wc);
     await sleep(500);
@@ -637,7 +644,7 @@ async function run(win, outDir) {
     await G(`g.setCareHubProgressForCapture(4, { sun: 3, water: 2, fertilizer: 1, stake: true })`);
     await G('g.setSelectedPlot(4)');
     await G('g.primeCareHarvestForCapture(4)');
-    await G(`g.setSignalPanelDemoForCapture('breathe')`);
+    await captureSignalPanel('breathe', { channel: 'harvest' });
     await G(`g.setTendStripActiveForCapture('harvest')`);
     await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-breathe'); return true; })()`);
     await sleep(900);
