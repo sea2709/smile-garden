@@ -17,6 +17,19 @@ test('head roll from eye landmarks matches tilt sign (mirrored camera)', () => {
     assert.ok(S.radToDeg(raw) < -10, 'unmirrored flips sign');
 });
 
+test('mirrored preview maps player left shoulder to left side and matching roll sign', () => {
+  const leftFlow = S.createStretchFlow({ tiltDeg: 12, smoothWindowSec: 0.08, holdSeconds: 2 });
+  for (let i = 0; i < 5; i++) leftFlow.update(0.15, { points: pts(-20), faceVisible: true, mirrored: true });
+  const leftHold = leftFlow.snapshot();
+  assert.equal(leftHold.activeSide, 'left');
+  assert.ok(leftHold.rollDeg < -8, 'guide roll matches mirrored left tilt');
+  const rightFlow = S.createStretchFlow({ tiltDeg: 12, smoothWindowSec: 0.08, holdSeconds: 2 });
+  for (let i = 0; i < 5; i++) rightFlow.update(0.15, { points: pts(20), faceVisible: true, mirrored: true });
+  const rightHold = rightFlow.snapshot();
+  assert.equal(rightHold.activeSide, 'right');
+  assert.ok(rightHold.rollDeg > 8, 'guide roll matches mirrored right tilt');
+});
+
 test('display progress eases back when player relaxes mid-hold', () => {
     const flow = S.createStretchFlow({ holdSeconds: 2, tiltDeg: 12, displayEaseTau: 0.4 });
     const feed = (deg, dt) => flow.update(dt, { points: pts(deg), faceVisible: true, mirrored: true });
