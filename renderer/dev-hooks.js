@@ -437,16 +437,20 @@
             } else if (mode === 'partial') {
                 setBed(2, { allMet: false, progress: { sun: 1, water: 0, fertilizer: 0, stake: false } });
             } else if (mode === 'garden') {
+                // Match Heily make_mockups.py garden tag layout (beds 1,2,3,5,7).
                 setBed(0, { allMet: false, progress: { sun: 1, water: 2, fertilizer: 0, stake: false } });
-                setBed(1, { allMet: false, progress: { sun: 2, water: 0, fertilizer: 1, stake: false } });
-                setBed(2, { allMet: true, staked: true, resting: false });
+                setBed(1, { allMet: true, staked: false, resting: false });
+                setBed(2, { allMet: false, progress: { sun: 1, water: 0, fertilizer: 0, stake: false } });
                 setBed(4, { allMet: false, progress: { sun: 1, water: 1, fertilizer: 0, stake: false } });
-                setBed(6, { allMet: false, progress: { sun: 2, water: 1, fertilizer: 0, stake: true } });
+                setBed(6, { allMet: false, progress: { sun: 3, water: 2, fertilizer: 2, stake: true }, staked: true });
             }
+            scene.setEffects({ plot: null, sun: 0, water: 0, fert: 0, stake: 0, breath: 0 });
+            scene.setTendSelection(null);
             save();
             show('idle');
             plotsForScene({ instant: true });
             renderHud();
+            scene.draw(performance.now() / 1000);
             return mode;
         },
         prepTagGardenDemo(mode) {
@@ -511,6 +515,57 @@
             renderNeedsCard();
             return step;
         },
+        prepHarvestTendStripShot(plot) {
+            const i = Number(plot);
+            if (!state.plots[i] || !state.plots[i].plantId) return false;
+            if (!session) {
+                const planted = state.plots.map((pl, idx) => (pl ? idx : -1)).filter((idx) => idx >= 0);
+                session = new V.VisitSession({
+                    fast: config.fast,
+                    pace: state.settings.pace,
+                    breaths: state.settings.breaths,
+                    plots: state.plots,
+                    today: gardenTodayKey(),
+                    gardenDay: state.dayNumber,
+                    dailyTends: state.dailyTends,
+                    tendBeds: planted.length ? planted : [i],
+                });
+                session.phase = 'tend';
+                session.plantRound = Math.max(0, planted.indexOf(i));
+                session.go('care-hub');
+                session.selectedPlot = i;
+            }
+            if (session.gardenDay == null) session.gardenDay = state.dayNumber;
+            session.pendingHarvests = (session.pendingHarvests || []).filter((p) => p !== i);
+            session.pacer = null;
+            session.breathT = 0;
+            session.breathsDone = 0;
+            session.activeCareChannel = 'harvest';
+            session.step = 'care-hub';
+            syncToApp();
+            signalPanelDemoLock = null;
+            if (signalSwitcher && signalSwitcher.reset) signalSwitcher.reset();
+            state.settings.chart = false;
+            if (els.chartPanel) els.chartPanel.hidden = true;
+            const ok = hooks.primeCareHarvestForCapture(i);
+            syncFromApp();
+            if (!session) return false;
+            session.pendingHarvests = (session.pendingHarvests || []).filter((p) => p !== i);
+            show('visit');
+            onStep('care-hub');
+            if (els.idleBar) els.idleBar.hidden = true;
+            if (els.hint) els.hint.hidden = true;
+            renderNeedsCard();
+            if (els.tendStrip) els.tendStrip.hidden = false;
+            document.body.dataset.tendStrip = '1';
+            hooks.captureRedraw();
+            return ok && session.canCareHarvest(i);
+        },
+        setCaptureStripGlow(on) {
+            if (on) document.body.dataset.captureStripGlow = '1';
+            else delete document.body.dataset.captureStripGlow;
+            return !!on;
+        },
         primeCareHarvestForCapture(plot) {
             const i = Number(plot);
             const p = state.plots[i];
@@ -523,6 +578,7 @@
             p.matureFert = 1;
             if (L.plantNeedsStake(p.plantId)) p.staked = true;
             if (!session) return false;
+            if (session.gardenDay == null) session.gardenDay = state.dayNumber;
             const needs = L.plantNeeds(p.plantId);
             session.go('care-hub');
             session.setCareProgress(i, {

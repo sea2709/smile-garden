@@ -103,11 +103,11 @@ body[data-lighting='night'] .tend-strip {
 .tend-care[data-need='water']::before      { background-image: url('../assets/ui/tend/tend-glow-water-row.png'); }
 .tend-care[data-need='fertilizer']::before { background-image: url('../assets/ui/tend/tend-glow-fertilizer-row.png'); }
 .tend-care[data-need='stake']::before      { background-image: url('../assets/ui/tend/tend-glow-stake-row.png'); }
-.tend-harvest-icon::before                 { background-image: url('../assets/ui/tend/tend-glow-harvest.png'); }
+.tend-harvest-icon::before                 { background-image: url('../assets/ui/tend/tend-glow-harvest-row.png'); }
 body[data-lighting='night'] .tend-care[data-need='water']::before      { background-image: url('../assets/ui/tend/tend-glow-water-row-night.png'); }
 body[data-lighting='night'] .tend-care[data-need='fertilizer']::before { background-image: url('../assets/ui/tend/tend-glow-fertilizer-row-night.png'); }
 body[data-lighting='night'] .tend-care[data-need='stake']::before      { background-image: url('../assets/ui/tend/tend-glow-stake-row-night.png'); }
-body[data-lighting='night'] .tend-harvest-icon::before                 { background-image: url('../assets/ui/tend/tend-glow-harvest-night.png'); }
+body[data-lighting='night'] .tend-harvest-icon::before                 { background-image: url('../assets/ui/tend/tend-glow-harvest-row-night.png'); }
 @keyframes tend-breathe { 50% { opacity: 0.6; transform: scale(0.96); } }
 @media (prefers-reduced-motion: reduce) {
     .tend-care.is-active::before, .tend-harvest-icon.is-active::before { animation: none; }
@@ -124,3 +124,16 @@ body[data-lighting='night'] .tend-harvest-icon::before                 { backgro
 
 body[data-tend-strip='1'] #hint,
 body[data-tend-strip='1'] #toast { visibility: hidden !important; pointer-events: none; }
+
+/* Doc captures: keep row glow visible without waiting on CSS transition / reduced motion */
+body[data-capture-strip-glow='1'] .tend-care.is-active::before,
+body[data-capture-strip-glow='1'] .tend-harvest-icon.is-active::before {
+    opacity: 1 !important;
+    transform: scale(1) !important;
+    transition: none !important;
+    animation: none !important;
+    z-index: 0 !important;
+}
+body[data-capture-strip-glow='1'] .tend-care.is-active {
+    overflow: visible;
+}

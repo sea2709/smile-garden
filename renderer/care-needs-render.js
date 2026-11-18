@@ -133,7 +133,10 @@
         for (const spec of careSlots) {
             const stat = disp('filledAndLeft', C, prog, needs, spec.key, pl.staked);
             if (stat.req <= 0) continue;
-            const active = slotIsActive(spec.channel, activeCh, nowMs);
+            const captureGlow = typeof document !== 'undefined' && document.body.dataset.captureStripGlow === '1';
+            const active = captureGlow && activeCh === spec.channel
+                ? true
+                : slotIsActive(spec.channel, activeCh, nowMs);
             const row = document.createElement('div');
             row.className = 'tend-care' + (stat.done ? ' tend-care--done' : '') + (active ? ' is-active' : '');
             row.dataset.need = spec.key;

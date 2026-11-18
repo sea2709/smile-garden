@@ -652,7 +652,14 @@ async function run(win, outDir) {
         progress: daySmileProgress,
         mockPhase: 'care-hub-smile',
     });
+    await G('g.setCaptureStripGlow(true)');
+    await G(`g.setTendStripActiveForCapture('water')`);
+    await sleep(200);
+    await G(`g.setTendStripActiveForCapture('water')`);
+    await G('g.captureRedraw()');
+    await sleep(120);
     await shot('tend-strip-active-glow.png');
+    await G('g.setCaptureStripGlow(false)');
     await js('window.__smileGarden.setMockPipForCapture(true, { stream: false })');
     await prepCareDocShot({
         panel: 'smile',
@@ -694,9 +701,21 @@ async function run(win, outDir) {
     await sleep(900);
     await G('g.captureRedraw()');
     await shot('07-care-harvest.png');
-    await G('g.primeCareHarvestForCapture(4)');
+    await G('g.prepHarvestTendStripShot(4)');
     await G('g.setTendStripActiveForCapture("harvest")');
-    await sleep(450);
+    await G('g.setCaptureStripGlow(false)');
+    const harvestOk = await js(`(() => {
+        const s = window.__smileGarden?.session;
+        const strip = document.getElementById('tend-strip');
+        if (!s || !strip || strip.hidden) return 'missing strip';
+        if (!s.canCareHarvest(4)) return 'canCareHarvest false';
+        if (!strip.classList.contains('tend-strip--harvest')) return 'no harvest class';
+        if (document.body.dataset.screen !== 'visit') return 'screen not visit';
+        return 'ok';
+    })()`);
+    if (harvestOk !== 'ok') throw new Error(`tend-strip-harvest preflight: ${harvestOk}`);
+    await sleep(350);
+    await G('g.captureRedraw()');
     await shot('tend-strip-harvest.png');
     await lightingTo('night');
     await G(`g.setCareHubProgressForCapture(4, { sun: 0, water: 1, fertilizer: 0, stake: false })`);

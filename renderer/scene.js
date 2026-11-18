@@ -172,11 +172,14 @@
             needsFaceImgs['dot-off-night'] = loadImage(resolveArt(ART.needsDotSrc(false, 'night')));
         }
         const tagWreathImgs = { day: null, night: null };
+        const tagRingImgs = { day: null, night: null };
         const tagPipImgs = {};
         if (window.SmileCareNeedsDisplay) {
             const pipPaths = window.SmileCareNeedsDisplay;
             tagWreathImgs.day = loadImage(resolveArt('../assets/ui/tag/tag-tended-wreath.png'));
             tagWreathImgs.night = loadImage(resolveArt('../assets/ui/tag/tag-tended-wreath-night.png'));
+            tagRingImgs.day = loadImage(resolveArt('../assets/ui/tag/tag-pip-ring.png'));
+            tagRingImgs.night = loadImage(resolveArt('../assets/ui/tag/tag-pip-ring-night.png'));
             for (const key of ['sun', 'water', 'fertilizer', 'stake']) {
                 for (const kind of ['day', 'night']) {
                     const lit = kind === 'night' ? 'night' : 'midday';
@@ -1373,21 +1376,18 @@
                 if (ready(wreath)) ctx.drawImage(wreath, box.x, box.y, box.w, box.h);
                 const im = needsFaceImgs[`bloom-${kind}`];
                 if (ready(im)) {
-                    const bw = ART.needs.bloomDisplay[0];
-                    const bh = ART.needs.bloomDisplay[1] * sc;
-                    ctx.drawImage(im, fx0 + (fw - bw) / 2, fy0 + (fh - bh) / 2, bw, bh);
+                    const bs = sc >= 0.6 ? ART.needs.bloomDisplay[0] : 18;
+                    const faceCy = ((ART.needs.faceBox[1] + ART.needs.faceBox[3]) / 2) * sf;
+                    ctx.drawImage(im, ax - bs / 2, y0 + faceCy - bs / 2, bs, bs);
                 }
                 return;
             }
-            if (pl.tagResting) {
-                const im = needsFaceImgs[`rest-${kind}`];
-                if (ready(im)) {
-                    const rw = ART.needs.restingDisplay[0];
-                    const rh = ART.needs.restingDisplay[1] * sc;
-                    ctx.drawImage(im, fx0 + (fw - rw) / 2, fy0 + (fh - rh) / 2, rw, rh);
-                }
-            }
             if (D && tagPipImgs[`water-empty-${kind}`]) {
+                const ring = tagRingImgs[kind];
+                if (ready(ring)) {
+                    const box = D.tagWreathBox([ax, ay], sc);
+                    ctx.drawImage(ring, box.x, box.y, box.w, box.h);
+                }
                 const layout = D.tagPipLayout(needs, sc);
                 for (let p = 0; p < layout.length; p++) {
                     const pip = layout[p];
@@ -1396,6 +1396,14 @@
                     if (!ready(im)) continue;
                     const px = pip.pip;
                     ctx.drawImage(im, ax + pip.ox - px / 2, ay + pip.oy - px / 2, px, px);
+                }
+            }
+            if (pl.tagResting) {
+                const im = needsFaceImgs[`rest-${kind}`];
+                if (ready(im)) {
+                    const ls = sc >= 0.6 ? ART.needs.restingDisplay[0] : 14;
+                    const faceCy = ((ART.needs.faceBox[1] + ART.needs.faceBox[3]) / 2) * sf;
+                    ctx.drawImage(im, ax - ls / 2, y0 + faceCy - ls / 2, ls, ls);
                 }
             }
         }
