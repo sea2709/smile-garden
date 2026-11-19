@@ -138,7 +138,7 @@
                 harvestIconEl.insertBefore(harvestGlow, harvestImgEl);
             }
             bindImg(harvestGlow, rowGlowSrc('harvest', cardLight), artUrl, null);
-            bindImg(harvestImgEl, ART.needsIconSrc('harvest', 'midday'), artUrl, '🧺');
+            bindImg(harvestImgEl, ART.needsIconSrc('harvest', cardLight === 'night' ? 'night' : 'day'), artUrl, '🧺');
         } else if (harvestIconEl) {
             harvestIconEl.classList.remove('is-active');
         }

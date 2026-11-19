@@ -87,8 +87,9 @@
     min-height: 26px;
 }
 #tend-strip.is-keyboard .tend-harvest-title b {
-    flex: 1 1 auto;
+    flex: 0 1 auto;
     min-width: 0;
+    white-space: nowrap;
 }
 #tend-strip.is-keyboard .tend-harvest-key {
     flex: 0 0 52px;
@@ -102,9 +103,10 @@
 /* Subtitle wraps in the space left of the Enter cap (title line, right). */
 #tend-strip.is-keyboard .tend-harvest-copy > span {
     white-space: normal;
-    padding-right: 60px;
+    padding-right: 0;
     box-sizing: border-box;
     max-width: 100%;
+    line-height: 20px;
 }
 #tend-strip.is-keyboard.tend-strip--harvest {
     min-height: 128px;

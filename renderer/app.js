@@ -873,6 +873,35 @@
         }
     }
 
+    async function ensureFarmerPipLive() {
+        if (!config.mock && !config.keyboard) return false;
+        syncKeyboardStripMode();
+        if (!(await ensureSource())) return false;
+        if (source && source.setNight) source.setNight(lighting === 'night');
+        if (!sourceReady) {
+            try { await startCamera(); } catch { return false; }
+        } else {
+            resumePipPreview();
+        }
+        return !!(els.preview && els.preview.srcObject);
+    }
+
+    function waitForFarmerPipReady(timeoutMs) {
+        const deadline = performance.now() + (timeoutMs || 6000);
+        return new Promise((resolve) => {
+            const step = () => {
+                const v = els.preview;
+                if (v && v.srcObject && v.readyState >= 2 && v.videoWidth > 0) {
+                    resolve(true);
+                    return;
+                }
+                if (performance.now() >= deadline) resolve(false);
+                else requestAnimationFrame(step);
+            };
+            step();
+        });
+    }
+
     function renderTendStrip() {
         if (!session || !els.tendStrip || !C || !window.SmileTendStrip) return;
         syncKeyboardStripMode();
@@ -992,17 +1021,19 @@
         source.on('status', (s) => { document.body.dataset.status = s; });
         source.on('error', (e) => handleSdkError(e));
         source.on('stream', (stream) => {
+            const farmerPip = els.pip && els.pip.classList.contains('pip-farmer');
             if (mockPipCapture) {
                 if (mockPipWantStream && stream) {
                     els.preview.srcObject = stream;
                     els.preview.removeAttribute('hidden');
                     if (els.preview.style) els.preview.style.removeProperty('visibility');
-                } else if (els.preview) {
+                } else if (els.preview && !farmerPip) {
                     els.preview.pause();
                     els.preview.srcObject = null;
                     els.preview.setAttribute('hidden', '');
                 }
-                els.pip.classList.toggle('pip-mock-capture', !mockPipWantStream || !els.preview.srcObject);
+                const hideOval = !farmerPip && (!mockPipWantStream || !els.preview.srcObject);
+                els.pip.classList.toggle('pip-mock-capture', hideOval);
                 syncPipVisibility();
                 return;
             }
@@ -2386,7 +2417,7 @@
         syncKeyboardStripMode();
         const resume = screen === 'visit' || screen === 'camera-check';
         if (resume) {
-            startCamera().then(() => {
+            ensureFarmerPipLive().then(() => {
                 syncKeyboardStripMode();
                 if (!source || !source.setPhase) return;
                 if (screen === 'visit' && session) {
@@ -2719,6 +2750,7 @@
         renderBreathRate, renderStretchHud, ensureStretchRingArt,
         renderSummary, renderMorningSummary, finishVisit,
         syncGardenSeasonFromDay, syncHudChipClamp, toggleDev, syncKeyboardStripMode,
+        ensureFarmerPipLive, waitForFarmerPipReady,
     });
 
 

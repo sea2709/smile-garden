@@ -97,8 +97,11 @@
             const ctx = canvas.getContext('2d');
             const Farmer = typeof window !== 'undefined' ? window.SmileFarmer : null;
             if (Farmer) {
-                const painted = Farmer.paint(ctx, farmerPaintState(face, talking));
-                if (painted) return;
+                const state = farmerPaintState(face, talking);
+                // Frames are screen-space; the preview video is CSS-mirrored once.
+                state.preflip = false;
+                Farmer.paint(ctx, state);
+                return;
             }
             ctx.fillStyle = '#c4d4e2';
             ctx.fillRect(0, 0, 400, 300);

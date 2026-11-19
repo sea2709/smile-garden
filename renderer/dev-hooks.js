@@ -27,6 +27,7 @@
             show: showScreen, save, toast, mkBtn, gardenTodayKey,
             refreshLighting, renderHud, plotsForScene, syncPipVisibility,
             restorePipHome, startCamera, ensureSource, syncKeyboardStripMode,
+            ensureFarmerPipLive, waitForFarmerPipReady,
             primeSignalTraceForCapture, redrawSignalPanel,
             renderBreathRate, renderStretchHud, ensureStretchRingArt,
             renderSummary, renderMorningSummary, finishVisit,
@@ -803,14 +804,43 @@
             });
             show('summary');
         },
-        setKeyboardModeForCapture(on = true) {
+        async setKeyboardModeForCapture(on = true) {
             config.keyboard = !!on;
             if (on && source && source.setAuto) source.setAuto(false);
             if (els.mockBadge) els.mockBadge.hidden = !on && !config.mock;
             if (on) els.mockMode.textContent = 'Keyboard player';
             syncKeyboardStripMode();
+            if (on) {
+                await ensureFarmerPipLive();
+            }
             renderNeedsCard();
             return config.keyboard;
+        },
+        setFarmerNightRestForCapture() {
+            syncFromApp();
+            if (source && source.setNight) source.setNight(true);
+            if (source && source.setAuto) source.setAuto(false);
+            if (source && source.setKeys) {
+                source.setKeys({
+                    smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false,
+                });
+            }
+            return true;
+        },
+        async ensureFarmerPipForCapture() {
+            try {
+                await hooks.setKeyboardModeForCapture(true);
+                await ensureFarmerPipLive();
+                await waitForFarmerPipReady(10000);
+                syncFromApp();
+                if (source && source.setNight) {
+                    source.setNight((document.body.dataset.lighting || '') === 'night');
+                }
+                return true;
+            } catch (e) {
+                console.error('[ensureFarmerPipForCapture]', e);
+                return false;
+            }
         },
         exportFarmerStateGridDataUrl() {
             const SF = global.SmileFarmer;
@@ -849,48 +879,82 @@
             }
             return canvas.toDataURL('image/png');
         },
-        exportFarmerStateGridDataUrlWhenReady() {
-            const SF = global.SmileFarmer;
-            if (!SF) return Promise.resolve(null);
-            SF.preload('day');
-            const names = ['rest', 'smile', 'talk-1', 'tilt-left', 'tilt-right', 'hidden'];
-            return new Promise((resolve) => {
-                let left = names.length;
-                let failed = false;
-                const done = () => {
-                    if (!failed) resolve(hooks.exportFarmerStateGridDataUrl());
-                    else resolve(null);
-                };
-                for (const n of names) {
-                    const img = new Image();
-                    img.onload = () => { left -= 1; if (left <= 0) done(); };
-                    img.onerror = () => { failed = true; resolve(null); };
-                    img.src = SF.srcFor('day', n);
-                    if (img.complete && img.naturalWidth > 0) {
-                        left -= 1;
-                    }
-                }
-                if (left <= 0) done();
-            });
-        },
-        prepKeyboardHintsStripShot(opts) {
-            const plot = opts && opts.plot != null ? Number(opts.plot) : 4;
-            const progress = (opts && opts.progress) || { sun: 2, water: 1, fertilizer: 0, stake: false };
-            const channel = (opts && opts.channel) || 'water';
-            hooks.setKeyboardModeForCapture(true);
-            hooks.setNeedsCardDemo(plot, progress);
+        async exportFarmerStateGridFromLivePip() {
             syncFromApp();
-            if (opts && opts.lighting) setLightingOverride(opts.lighting);
-            else refreshLighting();
-            if (opts && opts.harvest) {
-                hooks.prepHarvestTendStripShot(plot);
-            } else {
-                hooks.setTendStripActiveForCapture(channel);
+            if (!els.preview || !els.preview.srcObject) await hooks.ensureFarmerPipForCapture();
+            if (source && source.setAuto) source.setAuto(false);
+            if (source && source.setNight) source.setNight(false);
+            refreshLighting();
+            const tiles = [
+                { label: 'rest', keys: { smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false } },
+                { label: 'smile', keys: { smile: true, talk: false, hide: false, tiltLeft: false, tiltRight: false } },
+                { label: 'talk', keys: { smile: false, talk: true, hide: false, tiltLeft: false, tiltRight: false } },
+                { label: 'tilt [', keys: { smile: false, talk: false, hide: false, tiltLeft: true, tiltRight: false } },
+                { label: 'tilt ]', keys: { smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: true } },
+                { label: 'hidden', keys: { smile: false, talk: false, hide: true, tiltLeft: false, tiltRight: false } },
+            ];
+            const pipW = 200;
+            const pipH = 150;
+            const labelH = 22;
+            const cols = 3;
+            const canvas = document.createElement('canvas');
+            canvas.width = pipW * cols;
+            canvas.height = (pipH + labelH) * 2;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#f0e6d2';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const v = els.preview;
+            if (!v) return null;
+            for (let i = 0; i < tiles.length; i++) {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                const spec = tiles[i];
+                if (source && source.setKeys) source.setKeys(spec.keys);
+                await waitForFarmerPipReady(6000);
+                const x = col * pipW;
+                const y = row * (pipH + labelH);
+                try {
+                    ctx.drawImage(v, x, y, pipW, pipH);
+                } catch { /* ignore */ }
+                ctx.fillStyle = '#3E2A1A';
+                ctx.font = 'bold 12px Nunito, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(spec.label, x + pipW / 2, y + pipH + 16);
             }
-            document.body.dataset.demoCareChannel = channel;
-            renderNeedsCard();
-            hooks.captureRedraw();
-            return true;
+            if (source && source.setKeys) {
+                source.setKeys({ smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false });
+            }
+            return canvas.toDataURL('image/png');
+        },
+        async prepKeyboardHintsStripShot(opts) {
+            try {
+                const plot = opts && opts.plot != null ? Number(opts.plot) : 4;
+                const progress = (opts && opts.progress) || { sun: 2, water: 1, fertilizer: 0, stake: false };
+                const channel = (opts && opts.channel) || 'water';
+                await hooks.setKeyboardModeForCapture(true);
+                hooks.setNeedsCardDemo(plot, progress);
+                syncFromApp();
+                if (opts && opts.lighting) setLightingOverride(opts.lighting);
+                else refreshLighting();
+                syncFromApp();
+                if (source && source.setNight) {
+                    source.setNight((document.body.dataset.lighting || '') === 'night');
+                }
+                if (opts && opts.harvest) {
+                    hooks.prepHarvestTendStripShot(plot);
+                } else {
+                    hooks.setTendStripActiveForCapture(channel);
+                }
+                document.body.dataset.demoCareChannel = channel;
+                renderNeedsCard();
+                await ensureFarmerPipLive();
+                await waitForFarmerPipReady(10000);
+                hooks.captureRedraw();
+                return true;
+            } catch (e) {
+                console.error('[prepKeyboardHintsStripShot]', e);
+                return false;
+            }
         },
         };
 

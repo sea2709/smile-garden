@@ -478,39 +478,50 @@ async function runKeyboardFarmerArt(win, outDir) {
     await G('g.prepCaptureGarden()');
     await sleep(600);
     await js('window.__smileGarden.setMockPipForCapture(true, { stream: true })');
-    await G('g.setKeyboardModeForCapture(true)');
+    const pipBoot = await G('g.ensureFarmerPipForCapture()');
+    if (!pipBoot) throw new Error('ensureFarmerPipForCapture failed during boot');
     await lightingTo('midday');
-    await G(`g.prepKeyboardHintsStripShot({ plot: 4, channel: 'water', progress: { sun: 2, water: 1, fertilizer: 0, stake: false } })`);
-    await sleep(500);
-    await G('g.captureRedraw()');
+    async function prepStrip(channel, progress, harvest) {
+        await G('g.setKeyboardModeForCapture(true)');
+        await G(`g.setNeedsCardDemo(4, ${JSON.stringify(progress)})`);
+        if (harvest) {
+            await G('g.prepHarvestTendStripShot(4)');
+        } else {
+            await G(`g.setTendStripActiveForCapture('${channel}')`);
+            await js(`document.body.dataset.demoCareChannel='${channel}'`);
+        }
+        await G('g.ensureFarmerPipForCapture()');
+        await G('g.captureRedraw()');
+        await sleep(200);
+    }
+    await prepStrip('water', { sun: 2, water: 1, fertilizer: 0, stake: false }, false);
     await shot('keyboard-hints-strip-day.png');
     await lightingTo('night');
-    await G(`g.prepKeyboardHintsStripShot({ plot: 4, channel: 'water', progress: { sun: 1, water: 0, fertilizer: 0, stake: false }, lighting: 'night' })`);
-    await sleep(500);
-    await G('g.captureRedraw()');
+    await G(`g.setLightingOverride('night')`);
+    await sleep(400);
+    await prepStrip('water', { sun: 1, water: 0, fertilizer: 0, stake: false }, false);
     await shot('keyboard-hints-strip-night.png');
     await lightingTo('midday');
-    await G(`g.prepKeyboardHintsStripShot({ plot: 4, harvest: true, channel: 'harvest' })`);
-    await sleep(500);
-    await G('g.captureRedraw()');
+    await prepStrip('harvest', { sun: 3, water: 2, fertilizer: 1, stake: true }, true);
     await shot('keyboard-hints-strip-harvest.png');
 
-    const gridUrl = await js('window.__smileGarden.exportFarmerStateGridDataUrlWhenReady()');
+    const gridUrl = await G('g.exportFarmerStateGridFromLivePip()');
     await writeDataUrl('farmer-states-day.png', gridUrl);
 
     await lightingTo('night');
-    await js(`(() => { const s = window.__smileGarden?.source; if (s) { s.setNight(true); s.setAuto(false); s.setKeys({ smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false }); } return true; })()`);
+    await js('window.__smileGarden.setMockPipForCapture(true, { stream: true })');
+    await G('g.setNeedsCardDemo(4, {"sun":1,"water":0,"fertilizer":0,"stake":false})');
+    await G('g.ensureFarmerPipForCapture()');
+    await G('g.setFarmerNightRestForCapture()');
     await sleep(400);
     await G('g.captureRedraw()');
     await sleep(200);
+    const pipVis = await G('!document.getElementById("pip").hidden');
+    if (!pipVis) throw new Error('pip hidden before farmer-night');
     await shotPip('farmer-night.png');
 
     await lightingTo('midday');
-    await G('g.setKeyboardModeForCapture(true)');
-    await G(`g.prepKeyboardHintsStripShot({ plot: 4, channel: 'water', progress: { sun: 2, water: 1, fertilizer: 0, stake: false } })`);
-    await js('window.__smileGarden.setMockPipForCapture(true, { stream: true })');
-    await G('g.captureRedraw()');
-    await sleep(300);
+    await prepStrip('water', { sun: 2, water: 1, fertilizer: 0, stake: false }, false);
     await shot('farmer-in-app.png');
 }
 
