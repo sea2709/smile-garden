@@ -179,6 +179,9 @@ function createSdkSource(config) {
         });
 
         sdk.on('error', (code, message, retryable) => {
+            // Fatal SDK errors stop the pipeline; clear so a later start()/reset()
+            // can recover (e.g. kSustainedLowFrameRate) instead of no-op'ing.
+            running = false;
             em.emit('error', { code, name: ERROR_NAMES[code] || String(code), message, retryable: !!retryable });
         });
 

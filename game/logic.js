@@ -608,7 +608,7 @@
             needs: Object.freeze({ sun: 1, water: 3, fertilizer: 1, stake: false }),
             sunHours: 4, sunHoursLabel: '4 hours',
             cost: 4, difficulty: 'easy', difficultyLabel: 'Easy',
-            blurb: 'Leafy lettuce is happy with about 4 hours of sun. Keep the soil moist so the leaves stay sweet, not bitter.',
+            blurb: 'A thirsty leafy bed: three smiles fill its water, then one short chat adds fertilizer. It stays low, so no stake.',
             source: 'https://cals.cornell.edu/school-integrative-plant-science/school-sections/horticulture-section/outreach-and-extension/pandemic-vegetable-gardening/pandemic-vegetable-gardening-2020-archive/sunlight-key-great-vegetables',
             sourceLabel: 'Cornell CALS: leafy crops need about 3–4 hours of sun',
         }),
@@ -617,7 +617,7 @@
             needs: Object.freeze({ sun: 1, water: 3, fertilizer: 1, stake: false }),
             sunHours: 5, sunHoursLabel: '4–6 hours',
             cost: 5, difficulty: 'easy', difficultyLabel: 'Easy',
-            blurb: 'Mint likes 4–6 hours of sun, or a little shade. It spreads, so give it its own plot and keep the soil moist.',
+            blurb: 'Mint drinks often — three smiles of water and a light chat of fertilizer. Soft stems, no staking needed.',
             source: 'https://ipm.ucanr.edu/home-and-landscape/cultural-tips-for-growing-mint/',
             sourceLabel: 'UC IPM: full sun to partial shade, at least 4–6 hours a day',
         }),
@@ -626,7 +626,7 @@
             needs: Object.freeze({ sun: 2, water: 3, fertilizer: 2, stake: true }),
             sunHours: 7, sunHoursLabel: '6–8 hours',
             cost: 7, difficulty: 'medium', difficultyLabel: 'Medium',
-            blurb: 'Cucumbers want 6–8 hours of direct sun and steady water. Give the vine room to climb.',
+            blurb: 'A climbing vine: keep water topped with three smiles, two chats of fertilizer, and a stretch to stake it up.',
             source: 'https://cals.cornell.edu/school-integrative-plant-science/school-sections/horticulture-section/outreach-and-extension/pandemic-vegetable-gardening/pandemic-vegetable-gardening-2021-archive/no-yard-grow-vegetables-and-more-containers',
             sourceLabel: 'Cornell CALS: fruiting crops like cucumbers need 6–8 hours of direct sun',
         }),
@@ -635,7 +635,7 @@
             needs: Object.freeze({ sun: 3, water: 2, fertilizer: 3, stake: true }),
             sunHours: 8, sunHoursLabel: '7–8 hours',
             cost: 8, difficulty: 'medium', difficultyLabel: 'Medium',
-            blurb: 'Tomatoes are sun lovers: 7–8 hours if you can. Warmth and regular water help the fruit ripen.',
+            blurb: 'Hungry fruit: two smiles of water, three chats of fertilizer, and a stretch to stake the heavy stems.',
             source: 'https://cals.cornell.edu/school-integrative-plant-science/school-sections/horticulture-section/outreach-and-extension/pandemic-vegetable-gardening/pandemic-vegetable-gardening-2020-archive/sunlight-key-great-vegetables',
             sourceLabel: 'Cornell CALS: fruiting crops like tomatoes need 7–8 hours of sun',
         }),
@@ -644,7 +644,7 @@
             needs: Object.freeze({ sun: 3, water: 1, fertilizer: 1, stake: true }),
             sunHours: 8, sunHoursLabel: '6–8+ hours',
             cost: 10, difficulty: 'hard', difficultyLabel: 'Hard',
-            blurb: 'Sunflowers thrive in full sun, 6–8 hours or more. Plant them where they can stretch tall and drink the light.',
+            blurb: 'Light care once tall: one smile of water, one chat of fertilizer, and a stretch so the stalk stays upright.',
             source: 'https://extension.oregonstate.edu/catalog/em-9866-grow-your-own-sunflowers',
             sourceLabel: 'Oregon State Extension: full sun, 6–8+ hours per day',
         }),
@@ -653,7 +653,7 @@
             needs: Object.freeze({ sun: 3, water: 2, fertilizer: 2, stake: true }),
             sunHours: 8, sunHoursLabel: '8 hours',
             cost: 12, difficulty: 'hard', difficultyLabel: 'Hard',
-            blurb: 'Apple trees need a full 8 hours of sun. A tree takes patience — more smiles to reach the fruit.',
+            blurb: 'A patient tree: two smiles of water, two chats of fertilizer, and a stretch to stake young growth while it takes its time.',
             source: 'https://extension.umn.edu/garden-and-home/yard-and-garden/gardening-in-minnesota/growing-apples',
             sourceLabel: 'University of Minnesota Extension: at least 8 hours of sun per day',
         }),
@@ -678,6 +678,15 @@
 
     function plantNeedsStake(id) {
         return !!plantNeeds(id).stake;
+    }
+
+    /** Player-facing care line for seed library / picker (water, fertilizer, stake). */
+    function plantCareSummary(id) {
+        const n = plantNeeds(id);
+        const water = n.water === 1 ? '1 smile' : `${n.water} smiles`;
+        const fert = n.fertilizer === 1 ? '1 chat' : `${n.fertilizer} chats`;
+        const stake = n.stake ? 'needs staking' : 'no stake';
+        return `💧 Water ${water} · 🍃 Fertilizer ${fert} · 🌻 ${stake.charAt(0).toUpperCase()}${stake.slice(1)}`;
     }
 
     /** Stage for a 0..1 fill: { index, key, label, at, next, toNext, progress }. */
@@ -1111,6 +1120,7 @@
         plantById,
         plantNeeds,
         plantNeedsStake,
+        plantCareSummary,
         DEFAULT_PLANT_NEEDS,
         scorePlots,
         mulberry32,

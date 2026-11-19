@@ -355,7 +355,9 @@ body[data-screen="visit"][data-step^="care-"] .mock-badge {
 .seed-card img { width: 100%; height: 88px; object-fit: contain; object-position: bottom; }
 .seed-card h3 { font-family: var(--serif); font-weight: 600; font-size: 17px; margin: 6px 0 2px; }
 .seed-sun { font-size: 12.5px; font-weight: 800; color: #a87a1c; }
+.seed-care { font-size: 12.5px; font-weight: 800; color: var(--sage-dark); line-height: 1.35; }
 .seed-meta { font-size: 11.5px; color: var(--ink-soft); font-weight: 700; margin: 2px 0 5px; }
+.lib-card .seed-meta { margin: 2px 0 6px; font-weight: 700; }
 .seed-blurb { font-size: 11.8px; line-height: 1.35; color: var(--ink); margin: 0; flex: 1; }
 .seed-src { font-size: 10px; color: var(--ink-soft); margin-top: 6px; font-style: italic; }
 .seed-card.locked { cursor: default; }

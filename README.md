@@ -6,9 +6,9 @@ Plants grow one stage per day (over real days) when they have had enough sun and
 ever dies or wilts. Built on Presage **SmartSpectra**'s Node/Electron SDK (face expression +
 talking metrics), with a keyboard/demo fallback so it runs without a camera or API key.
 
-| Dawn | Midday | Golden hour | Night |
-|---|---|---|---|
-| ![](docs/17-full-garden-dawn.png) | ![](docs/16-full-garden-midday.png) | ![](docs/18-full-garden-golden-hour.png) | ![](docs/19-full-garden-night.png) |
+| Dawn | Midday | Night |
+|---|---|---|
+| ![](docs/17-full-garden-dawn.png) | ![](docs/16-full-garden-midday.png) | ![](docs/19-full-garden-night.png) |
 
 | Smile (sunlight) | Talk (water) | Breathe (fertilizer, optional) | Summary |
 |---|---|---|---|
@@ -68,7 +68,7 @@ at garden night: "🌙 It's a little dark in here: try turning on a soft light i
 
 ### Lighting
 
-The scene follows local time: **dawn 5–9, midday 9–16, golden hour 16–19, night otherwise**, with a
+The scene follows local time: **dawn 5–9, midday 9–19, night otherwise**, with a
 1.6 s crossfade between painted backdrops. The plant sprites get a matching colour grade (dimmer and
 cooler at night). The demo tools have a lighting override.
 

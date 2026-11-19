@@ -341,10 +341,10 @@
         }
 
         function setLightingBlend(weights) {
-            const w = Object.assign({ dawn: 0, midday: 0, 'golden-hour': 0, night: 0 }, weights || {});
+            const w = Object.assign({ dawn: 0, midday: 0, night: 0 }, weights || {});
             let primary = 'midday';
             let best = -1;
-            for (const k of ['dawn', 'midday', 'golden-hour', 'night']) {
+            for (const k of ['dawn', 'midday', 'night']) {
                 if ((w[k] || 0) > best) { best = w[k]; primary = k; }
             }
             if (primary !== lighting) {
@@ -924,7 +924,7 @@
             if (lightWeights) {
                 ctx.fillStyle = '#e9e0c9';
                 ctx.fillRect(0, 0, ART.width, ART.height);
-                for (const k of ['dawn', 'midday', 'golden-hour', 'night']) {
+                for (const k of ['dawn', 'midday', 'night']) {
                     const alpha = lightWeights[k] || 0;
                     if (alpha < 0.008) continue;
                     const img = bgImgs[k];
@@ -1103,7 +1103,6 @@
         const SPRITE_FILTER = {
             dawn: 'sepia(0.10) saturate(1.02) brightness(0.98) hue-rotate(-4deg)',
             midday: 'none',
-            'golden-hour': 'sepia(0.20) saturate(1.08) brightness(0.98)',
             night: 'brightness(0.58) saturate(0.62) hue-rotate(8deg) contrast(0.95)',
         };
         function drawReadyLoop(i, t) {
@@ -1505,7 +1504,7 @@
             if (a < 0.02) return;
             ctx.save();
             ctx.globalCompositeOperation = 'screen';
-            const warm = lighting === 'golden-hour' ? [255, 190, 110] : lighting === 'dawn' ? [255, 214, 190] : lighting === 'night' ? [190, 200, 255] : [255, 240, 190];
+            const warm = lighting === 'dawn' ? [255, 214, 190] : lighting === 'night' ? [190, 200, 255] : [255, 240, 190];
             for (let k = 0; k < 5; k++) {
                 const x0 = 120 + k * 230 + Math.sin(t * 0.25 + k) * 30;
                 const w = 90 + (k % 2) * 60;
@@ -1547,7 +1546,7 @@
             ctx.save();
             ctx.globalCompositeOperation = 'lighter';
             if (!night) {
-                const tint = lighting === 'golden-hour' ? [255, 196, 120] : lighting === 'dawn' ? [255, 214, 200] : [255, 248, 214];
+                const tint = lighting === 'dawn' ? [255, 214, 200] : [255, 248, 214];
                 const base = lighting === 'midday' ? 0.28 : 0.36;
                 for (const m of motes) {
                     const fade = Math.min(1, m.life / 1.5, (m.max - m.life) / 1.5);

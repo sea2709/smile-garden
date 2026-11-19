@@ -19,9 +19,14 @@ test('garden clock pauses at late night and advances with real time', () => {
     assert.equal(s.gardenMinutes, D.DEFAULT_DAY_CONFIG.lateNightStop);
 });
 
-test('lighting blends across dawn, midday, golden hour, and night', () => {
+test('lighting blends across dawn, midday, and night', () => {
     const dawn = D.lightingBlend(7 * 60);
     assert.ok(dawn.weights.dawn + dawn.weights.midday > 0.9);
+    const midday = D.lightingBlend(17 * 60);
+    assert.equal(midday.weights.midday, 1);
+    assert.equal(midday.primary, 'midday');
+    const dusk = D.lightingBlend(20 * 60);
+    assert.ok(dusk.weights.midday > 0 && dusk.weights.night > 0);
     const night = D.lightingBlend(22 * 60);
     assert.equal(night.weights.night, 1);
 });

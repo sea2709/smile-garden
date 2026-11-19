@@ -844,15 +844,15 @@ async function run(win, outDir) {
     await G('g.captureRedraw()');
     await shot('care-needs-tags-garden.png');
 
-    // --- a few days later, golden hour ---
+    // --- a few days later, evening (still midday lighting) ---
     await G('g.simulateDays(2)');
     await G(`g.plant('tomato', 2)`);
     await G(`g.plant('lettuce', 6)`);
-    await lightingTo('golden-hour');
+    await lightingTo('midday');
     await G(`g.show('idle')`);
     await sleep(2500);
     await G(`g.show('idle')`);
-    await shot('09-golden-hour-garden.png');
+    await shot('09-evening-garden.png');
     await G('g.setStakedBed(2, true)');
     await sleep(800);
     await shot('09b-staked-plant-bed.png');
@@ -896,7 +896,7 @@ async function run(win, outDir) {
     await shot('12-night-garden-fireflies.png');
 
     // --- journal ---
-    await lightingTo('golden-hour');
+    await lightingTo('midday');
     await G(`g.openJournal('diary')`);
     await sleep(800);
     await shot('13-journal-diary.png');
@@ -916,7 +916,7 @@ async function run(win, outDir) {
     await G('g.simulateDays(14)');
     await sleep(1600);
     await G(`g.show('idle')`);
-    for (const [l, n] of [['midday', '16-full-garden-midday.png'], ['dawn', '17-full-garden-dawn.png'], ['golden-hour', '18-full-garden-golden-hour.png'], ['night', '19-full-garden-night.png']]) {
+    for (const [l, n] of [['midday', '16-full-garden-midday.png'], ['dawn', '17-full-garden-dawn.png'], ['night', '19-full-garden-night.png']]) {
         await lightingTo(l);
         await sleep(1200);
         await shot(n);

@@ -28,7 +28,7 @@
         'screen-summary', 'sum-card', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'btn-dev-close', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
         'dev-ready', 'dev-fill', 'dev-reset', 'basket-chip', 'basket-count', 'screen-unlock', 'unlock-title', 'unlock-body', 'unlock-art', 'btn-unlock-ok',
         'brand-logo-day', 'brand-logo-night', 'brand-fallback',
-        'error-banner', 'error-title', 'error-message', 'btn-error-keyboard', 'btn-error-dismiss']) {
+        'error-banner', 'error-title', 'error-message', 'btn-error-retry', 'btn-error-keyboard', 'btn-error-dismiss']) {
         els[id.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = $(id);
     }
 
@@ -746,7 +746,7 @@
         let msg = 'Wander the beds, tend your plants, and harvest when ready.';
         if (state.version >= 5) {
             if (gardenClock.atLateNight()) msg = 'A peaceful night. Go to bed when you are ready — the day never ends by force.';
-            else if (gardenClock.suggestBed()) msg = 'Golden hour. You can keep tending, or head to bed whenever you like.';
+            else if (gardenClock.suggestBed()) msg = 'Evening. You can keep tending, or head to bed whenever you like.';
             else if (!tendable.length && !ready) msg = 'Every plant is tended for today. Rest, harvest, or go to bed when ready.';
         }
         els.idleText.textContent = msg;
@@ -799,19 +799,16 @@
             diff.className = `diff diff-${p.difficulty}`;
             diff.textContent = p.difficultyLabel;
             h3.appendChild(diff);
-            const sun = document.createElement('div');
-            sun.className = 'seed-sun';
-            sun.textContent = `☀ ${p.sunHoursLabel} of sun a day`;
+            const care = document.createElement('div');
+            care.className = 'seed-care';
+            care.textContent = info.careSummary;
             const meta = document.createElement('div');
             meta.className = 'seed-meta';
-            meta.textContent = `Needs ${p.cost} sun-hours per stage · 4 stages to grow`;
+            meta.textContent = 'Smile · talk · stretch · 4 stages to grow';
             const blurb = document.createElement('p');
             blurb.className = 'seed-blurb';
             blurb.textContent = info.tips[0] || p.blurb;
-            const src = document.createElement('div');
-            src.className = 'seed-src';
-            src.textContent = 'Sun need: ' + p.sourceLabel.split(':')[0];
-            card.append(img, h3, sun, meta, blurb, src);
+            card.append(img, h3, care, meta, blurb);
             if (unlocked) card.addEventListener('click', () => plant(p.id));
             els.seedCards.appendChild(card);
         }
@@ -846,7 +843,7 @@
         breathe: { title: 'Breathe with the light', text: 'Follow the glow: in as it grows, out as it fades. No holding, no straining.' },
         'stretch-offer': { title: 'Stake this plant', text: 'Optional neck stretch — tip each ear toward a shoulder and hold briefly, like setting a gentle stake. Skip anytime.' },
         stretch: { title: 'Neck stretch', text: 'Tilt toward one shoulder (~15°) and hold about 3 seconds, then the other. Order does not matter.' },
-        'care-hub': { title: 'Tend with your camera', text: 'Select a bed once. Sunlight fills by day; smile to water, talk to fertilize, breathe to harvest when mature, and stretch to stake climbers. The needs card shows status only.' },
+        'care-hub': { title: 'Tend with your camera', text: 'Pick any bed anytime (click, arrows, or Enter). Sunlight fills by day; smile to water, talk to fertilize, breathe to harvest when mature, and stretch to stake climbers. Partial care is kept per bed.' },
         'care-smile': { title: 'Water', text: 'Smile at your plant while the water dot fills (~10 s per dot).' },
         'care-talk': { title: 'Fertilize', text: 'Talk to your plant while the fertilizer dot fills (~10 s per dot).' },
         'care-harvest': { title: 'Harvest', text: 'Breathe with the guide to harvest this mature crop. Gentle nose breathing only.' },
@@ -980,7 +977,7 @@
             signal.validationHint = (v && v.hint) || '';
         });
         source.on('status', (s) => { document.body.dataset.status = s; });
-        source.on('error', (e) => showError('SmartSpectra error', `${e.name}: ${e.message || ''}`, !config.mock));
+        source.on('error', (e) => handleSdkError(e));
         source.on('stream', (stream) => {
             if (mockPipCapture) {
                 if (mockPipWantStream && stream) {
@@ -1654,9 +1651,12 @@
                 els.stepLive.textContent = 'Fully grown — breathe calmly to pick, or press Enter. Esc ends the visit.';
             } else {
                 const all = pl && C.allNeedsMet(session.careProgressFor(session.selectedPlot), L.plantNeeds(pl.plantId), pl.staked);
+                const moreBeds = session.selectablePlots && session.selectablePlots().length > 1;
                 els.stepLive.textContent = all
-                    ? 'All needs met — bloom stamp on the tag. Finish when you like.'
-                    : 'Smile to water, talk to fertilize, stretch to stake. Switch beds with a click or arrow keys.';
+                    ? (moreBeds
+                        ? 'All needs met — arrow keys or Enter for another bed. Finish when you like.'
+                        : 'All needs met — bloom stamp on the tag. Finish when you like.')
+                    : 'Smile to water, talk to fertilize, stretch to stake. Switch beds with arrow keys, Enter, or a click.';
             }
         } else if (step === 'care-smile') {
             els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
@@ -2015,7 +2015,7 @@
                 let status = `${V.STAGES[p.stage].label}`;
                 if (V.isPlotReady(p, today)) status += ' · ready to pick';
                 else if (V.isPlotRegrowing(p, today)) status += ' · regrowing';
-                line.textContent = `${status} · planted ${days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago'} · needs ${kind.sunHoursLabel} of sun a day`;
+                line.textContent = `${status} · planted ${days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago'} · ${L.plantCareSummary(p.plantId)}`;
                 txt.append(b, pips, line);
                 if (p.stage < 5) {
                     const bank = document.createElement('div');
@@ -2098,21 +2098,23 @@
                 img.alt = '';
                 const txt = document.createElement('div');
                 const h = document.createElement('h3'); h.textContent = p.name;
-                const sun = document.createElement('div'); sun.className = 'seed-sun'; sun.textContent = `☀ Sun need: ${p.sunHoursLabel} a day · in the game ${p.cost} sun-hours per stage`;
+                const care = document.createElement('div');
+                care.className = 'seed-care';
+                care.textContent = info.careSummary;
+                const how = document.createElement('div');
+                how.className = 'seed-meta';
+                how.textContent = 'Smile to water · talk to fertilize · stretch to stake · daylight fills sun';
                 const blurb = document.createElement('div'); blurb.className = 'note'; blurb.textContent = p.blurb;
                 const ul = document.createElement('ul');
                 for (const tip of info.tips) { const li = document.createElement('li'); li.textContent = tip; ul.appendChild(li); }
-                const src = document.createElement('div'); src.className = 'src';
-                const sb = document.createElement('b'); sb.textContent = 'Source: ';
-                src.append(sb, document.createTextNode(`${p.sourceLabel}. ${p.source}`));
-                txt.append(h, sun, blurb, ul, src);
+                txt.append(h, care, how, blurb, ul);
                 card.append(img, txt);
                 grid.appendChild(card);
             }
             body.appendChild(grid);
             const fine = document.createElement('p');
             fine.className = 'fineprint';
-            fine.textContent = 'Sun needs come from the university extension sources shown. The other tips are general gardening advice; your local extension service knows your climate best. Water and fertilizer amounts in the game are simplified.';
+            fine.textContent = 'Care amounts are for this garden: each water or fertilizer dot takes a short smile or chat, and staking is one stretch. Daylight fills sun on its own while you visit.';
             body.appendChild(fine);
         }
     }
@@ -2140,11 +2142,81 @@
         clearTimeout(toastTimer);
         toastTimer = setTimeout(() => { els.toast.hidden = true; }, 2600);
     }
-    function showError(title, msg, offerKeyboard) {
+    function showError(title, msg, offerKeyboard, offerRetry) {
         els.errorTitle.textContent = title;
         els.errorMessage.textContent = msg;
+        if (els.btnErrorRetry) {
+            els.btnErrorRetry.hidden = !offerRetry;
+            els.btnErrorRetry.disabled = false;
+        }
         els.btnErrorKeyboard.hidden = !offerKeyboard;
         els.errorBanner.hidden = false;
+    }
+
+    /** Map SmartSpectra error events to copy + optional user-initiated retry. */
+    function handleSdkError(e) {
+        // Pipeline already stopped; keep startCamera() from early-returning.
+        sourceReady = false;
+        const name = (e && e.name) || '';
+        const live = !config.mock && !config.keyboard;
+        if (name === 'SustainedLowFrameRate') {
+            showError(
+                'Camera too slow',
+                'The reading paused because the frame rate stayed too low. Close other apps using the webcam, add soft light on your face, then try again.',
+                live,
+                live,
+            );
+            return;
+        }
+        const offerRetry = live && !!(e && e.retryable);
+        showError(
+            'SmartSpectra error',
+            `${name || 'Error'}: ${(e && e.message) || ''}`,
+            live,
+            offerRetry,
+        );
+    }
+
+    /**
+     * User-initiated recovery after a retryable SDK stop (e.g. SustainedLowFrameRate).
+     * Presage: reset after kError, then start — do not auto-loop.
+     */
+    async function retryAfterSdkError() {
+        if (els.btnErrorRetry) els.btnErrorRetry.disabled = true;
+        els.errorBanner.hidden = true;
+        toast('Restarting the camera…');
+        try {
+            await enqueueCamera(async () => {
+                if (!(await ensureSource())) throw new Error('Camera source unavailable');
+                if (typeof source.reset === 'function') {
+                    try { await source.reset(); } catch { /* best-effort */ }
+                } else if (typeof source.stop === 'function') {
+                    try { await source.stop(); } catch { /* ignore */ }
+                }
+                sourceReady = false;
+                await new Promise((r) => setTimeout(r, 250));
+                await source.start();
+                sourceReady = true;
+                resumePipPreview();
+                if (source.setPhase) {
+                    if (screen === 'visit' && session) {
+                        source.setPhase(session.step === 'care-hub' ? careHubMockPhase() : session.step);
+                    } else if (screen === 'camera-check') {
+                        source.setPhase('camera-check-smile');
+                    }
+                }
+            });
+            toast('Camera restarted. Hold still with good light.');
+        } catch (err) {
+            showError(
+                'Camera could not restart',
+                String(err && err.message || err),
+                !config.mock && !config.keyboard,
+                true,
+            );
+        } finally {
+            if (els.btnErrorRetry) els.btnErrorRetry.disabled = false;
+        }
     }
 
     // plot hover tips + clicks
@@ -2217,12 +2289,12 @@
         const i = scene.plotAt(e.clientX, e.clientY);
         if (i === null) return;
         lastGardenPickAt = now;
-        if (screen === 'visit' && session && (session.step === 'pick' || session.step === 'pick-harvest' || session.step === 'care-hub')) {
+        const visitSelectSteps = ['pick', 'pick-harvest', 'care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
+        if (screen === 'visit' && session && visitSelectSteps.includes(session.step)) {
             if (session.setSelectedPlot(i)) {
-                syncTendRing();
-                renderNeedsCard();
-                if (session.step === 'care-hub') onStep('care-hub');
-                else if (session.step === 'pick') {
+                // Mid-tend / stretch: land back on care-hub for the newly chosen bed.
+                onStep(session.step);
+                if (session.step === 'pick') {
                     els.stepLive.textContent = `${selectedPlantLabel()} · plant ${session.plantRound + 1} of ${session.plantedBeds.length}. Enter or Space to tend.`;
                 } else if (session.step === 'pick-harvest') {
                     els.stepLive.textContent = `${selectedPlantLabel()} · ready to pick. Enter or Space to harvest.`;
@@ -2272,9 +2344,16 @@
     els.btnPlantIdle.addEventListener('click', () => openPicker());
     els.btnDev.addEventListener('click', () => toggleDev());
     els.btnDevClose.addEventListener('click', () => toggleDev(false));
-    els.btnErrorDismiss.addEventListener('click', () => { els.errorBanner.hidden = true; });
+    els.btnErrorDismiss.addEventListener('click', () => {
+        els.errorBanner.hidden = true;
+        if (els.btnErrorRetry) els.btnErrorRetry.hidden = true;
+    });
+    if (els.btnErrorRetry) {
+        els.btnErrorRetry.addEventListener('click', () => { void retryAfterSdkError(); });
+    }
     els.btnErrorKeyboard.addEventListener('click', () => {
         els.errorBanner.hidden = true;
+        if (els.btnErrorRetry) els.btnErrorRetry.hidden = true;
         // Tear down the real SDK fully — including sourceReady — so startCamera()
         // actually starts the mock tick loop (otherwise S/T appear dead).
         if (source) { try { source.destroy(); } catch { /* ignore */ } }
@@ -2395,21 +2474,44 @@
                 if (session.step === 'pick-harvest') { onStep(session.confirmPick()); return; }
                 if (session.step === 'harvest-hold') { onStep(session.confirmHarvestInstant()); return; }
                 if (session.step === 'pick') { onStep(session.confirmPick()); return; }
-                if (session.step === 'care-hub' && session.canCareHarvest(session.selectedPlot)) {
-                    onStep(session.confirmCareHarvest());
-                    return;
-                }
                 if (session.step === 'care-harvest') {
                     onStep(session.confirmCareHarvest());
                     return;
                 }
+                if (k === 'enter' && (session.step === 'care-hub' || session.step === 'care-smile'
+                    || session.step === 'care-talk' || session.step === 'stretch-offer' || session.step === 'stretch')) {
+                    // Harvest only when the breath/harvest channel is live or today's needs are done.
+                    // Otherwise Enter switches beds so mid-tend players are not stuck on a mature plant.
+                    const harvesting = session.activeCareChannel === 'harvest'
+                        || (session.pacer && session.breathT > 0.05);
+                    const doneHere = session.selectedPlot != null && session.allNeedsMetForPlot
+                        && session.allNeedsMetForPlot(session.selectedPlot);
+                    const canPick = session.canCareHarvest(session.selectedPlot);
+                    const moreBeds = session.selectablePlots && session.selectablePlots().length > 1;
+                    if (canPick && (harvesting || doneHere || !moreBeds)) {
+                        onStep(session.confirmCareHarvest());
+                        return;
+                    }
+                    if (moreBeds && typeof session.selectNextPlant === 'function') {
+                        const before = session.selectedPlot;
+                        session.selectNextPlant();
+                        if (session.selectedPlot !== before) onStep('care-hub');
+                    }
+                    return;
+                }
             }
             const nav = { arrowleft: 'left', arrowright: 'right', arrowup: 'up', arrowdown: 'down' };
-            if (nav[k] && (session.step === 'pick' || session.step === 'pick-harvest' || session.step === 'care-hub')) {
+            const navSteps = ['pick', 'pick-harvest', 'care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
+            if (nav[k] && navSteps.includes(session.step)) {
                 e.preventDefault();
+                const before = session.selectedPlot;
+                const beforeStep = session.step;
                 session.moveSelection(nav[k]);
-                renderNeedsCard();
-                syncTendRing();
+                if (session.selectedPlot !== before || session.step !== beforeStep) onStep(session.step);
+                else {
+                    renderNeedsCard();
+                    syncTendRing();
+                }
                 return;
             }
         }

@@ -23,7 +23,7 @@ const keepPng = new Set([
     'breath-mockup.png', 'camera-check-mockup.png',
     '02-greeting-dawn.png', '08-summary-growth.png', '10-greeting-night.png', '11-night-light-hint.png',
     '12-night-garden-fireflies.png', '13-journal-diary.png', '14-journal-my-plants.png', '15-journal-seed-library.png',
-    '16-full-garden-midday.png', '17-full-garden-dawn.png', '18-full-garden-golden-hour.png', '19-full-garden-night.png',
+    '16-full-garden-midday.png', '17-full-garden-dawn.png', '19-full-garden-night.png',
     '20-demo-tools.png', 'bedtime-window-glow.png', 'morning-card.png', 'stake-ring-midfill.png',
     'clock-dawn.png', 'clock-dawn-6am.png', 'clock-dusk.png', 'clock-night.png', 'clock-noon.png', 'clock-sunset-6pm.png',
     'logo-day-full.png', 'logo-night-full.png', 'logo-night-garden.png',

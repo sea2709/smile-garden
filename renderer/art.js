@@ -11,7 +11,6 @@
         backgrounds: {
             dawn: '../assets/backgrounds/dawn.png',
             midday: '../assets/backgrounds/midday.png',
-            'golden-hour': '../assets/backgrounds/golden-hour.png',
             night: '../assets/backgrounds/night.jpg',
         },
         plots: [{"x":347,"y":369,"w":169,"h":58,"row":0,"scale":0.5,"box":[266,338,435,396]},{"x":554,"y":369,"w":151,"h":58,"row":0,"scale":0.5,"box":[478,340,629,398]},{"x":761,"y":369,"w":154,"h":59,"row":0,"scale":0.5,"box":[684,340,838,399]},{"x":968,"y":369,"w":171,"h":55,"row":0,"scale":0.5,"box":[883,342,1054,397]},{"x":283,"y":494,"w":215,"h":93,"row":1,"scale":0.62,"box":[173,446,388,539]},{"x":528,"y":504,"w":186,"h":99,"row":1,"scale":0.62,"box":[430,452,616,551]},{"x":771,"y":504,"w":188,"h":100,"row":1,"scale":0.62,"box":[687,452,875,552]},{"x":1027,"y":506,"w":226,"h":101,"row":1,"scale":0.62,"box":[921,450,1147,551]}],
@@ -57,14 +56,14 @@
             h: 807,
             src: '../assets/ui/pantry-shelf.png',
             iconFrac: 0.52,
-            // Cubby interiors (shelf image pixels); labels are blank plaques below each opening.
+            // Cubby interiors (shelf image pixels); labels sit on the cream plaques under each opening.
             cubbies: [
-                Object.freeze({ box: [48, 48, 510, 258], label: [279, 278] }),
-                Object.freeze({ box: [536, 48, 998, 258], label: [767, 278] }),
-                Object.freeze({ box: [48, 305, 510, 515], label: [279, 535] }),
-                Object.freeze({ box: [536, 305, 998, 515], label: [767, 535] }),
-                Object.freeze({ box: [48, 562, 510, 772], label: [279, 792] }),
-                Object.freeze({ box: [536, 562, 998, 772], label: [767, 792] }),
+                Object.freeze({ box: [48, 48, 510, 258], label: [278, 246] }),
+                Object.freeze({ box: [536, 48, 998, 258], label: [752, 246] }),
+                Object.freeze({ box: [48, 305, 510, 515], label: [278, 494] }),
+                Object.freeze({ box: [536, 305, 998, 515], label: [752, 494] }),
+                Object.freeze({ box: [48, 562, 510, 772], label: [278, 744] }),
+                Object.freeze({ box: [536, 562, 998, 772], label: [752, 744] }),
             ],
         }),
         ui: {
@@ -284,7 +283,7 @@
             const day = lighting !== 'night';
             return day ? this.needs.plantTagDay : this.needs.plantTagNight;
         },
-        /** Dawn/midday/golden hour → day card; night → painted night sheet (same layout boxes). */
+        /** Dawn/midday → day card; night → painted night sheet (same layout boxes). */
         needsCardSrc(lighting) {
             const day = lighting !== 'night';
             return day ? this.needs.needsCard : this.needs.needsCardNight;

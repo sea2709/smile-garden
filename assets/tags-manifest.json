@@ -80,7 +80,7 @@
   },
   "bedsNote": "backdrop px (1280x720), on the lawn just in front of each bed's front-left rim corner; draw after plants (in front of the rim). Formula: soil-quad bottom-left + 13% along the front edge, +22 px (back) / +30 px (front) down past the rim.",
   "drawOrder": "depth-sort by row: back-row plants -> back-row tags -> front-row plants -> front-row tags (a back tag can be partly behind a tall front plant; lift the hovered/selected bed's tag to the top). Tag face content: up to 4 care icons at 0.75x (48 PNG px) along the top of faceBox, need dots at 16 PNG px under each; complete = bloom-stamp fitted to faceBox height; resting = resting-leaf fitted to faceBox.",
-  "nightNote": "night tint matches stake night (blend 42% toward #34405F). At dawn/golden-hour use day."
+  "nightNote": "night tint matches stake night (blend 42% toward #34405F). At dawn/midday use day."
  },
  "card": {
   "file": "ui/tag/needs-card.png",
@@ -636,7 +636,7 @@
   },
   "units": "1x backdrop px; drawImage(img, pos[0], pos[1]) in art space, no scaling",
   "order": "draw after drawBackdrop() and before plants/selection ring; pre-shaped to each bed's soil quad (stone rims and lawn left clear), no masking needed",
-  "lighting": "day file for dawn/midday/golden-hour, night file for night; crossfade with the same lightWeights as the backdrop (day alpha = 1 - weights.night)",
+  "lighting": "day file for dawn/midday, night file for night; crossfade with the same lightWeights as the backdrop (day alpha = 1 - weights.night)",
   "fade": "fade in over ~1.2 s when a tag completes; remove at the morning reset"
  },
  "passiveSun": {

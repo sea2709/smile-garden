@@ -16,6 +16,18 @@ test('plant needs table matches design', () => {
     assert.deepEqual(L.plantNeeds('apple'), { sun: 3, water: 2, fertilizer: 2, stake: true });
 });
 
+test('plantCareSummary leads with water, fertilizer, and stake', () => {
+    assert.match(L.plantCareSummary('lettuce'), /Water 3 smiles/);
+    assert.match(L.plantCareSummary('lettuce'), /Fertilizer 1 chat/);
+    assert.match(L.plantCareSummary('lettuce'), /No stake/);
+    assert.match(L.plantCareSummary('tomato'), /Water 2 smiles/);
+    assert.match(L.plantCareSummary('tomato'), /Fertilizer 3 chats/);
+    assert.match(L.plantCareSummary('tomato'), /Needs staking/);
+    const info = V.plantInfo('cucumber');
+    assert.equal(info.careSummary, L.plantCareSummary('cucumber'));
+    assert.deepEqual(info.needs, L.plantNeeds('cucumber'));
+});
+
 test('dot unit lengths', () => {
     assert.deepEqual(C.CARE_DOT_SECONDS, { sun: 10, water: 10, fertilizer: 15 });
 });

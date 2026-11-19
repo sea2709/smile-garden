@@ -14,8 +14,8 @@ vm.runInNewContext(fs.readFileSync(path.join(root, 'renderer', 'art.js'), 'utf8'
 const ART = sandbox.window.SmileArt;
 const fromRenderer = (rel) => path.join(root, 'renderer', rel);
 
-test('art manifest: 4 backdrops, 8 plots inside the 1280x720 frame', () => {
-    assert.deepEqual(Object.keys(ART.backgrounds).sort(), ['dawn', 'golden-hour', 'midday', 'night']);
+test('art manifest: 3 backdrops, 8 plots inside the 1280x720 frame', () => {
+    assert.deepEqual(Object.keys(ART.backgrounds).sort(), ['dawn', 'midday', 'night']);
     for (const src of Object.values(ART.backgrounds)) assert.ok(fs.existsSync(fromRenderer(src)), src);
     assert.equal(ART.plots.length, 8);
     for (const p of ART.plots) {
@@ -101,7 +101,7 @@ test('critter strips and day backdrops without painted insects', () => {
         const frames = Cmod.stripFrameCount(w, spec.frameW);
         assert.equal(frames, spec.frames, `${key} frame count`);
     }
-    for (const day of ['dawn', 'midday', 'golden-hour']) {
+    for (const day of ['dawn', 'midday']) {
         assert.ok(ART.backgrounds[day].endsWith('.png'), day);
     }
     assert.ok(fs.existsSync(fromRenderer(ART.ui.logoDay)));

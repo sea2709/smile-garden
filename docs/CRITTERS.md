@@ -1,6 +1,6 @@
 # Daytime garden critters & canvas logo
 
-Animated **monarch butterfly**, **white butterfly**, and **bee** on **dawn / midday / golden hour**, fading at **night** with the backdrop crossfade.
+Animated **monarch butterfly**, **white butterfly**, and **bee** on **dawn / midday**, fading at **night** with the backdrop crossfade.
 
 ## Critter strips (`assets/critters/`)
 
@@ -27,7 +27,7 @@ Drawn on the **canvas** at `ART.logoHud` (top-left). Day/night layers crossfade 
 
 ## Day backdrops
 
-`assets/backgrounds/dawn.png`, `midday.png`, `golden-hour.png` — insect-free; `night.jpg` unchanged.
+`assets/backgrounds/dawn.png`, `midday.png` — insect-free; `night.jpg` unchanged.
 
 `prefers-reduced-motion: reduce` — critters hold frame 0 with slower wander.
 

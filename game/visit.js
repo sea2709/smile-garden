@@ -4,8 +4,8 @@
 // SDK). Runs in Node (node:test) and in the renderer as window.SmileVisit.
 //
 //   * Local-time helpers: day keys (reset at local midnight), ISO-ish weeks
-//     (Mon–Sun), time-of-day lighting (dawn 5–9, midday 9–16, golden hour
-//     16–19, night otherwise).
+//     (Mon–Sun), time-of-day lighting (dawn 5–9, midday 9–19, night
+//     otherwise).
 //   * Persistent garden state: 8 plots, plants at stages 1..5, a sun bank per
 //     plant, visit days, a journal. JSON in / JSON out, versioned.
 //   * VisitSession: greeting -> smile (~45 s) -> talk (~30 s) -> optional
@@ -75,38 +75,38 @@
     /** @deprecated visit-count only; prefer H.SEED_UNLOCK with harvest milestones. */
     const UNLOCK_AT_VISIT = Object.freeze({ lettuce: 0, mint: 0, cucumber: 0, tomato: 2, sunflower: 3, apple: 4 });
 
-    // General, widely-published growing tips (not from the sun-hour source).
-    // The sun need + source stay on logic.js PLANTS.
+    // In-game care tips keyed to plantNeeds (smile = water, talk = fertilizer, stretch = stake).
+    // Daylight fills sun on its own; library copy leads with what the player does.
     const TIPS = Object.freeze({
         lettuce: Object.freeze([
-            'Sow seeds shallow, about ¼ inch (6 mm) deep. They need a little light to sprout.',
-            'A cool-season crop: spring and fall are best; summer heat makes leaves bitter.',
-            'Keep the soil evenly moist and pick the outer leaves as they grow.',
+            'Smile three times to fill its water for the day — lettuce is the thirstiest easy bed.',
+            'One short chat adds the fertilizer it needs; no stretch or stake.',
+            'When it is mature, breathe slowly to harvest the leaves.',
         ]),
         mint: Object.freeze([
-            'Easiest from a cutting or a small nursery plant rather than seed.',
-            'It spreads by runners, so a pot or its own bed keeps it from taking over.',
-            'Keep the soil moist and pinch off the tips to keep it bushy.',
+            'Three smiles keep mint watered; it likes a moist bed every visit.',
+            'One chat of fertilizer is enough — soft stems do not need staking.',
+            'Breathe to harvest once mature; it regrows for another pick later.',
         ]),
         cucumber: Object.freeze([
-            'Plant after the last frost, once the soil feels warm.',
-            'Give the vines a trellis to climb; it saves space and keeps fruit clean.',
-            'Water steadily at the base of the plant and pick often to keep it producing.',
+            'Three smiles of water and two chats of fertilizer keep the vine growing.',
+            'Stretch once to stake it so the climber can reach for light.',
+            'Daylight fills its sun on its own while you tend water and fertilizer.',
         ]),
         tomato: Object.freeze([
-            'Set out young plants after the last frost; they love warmth.',
-            'Use a stake or cage so stems and fruit stay off the ground.',
-            'Water deeply and evenly, and mulch to keep the soil moisture steady.',
+            'Two smiles of water, then three chats — tomatoes run on fertilizer.',
+            'Stretch to stake the stems before fruit weighs them down.',
+            'Sun fills by daylight; your job is water, fertilizer, and the stake.',
         ]),
         sunflower: Object.freeze([
-            'Sow seeds right in the ground after frost, about 1 inch (2–3 cm) deep.',
-            'Tall varieties may need a stake on windy sites.',
-            'Water deeply while young; established plants handle dry spells better.',
+            'Light care: one smile of water and one chat of fertilizer per day.',
+            'Stretch to stake the tall stalk so it stays upright as it grows.',
+            'It drinks daylight on its own; staking is the main hands-on need.',
         ]),
         apple: Object.freeze([
-            'Most apple trees need a second, different variety nearby for pollination.',
-            'Pick a spot with well-drained soil and room for the tree to spread.',
-            'Patience: young trees often take a few years before their first fruit.',
+            'Two smiles of water and two chats of fertilizer each visit.',
+            'Stretch to stake young growth while the tree takes its time.',
+            'Hard mode means more days of care before harvest — patience pays off.',
         ]),
     });
 
@@ -150,15 +150,14 @@
         return dayKey(d);
     }
 
-    const LIGHTINGS = Object.freeze(['dawn', 'midday', 'golden-hour', 'night']);
-    const LIGHTING_LABELS = Object.freeze({ dawn: 'Dawn', midday: 'Midday', 'golden-hour': 'Golden hour', night: 'Night' });
+    const LIGHTINGS = Object.freeze(['dawn', 'midday', 'night']);
+    const LIGHTING_LABELS = Object.freeze({ dawn: 'Dawn', midday: 'Midday', night: 'Night' });
 
-    /** dawn 05:00–08:59, midday 09:00–15:59, golden hour 16:00–18:59, night otherwise. */
+    /** dawn 05:00–08:59, midday 09:00–18:59, night otherwise. */
     function lightingForHour(hour) {
         const h = Number(hour);
         if (h >= 5 && h < 9) return 'dawn';
-        if (h >= 9 && h < 16) return 'midday';
-        if (h >= 16 && h < 19) return 'golden-hour';
+        if (h >= 9 && h < 19) return 'midday';
         return 'night';
     }
 
@@ -172,7 +171,6 @@
         return {
             dawn: 'Good morning, gardener',
             midday: 'Hello, gardener',
-            'golden-hour': 'Good evening, gardener',
             night: 'A quiet night in the garden',
         }[lighting] || 'Hello, gardener';
     }
@@ -199,8 +197,11 @@
     function plantInfo(id) {
         const p = L.plantById(id);
         if (!p) return null;
+        const needs = L.plantNeeds(id);
         return Object.assign({}, p, {
             tips: TIPS[id] || [],
+            needs,
+            careSummary: L.plantCareSummary(id),
             unlockAtVisit: (H.SEED_UNLOCK[id] && H.SEED_UNLOCK[id].visits) || 0,
             unlockHarvests: (H.SEED_UNLOCK[id] && H.SEED_UNLOCK[id].harvests) || 0,
             sunCost: p.cost,
@@ -460,11 +461,17 @@
         return null;
     }
 
-    /** Move selection among planted beds along an arrow direction (wraps within 8 steps). */
+    /**
+     * Move selection among planted beds along an arrow direction.
+     * Prefers a straight-line neighbor on the 2×4 grid; if none is planted
+     * (common when beds are staggered), cycles the selectable list so
+     * keyboard players can always reach every bed.
+     */
     function movePlotSelection(current, dir, planted) {
-        const set = new Set(planted);
-        if (!set.size) return null;
-        const start = set.has(current) ? current : planted[0];
+        const list = Array.isArray(planted) ? planted.filter((i) => i >= 0) : [];
+        if (!list.length) return null;
+        const set = new Set(list);
+        const start = set.has(current) ? current : list[0];
         let i = start;
         for (let n = 0; n < 8; n++) {
             const next = neighborPlot(i, dir);
@@ -472,7 +479,11 @@
             i = next;
             if (set.has(i)) return i;
         }
-        return start;
+        const idx = list.indexOf(start);
+        if (idx < 0) return list[0];
+        if (list.length === 1) return start;
+        const delta = (dir === 'left' || dir === 'up') ? -1 : 1;
+        return list[(idx + delta + list.length) % list.length];
     }
 
     function plantedPlotIndices(plots) {
@@ -1269,23 +1280,46 @@
             if (!(i >= 0 && i < PLOTS) || !list.includes(i)) return false;
             const careSteps = ['pick', 'pick-harvest', 'care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
             if (!careSteps.includes(this.step)) return false;
+            const changed = this.selectedPlot !== i;
             this.selectedPlot = i;
             this._loadCareProgress(i);
             this._syncLiveFromTally();
             this.events.push({ type: 'select', plot: i });
+            if (changed) this._clearActiveCareInput();
+            // Leaving a focused stretch / single-need step returns to the free care hub.
+            if (this.step === 'care-smile' || this.step === 'care-talk' || this.step === 'care-harvest'
+                || this.step === 'stretch-offer' || this.step === 'stretch') {
+                this.go('care-hub');
+            }
             return true;
+        }
+
+        _clearActiveCareInput() {
+            this.activeCareChannel = null;
+            this.pacer = null;
+            this.breathT = 0;
+            this.breathsDone = 0;
+            if (this.stretchFlow) this.stretchFlow.reset();
+            this.stretchSnap = { leftProgress: 0, rightProgress: 0, rollDeg: 0, needsFaceHint: false };
         }
 
         moveSelection(dir) {
             if (this.step !== 'pick' && this.step !== 'pick-harvest' && this.step !== 'care-hub'
-                && this.step !== 'care-smile' && this.step !== 'care-talk' && this.step !== 'care-harvest') return this.selectedPlot;
+                && this.step !== 'care-smile' && this.step !== 'care-talk' && this.step !== 'care-harvest'
+                && this.step !== 'stretch-offer' && this.step !== 'stretch') return this.selectedPlot;
             const list = this.selectablePlots();
             const next = movePlotSelection(this.selectedPlot, dir, list);
-            if (next !== null && next !== this.selectedPlot) {
-                this.selectedPlot = next;
-                this._syncLiveFromTally();
-                this.events.push({ type: 'select', plot: next });
-            }
+            if (next !== null && next !== this.selectedPlot) this.setSelectedPlot(next);
+            return this.selectedPlot;
+        }
+
+        /** Cycle to the next selectable bed (Enter / keyboard) — works mid-tend. */
+        selectNextPlant() {
+            const list = this.selectablePlots();
+            if (list.length < 2 || this.selectedPlot == null) return this.selectedPlot;
+            const idx = list.indexOf(this.selectedPlot);
+            const next = list[(Math.max(0, idx) + 1) % list.length];
+            if (next !== this.selectedPlot) this.setSelectedPlot(next);
             return this.selectedPlot;
         }
 

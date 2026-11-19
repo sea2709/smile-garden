@@ -198,7 +198,7 @@
    720
   ],
   "drawOrder": "backdrop -> season overlay -> plants/critters/effects",
-  "dayNight": "Blend like the backdrops: day overlay over dawn/midday/golden-hour, night overlay over night; crossfade with the same night alpha.",
+  "dayNight": "Blend like the backdrops: day overlay over dawn/midday, night overlay over night; crossfade with the same night alpha.",
   "plots": "Bed soil is kept clear in every overlay (winter dusts the stone rims only).",
   "particles": {
    "files": {

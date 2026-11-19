@@ -67,32 +67,28 @@ function gardenHour(minutes) {
     return Math.floor((Number(minutes) || 0) / 60);
 }
 
-/** Piecewise lighting blend weights (dawn 6–9, midday 9–16, golden 16–19, night 19–24). */
+/** Piecewise lighting blend weights (dawn 6–9, midday 9–19, night 19–24). */
 function lightingBlend(minutes) {
     const h = (Number(minutes) || 0) / 60;
-    const w = { dawn: 0, midday: 0, 'golden-hour': 0, night: 0 };
+    const w = { dawn: 0, midday: 0, night: 0 };
     if (h < 6) {
         w.night = 1;
     } else if (h < 9) {
         const t = (h - 6) / 3;
         w.dawn = 1 - t;
         w.midday = t;
-    } else if (h < 16) {
-        w.midday = 1;
     } else if (h < 19) {
-        const t = (h - 16) / 3;
-        w.midday = 1 - t;
-        w['golden-hour'] = t;
+        w.midday = 1;
     } else if (h < 21) {
         const t = (h - 19) / 2;
-        w['golden-hour'] = 1 - t;
+        w.midday = 1 - t;
         w.night = t;
     } else {
         w.night = 1;
     }
     let primary = 'midday';
     let best = -1;
-    for (const k of ['dawn', 'midday', 'golden-hour', 'night']) {
+    for (const k of ['dawn', 'midday', 'night']) {
         if (w[k] > best) { best = w[k]; primary = k; }
     }
     return { weights: w, primary, hour: h };

@@ -74,12 +74,12 @@ const noFace = { happiness: null, talking: null, faceVisible: false };
 const withDaylight = (input, isDaylight) => Object.assign({}, input, { isDaylight });
 
 // ---------- time of day ----------
-test('lighting follows local time: dawn 5–9, midday 9–16, golden hour 16–19, night otherwise', () => {
-    const expect = { 0: 'night', 4: 'night', 5: 'dawn', 8: 'dawn', 9: 'midday', 12: 'midday', 15: 'midday', 16: 'golden-hour', 18: 'golden-hour', 19: 'night', 23: 'night' };
+test('lighting follows local time: dawn 5–9, midday 9–19, night otherwise', () => {
+    const expect = { 0: 'night', 4: 'night', 5: 'dawn', 8: 'dawn', 9: 'midday', 12: 'midday', 15: 'midday', 16: 'midday', 18: 'midday', 19: 'night', 23: 'night' };
     for (const [h, l] of Object.entries(expect)) assert.equal(V.lightingForHour(Number(h)), l, `hour ${h}`);
     assert.equal(V.lightingFor(at(2026, 11, 16, 8, 59)), 'dawn');
     assert.equal(V.lightingFor(at(2026, 11, 16, 9, 0)), 'midday');
-    assert.equal(V.lightingFor(at(2026, 11, 16, 18, 59)), 'golden-hour');
+    assert.equal(V.lightingFor(at(2026, 11, 16, 18, 59)), 'midday');
 });
 
 test('debug lighting override wins over the clock; bad overrides are ignored', () => {
@@ -159,14 +159,15 @@ test('loadState sanitizes bad plots, stages, settings and visit days', () => {
 });
 
 // ---------- planting + growth ----------
-test('sun-hour costs come from the real-world plant table', () => {
+test('plant catalog keeps costs and care-focused tips', () => {
     const cost = Object.fromEntries(L.PLANTS.map((p) => [p.id, p.cost]));
     assert.deepEqual(cost, { lettuce: 4, mint: 5, cucumber: 7, tomato: 8, sunflower: 10, apple: 12 });
     for (const p of L.PLANTS) {
         const info = V.plantInfo(p.id);
         assert.ok(info.tips.length >= 2, `${p.id} has tips`);
-        assert.match(info.source, /^https:\/\//);
-        assert.ok(info.sunHoursLabel);
+        assert.match(info.careSummary, /Water/);
+        assert.match(info.careSummary, /Fertilizer/);
+        assert.ok(info.needs.water >= 1);
     }
 });
 
@@ -321,6 +322,31 @@ test('selection moves only among planted beds on the 2×4 grid', () => {
     assert.equal(V.movePlotSelection(5, 'up', planted), 1);
     assert.equal(V.movePlotSelection(0, 'right', planted), 1);
     assert.equal(V.firstPlantedPlot([null, { plantId: 'mint' }, null, null, null, null, null, null]), 1);
+});
+
+test('selection cycles when planted beds are not grid-adjacent', () => {
+    // Beds 1 (back row) and 4 (front row) share no straight arrow path.
+    assert.equal(V.movePlotSelection(1, 'down', [1, 4]), 4);
+    assert.equal(V.movePlotSelection(4, 'up', [1, 4]), 1);
+    assert.equal(V.movePlotSelection(1, 'right', [1, 4]), 4);
+    assert.equal(V.movePlotSelection(4, 'left', [1, 4]), 1);
+});
+
+test('after tending, keyboard can move to another planted bed', () => {
+    const plots = mkPlots([[1, 'lettuce'], [4, 'mint']]);
+    const s = new V.VisitSession({ plots, plantedBeds: [1, 4], gardenDay: 1 });
+    s.begin();
+    assert.equal(s.selectedPlot, 1);
+    const needs = L.plantNeeds('lettuce');
+    s.setCareProgress(1, {
+        sun: needs.sun, water: needs.water, fertilizer: needs.fertilizer, stake: false,
+    });
+    assert.equal(s.allNeedsMetForPlot(1), true);
+    assert.equal(s.step, 'care-hub');
+    assert.equal(s.moveSelection('down'), 4);
+    assert.equal(s.selectedPlot, 4);
+    assert.equal(s.selectNextPlant(), 1);
+    assert.equal(s.selectedPlot, 1);
 });
 
 test('applyVisit records per-bed care; only allMet beds grow overnight', () => {
