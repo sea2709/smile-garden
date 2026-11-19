@@ -9,7 +9,7 @@
     <link rel="stylesheet" href="./styles.css">
     <link rel="stylesheet" href="./breath-ui.css">
     <link rel="stylesheet" href="./stretch-ui.css">
-    <link rel="stylesheet" href="./tend-strip-ui.css">
+    <link rel="stylesheet" href="./care-needs.css">
     <link rel="stylesheet" href="./signal-panel-ui.css">
     <link rel="stylesheet" href="./camera-check-ui.css">
     <link rel="stylesheet" href="./summary-ui.css">
@@ -129,6 +129,10 @@
     <section id="tend-strip" class="tend-strip" role="status" aria-live="polite" aria-label="Tending" hidden>
         <div class="tend-head">
             <span id="tend-name" class="tend-name"></span>
+            <div class="tend-sun" data-need="sun">
+                <img class="tend-sun-icon" alt="">
+                <span class="tend-sun-verb"></span>
+            </div>
             <img id="tend-stamp" class="tend-stamp" alt="" hidden>
         </div>
         <div id="tend-row" class="tend-row"></div>
@@ -370,9 +374,10 @@
 <script src="./camera-check-ui.js"></script>
 <script src="./camera-check-controller.js"></script>
 <script src="./mock-source.js"></script>
+<script src="../game/care-needs-display.js"></script>
 <script src="./scene.js"></script>
 <script src="./smile-chart.js"></script>
-<script src="./tend-strip-ui.js"></script>
+<script src="./care-needs-render.js"></script>
 <script src="./dev-hooks.js"></script>
 <script src="./app.js"></script>
 </body>

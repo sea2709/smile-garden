@@ -1,0 +1,385 @@
+{
+  "name": "Care-need clarity (tend strip + tag pips)",
+  "artist": "Heily",
+  "date": "2026-11-18",
+  "scale": 2,
+  "game": [
+    1280,
+    720
+  ],
+  "window": [
+    1280,
+    772
+  ],
+  "note": "All tend/care/tag UI PNGs are 2x unless noted. CSS px = PNG px / 2, except tag pips, which are drawn at a fixed 16-18 stage px so they stay readable on the small wooden tags. Ink #3E2A1A, soft ink #6B4F36, no red. Night strip uses a warmer paper (same family as the day summary night card) so 18px labels stay readable; the old grey night card was only about 5:1.",
+  "wording": {
+    "water": {
+      "one": "1 more smile",
+      "many": "{n} more smiles",
+      "done": "all set",
+      "summary": "Water (smiles)"
+    },
+    "fertilizer": {
+      "one": "1 more chat",
+      "many": "{n} more chats",
+      "done": "all set",
+      "summary": "Fertilizer (talking)"
+    },
+    "stake": {
+      "one": "1 stretch",
+      "many": "{n} stretches",
+      "done": "all set",
+      "summary": "Stakes (stretching)"
+    },
+    "sun": {
+      "day": "daylight",
+      "night": "resting",
+      "note": "Passive; fills by itself. No remaining-count, no slots on the strip."
+    },
+    "harvest": {
+      "title": "Ready to harvest",
+      "sub": "Breathe slowly to pick it"
+    }
+  },
+  "strip": {
+    "display": [
+      320,
+      160
+    ],
+    "displayNote": "320x160 is the cucumber/tomato size (sun + water + fertilizer + stake). Height is auto: about 126 without a stake, about 112 in harvest. 9-slice supports the range.",
+    "areaPx": 51200,
+    "vsOldCompact": "40px wider and 48px taller than 280x112; still far from the camera pip (strip top at y=596, pip bottom at y=216).",
+    "placement": "position:fixed; left:50%; bottom:16px; translateX(-50%) -> x480 y596 w320 h160 in the 1280x772 window. .pip stays at x1062 y66 200x150, no overlap.",
+    "nineSlice": {
+      "day": "ui/tend/tend-strip-9s.png",
+      "night": "ui/tend/tend-strip-9s-night.png",
+      "px": [
+        198,
+        196
+      ],
+      "slice": 64,
+      "drawSlice": 32,
+      "repeat": "round",
+      "nightPaper": "Warmer cream with a cool edge (summary night card family), ink #3E2A1A. Do not use the old grey needs-card-night paper \u2014 18px labels would fall to about 5:1."
+    },
+    "baked": {
+      "day": "ui/tend/tend-strip.png",
+      "night": "ui/tend/tend-strip-night.png",
+      "px": [
+        640,
+        320
+      ],
+      "note": "Fallback at the fixed 320x160 size only. Prefer the 9-slice so height can shrink when stake is hidden or harvest is showing."
+    },
+    "ink": "#3E2A1A on both day and night",
+    "softInk": "#6B4F36",
+    "type": {
+      "name": "Lora 18 / 600",
+      "remain": "Nunito 18 / 700",
+      "bedAndSun": "Nunito 13 / 700 (sun verb italic)",
+      "harvestTitle": "Lora 20 / 600",
+      "harvestSub": "Nunito 18 / 700"
+    }
+  },
+  "slots": {
+    "order": [
+      "sun (header, passive)",
+      "water",
+      "fertilizer",
+      "stake (if needed)"
+    ],
+    "slotPx": [
+      64,
+      64
+    ],
+    "slotDisplay": 32,
+    "labelColumn": "Reserve min-width of 3 slots (106px) on .tend-slots so remaining labels line up, even when a care only has 1 or 2 slots.",
+    "files": {
+      "water": {
+        "empty": "ui/care/slot-water-empty.png",
+        "filled": "ui/care/slot-water-filled.png",
+        "emptyNight": "ui/care/slot-water-empty-night.png",
+        "filledNight": "ui/care/slot-water-filled-night.png"
+      },
+      "fertilizer": {
+        "empty": "ui/care/slot-fertilizer-empty.png",
+        "filled": "ui/care/slot-fertilizer-filled.png",
+        "emptyNight": "ui/care/slot-fertilizer-empty-night.png",
+        "filledNight": "ui/care/slot-fertilizer-filled-night.png"
+      },
+      "stake": {
+        "empty": "ui/care/slot-stake-empty.png",
+        "filled": "ui/care/slot-stake-filled.png",
+        "emptyNight": "ui/care/slot-stake-empty-night.png",
+        "filledNight": "ui/care/slot-stake-filled-night.png"
+      }
+    },
+    "iconsAtNight": "Use the DAY filled icons on the night strip (night icons go muddy). Empty sockets have a night variant with a cool outline on the warmer night paper.",
+    "check": {
+      "day": "ui/care/care-check.png",
+      "night": "ui/care/care-check-night.png",
+      "px": [
+        40,
+        40
+      ],
+      "display": 20
+    },
+    "sun": {
+      "art": "ui/care/sun-glow-0..3.png by daylight fill, ui/care/sun-resting.png at night",
+      "caption": "daylight / resting",
+      "display": 28,
+      "noSlots": true,
+      "noActive": true
+    }
+  },
+  "activeGlow": {
+    "row": {
+      "px": [
+        280,
+        120
+      ],
+      "display": [
+        140,
+        52
+      ],
+      "offset": [
+        -12,
+        -10
+      ],
+      "files": "ui/tend/tend-glow-{water,fertilizer,stake}-row(-night).png",
+      "note": "Behind the slot group while the camera sees that action. Fade in 350ms, gentle 2.4s breathe, hold about 400ms after the signal drops."
+    },
+    "harvest": {
+      "px": [
+        120,
+        120
+      ],
+      "display": [
+        72,
+        72
+      ],
+      "files": "ui/tend/tend-glow-harvest(-night).png"
+    }
+  },
+  "harvest": {
+    "icon": "ui/care/harvest-prompt-64.png (day art at night too)",
+    "display": 52,
+    "title": "Ready to harvest",
+    "sub": "Breathe slowly to pick it"
+  },
+  "stamp": {
+    "allMet": "ui/care/bloom-stamp.png",
+    "resting": "ui/care/resting-leaf.png",
+    "display": 20
+  },
+  "tagPips": {
+    "note": "A ring of icon-shaped pips around the wooden board so beds still needing care are readable in the garden. Do not put dots on the tag face any more. Hide pips when the harvest prompt or the fully-tended wreath is showing. The resting leaf can still sit on the face; pips stay visible so what is left can be seen.",
+    "pipPx": [
+      40,
+      40
+    ],
+    "displayBack": 18,
+    "displayFront": 20,
+    "draw": "Fixed stage pixels (18 or 20), centred on each {ox, oy} from tagPipLayout(needs, plot.scale). Offsets are relative to the tag ground anchor. Do not scale pips with the 2x tag (they would shrink to about 8px on the back row).",
+    "files": {
+      "sun": {
+        "empty": "ui/tag/tag-pip-sun-empty.png",
+        "filled": "ui/tag/tag-pip-sun-filled.png",
+        "emptyNight": "ui/tag/tag-pip-sun-empty-night.png",
+        "filledNight": "ui/tag/tag-pip-sun-filled-night.png"
+      },
+      "water": {
+        "empty": "ui/tag/tag-pip-water-empty.png",
+        "filled": "ui/tag/tag-pip-water-filled.png",
+        "emptyNight": "ui/tag/tag-pip-water-empty-night.png",
+        "filledNight": "ui/tag/tag-pip-water-filled-night.png"
+      },
+      "fertilizer": {
+        "empty": "ui/tag/tag-pip-fertilizer-empty.png",
+        "filled": "ui/tag/tag-pip-fertilizer-filled.png",
+        "emptyNight": "ui/tag/tag-pip-fertilizer-empty-night.png",
+        "filledNight": "ui/tag/tag-pip-fertilizer-filled-night.png"
+      },
+      "stake": {
+        "empty": "ui/tag/tag-pip-stake-empty.png",
+        "filled": "ui/tag/tag-pip-stake-filled.png",
+        "emptyNight": "ui/tag/tag-pip-stake-empty-night.png",
+        "filledNight": "ui/tag/tag-pip-stake-filled-night.png"
+      }
+    },
+    "underRing": {
+      "day": "ui/tag/tag-pip-ring.png",
+      "night": "ui/tag/tag-pip-ring-night.png",
+      "px": [
+        320,
+        275
+      ],
+      "anchor": [
+        160,
+        275
+      ],
+      "note": "Optional soft halo behind the pips. Same anchor and scale formula as the wreath."
+    },
+    "groups": "water 165-200 deg, sun 72-108 deg, fertilizer 350-375 deg, stake at 318 deg (math degrees, 90 = up). Radius 0.74 of tag width / 0.50 of tag height. See tagPipLayout().",
+    "sampleCucumber": {
+      "backRow_scale0.5": [
+        {
+          "key": "water",
+          "index": 0,
+          "ox": -40.03,
+          "oy": -47.97,
+          "angle": 165.0,
+          "pip": 18
+        },
+        {
+          "key": "water",
+          "index": 1,
+          "ox": -41.4,
+          "oy": -39.39,
+          "angle": 182.5,
+          "pip": 18
+        },
+        {
+          "key": "water",
+          "index": 2,
+          "ox": -38.94,
+          "oy": -30.92,
+          "angle": 200.0,
+          "pip": 18
+        },
+        {
+          "key": "sun",
+          "index": 0,
+          "ox": 12.81,
+          "oy": -67.61,
+          "angle": 72.0,
+          "pip": 18
+        },
+        {
+          "key": "sun",
+          "index": 1,
+          "ox": -12.81,
+          "oy": -67.61,
+          "angle": 108.0,
+          "pip": 18
+        },
+        {
+          "key": "fertilizer",
+          "index": 0,
+          "ox": 40.81,
+          "oy": -35.7,
+          "angle": 350.0,
+          "pip": 18
+        },
+        {
+          "key": "fertilizer",
+          "index": 1,
+          "ox": 40.03,
+          "oy": -47.97,
+          "angle": 375.0,
+          "pip": 18
+        },
+        {
+          "key": "stake",
+          "index": 0,
+          "ox": 30.8,
+          "oy": -21.64,
+          "angle": 318.0,
+          "pip": 18
+        }
+      ],
+      "frontRow_scale0.62": [
+        {
+          "key": "water",
+          "index": 0,
+          "ox": -49.63,
+          "oy": -59.48,
+          "angle": 165.0,
+          "pip": 20
+        },
+        {
+          "key": "water",
+          "index": 1,
+          "ox": -51.34,
+          "oy": -48.84,
+          "angle": 182.5,
+          "pip": 20
+        },
+        {
+          "key": "water",
+          "index": 2,
+          "ox": -48.29,
+          "oy": -38.34,
+          "angle": 200.0,
+          "pip": 20
+        },
+        {
+          "key": "sun",
+          "index": 0,
+          "ox": 15.88,
+          "oy": -83.84,
+          "angle": 72.0,
+          "pip": 20
+        },
+        {
+          "key": "sun",
+          "index": 1,
+          "ox": -15.88,
+          "oy": -83.84,
+          "angle": 108.0,
+          "pip": 20
+        },
+        {
+          "key": "fertilizer",
+          "index": 0,
+          "ox": 50.6,
+          "oy": -44.27,
+          "angle": 350.0,
+          "pip": 20
+        },
+        {
+          "key": "fertilizer",
+          "index": 1,
+          "ox": 49.63,
+          "oy": -59.48,
+          "angle": 375.0,
+          "pip": 20
+        },
+        {
+          "key": "stake",
+          "index": 0,
+          "ox": 38.19,
+          "oy": -26.83,
+          "angle": 318.0,
+          "pip": 20
+        }
+      ]
+    }
+  },
+  "tagWreath": {
+    "day": "ui/tag/tag-tended-wreath.png",
+    "night": "ui/tag/tag-tended-wreath-night.png",
+    "px": [
+      320,
+      275
+    ],
+    "anchor": [
+      160,
+      275
+    ],
+    "tagBox": [
+      58,
+      56,
+      262,
+      174
+    ],
+    "draw": "When allNeedsMet, hide pips and the face dots, draw the wreath with the same ground anchor and scale formula as the tag (px * plot.scale / 2), and keep the bloom stamp on the face."
+  },
+  "wiring": {
+    "html": "Replace renderer/tend-strip-ui.css with care-needs.css (or merge). Add a .tend-sun chip to the head (see tend-strip.html). #tend-row now holds stacked .tend-care rows, not .tend-slot columns. Existing ids (#tend-strip, #tend-name, #tend-stamp, #tend-row, #tend-harvest, #tend-harvest-icon, #tend-harvest-img) are unchanged.",
+    "js": "Replace renderer/tend-strip-ui.js with care-needs-render.js. SmileTendStrip.render keeps the same opts contract; it will create .tend-sun if missing. New helpers: remainingLabel, filledAndLeft, tagPipLayout, tagWreathBox, pipSrc, slotSrc.",
+    "scene": "In drawBedTag, stop drawing face icons + 16px dots. If allMet, draw the wreath then the bloom stamp. Else draw the optional under-ring + pips from tagPipLayout (filled = floor of that need, stake via stakeNeedMet). Keep harvest-prompt and resting-leaf on the face.",
+    "partialFill": "A slot fills when a whole unit is earned (floor), same as today. The label uses req - floor(got).",
+    "pr": "Follow-up on main (8d7057d already has the previous compact strip). No gameplay changes."
+  }
+}

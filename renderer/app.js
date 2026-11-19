@@ -1569,6 +1569,19 @@
         const input = currentInput();
         if (session && (session.step === 'stretch' || session.step === 'care-hub')) input.stretch = stretchSample();
         const events = session.update(dt, input);
+        if (signalPanelDemoLock && session && session.step === 'care-hub') {
+            if (signalPanelDemoLock === 'smile') {
+                session.smiling = true;
+                session.activeCareChannel = 'water';
+            } else if (signalPanelDemoLock === 'talk') {
+                session.talking = true;
+                session.activeCareChannel = 'fertilizer';
+            } else if (signalPanelDemoLock === 'stretch') {
+                session.activeCareChannel = 'stake';
+            } else if (signalPanelDemoLock === 'breathe') {
+                session.activeCareChannel = 'harvest';
+            }
+        }
         let breathPhase = null;
         if (session.activeCareChannel === 'harvest' && session.pacer && session.pacer.total > 0) {
             breathPhase = Math.sin((session.breathT / session.pacer.total) * Math.PI * 2);

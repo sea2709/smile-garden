@@ -311,6 +311,30 @@ test('summary card art (Heily manifest)', () => {
     assert.ok(fs.existsSync(path.join(root, 'renderer', 'summary-render.js')));
 });
 
+test('care-needs art matches assets/care-needs-manifest.json', () => {
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, 'assets', 'care-needs-manifest.json'), 'utf8'));
+    assert.equal(manifest.strip.display[0], 320);
+    for (const key of ['water', 'fertilizer', 'stake']) {
+        for (const st of ['empty', 'filled']) {
+            const rel = manifest.slots.files[key][st];
+            assert.ok(fs.existsSync(path.join(root, 'assets', rel)), rel);
+            const nightKey = st + 'Night';
+            if (manifest.slots.files[key][nightKey]) {
+                assert.ok(fs.existsSync(path.join(root, 'assets', manifest.slots.files[key][nightKey])), nightKey);
+            }
+        }
+    }
+    assert.ok(fs.existsSync(path.join(root, 'assets', manifest.slots.check.day)));
+    assert.ok(fs.existsSync(path.join(root, 'assets', manifest.tagWreath.day)));
+    for (const key of ['sun', 'water', 'fertilizer', 'stake']) {
+        assert.ok(fs.existsSync(path.join(root, 'assets', manifest.tagPips.files[key].empty)));
+        assert.ok(fs.existsSync(path.join(root, 'assets', manifest.tagPips.files[key].filled)));
+    }
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'care-needs.css')));
+    assert.ok(fs.existsSync(path.join(root, 'renderer', 'care-needs-render.js')));
+    assert.ok(fs.existsSync(path.join(root, 'game', 'care-needs-display.js')));
+});
+
 test('selection ring art: 8 day/night sprites and backdrop offsets', () => {
     assert.ok(ART.selection);
     for (let b = 1; b <= 8; b++) {
