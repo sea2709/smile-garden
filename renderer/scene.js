@@ -1691,6 +1691,19 @@
             ctx.restore();
         }
 
+        function drawLeftHudBrandWash() {
+            const k = clockRibbonKeepOut();
+            const washRight = Math.min(k.left - 16, 468);
+            if (washRight < 96) return;
+            ctx.save();
+            const g = ctx.createLinearGradient(0, 0, 0, 96);
+            g.addColorStop(0, 'rgba(251, 245, 230, 0.82)');
+            g.addColorStop(1, 'rgba(251, 245, 230, 0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, washRight, 96);
+            ctx.restore();
+        }
+
         function drawLogoHud() {
             const hud = ART.logoHud;
             if (!hud) return;
@@ -1704,6 +1717,7 @@
             const nightReady = ready(logoNightImg);
             refreshLogoOnCanvas();
             if (!logoOnCanvas) return;
+            drawLeftHudBrandWash();
             const { x, y, w, h } = hud;
             const [sw, sh] = hud.srcPixels || [w * 2, h * 2];
             if (dayReady && layers.day > 0.02) {

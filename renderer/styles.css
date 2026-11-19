@@ -100,8 +100,28 @@ body[data-painted-clock="1"] .topbar {
     height: auto;
     padding: 8px 18px;
     pointer-events: none;
-    /* Clock ribbon + label are painted on the garden canvas; no HTML wash over the HUD band. */
-    background: linear-gradient(to bottom, transparent, transparent);
+    /* Clock ribbon + label are on canvas; keep the bar clear over CLOCK_KEEP_OUT (left ≥ ~486). */
+    background: transparent;
+    isolation: isolate;
+}
+/* Soft cream over logo + stat chips only (left of the painted clock keep-out). */
+body[data-painted-clock="1"] .topbar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(
+        468px,
+        calc(var(--hud-logo-width) + var(--hud-logo-gap) + var(--hud-chips-max, 300px) + 36px)
+    );
+    background: linear-gradient(to bottom, rgba(251, 245, 230, 0.82), rgba(251, 245, 230, 0));
+    pointer-events: none;
+    z-index: 0;
+}
+body[data-painted-clock="1"] .topbar > * {
+    position: relative;
+    z-index: 1;
 }
 body[data-painted-clock="1"] .topbar .chip,
 body[data-painted-clock="1"] .topbar .btn { pointer-events: auto; }
