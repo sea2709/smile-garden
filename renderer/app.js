@@ -1434,11 +1434,16 @@
         const fresh = signal.hAt && now - signal.hAt < 700;
         const valOk = signal.validation === 'Ok' || signal.validation === 'CameraTuning';
         const faceVisible = !!fresh && valOk;
+        const breathFresh = signal.breathing && now - signal.breathing.at < 2500;
         return {
             happiness: faceVisible ? signal.h : null,
             talking: faceVisible && now - signal.talkAt < 700 ? signal.talking : false,
             faceVisible,
             isDaylight: lighting !== 'night',
+            // Visit care-hub harvest needs this; camera-check builds its own copy.
+            breathing: breathFresh
+                ? Object.assign({}, signal.breathing, { fresh: true })
+                : null,
         };
     }
 
@@ -2658,20 +2663,17 @@
                     onStep(session.confirmCareHarvest());
                     return;
                 }
+                // Ready crop: Enter and Space both instant-pick (keyboard has no breathe key).
+                if ((session.step === 'care-hub' || session.step === 'care-smile'
+                    || session.step === 'care-talk' || session.step === 'stretch-offer' || session.step === 'stretch')
+                    && session.canCareHarvest(session.selectedPlot)) {
+                    onStep(session.confirmCareHarvest());
+                    return;
+                }
                 if (k === 'enter' && (session.step === 'care-hub' || session.step === 'care-smile'
                     || session.step === 'care-talk' || session.step === 'stretch-offer' || session.step === 'stretch')) {
-                    // Harvest only when the breath/harvest channel is live or today's needs are done.
-                    // Otherwise Enter switches beds so mid-tend players are not stuck on a mature plant.
-                    const harvesting = session.activeCareChannel === 'harvest'
-                        || (session.pacer && session.breathT > 0.05);
-                    const doneHere = session.selectedPlot != null && session.allNeedsMetForPlot
-                        && session.allNeedsMetForPlot(session.selectedPlot);
-                    const canPick = session.canCareHarvest(session.selectedPlot);
+                    // Not harvest-ready: Enter cycles beds so keyboard players can leave a finished plant.
                     const moreBeds = session.selectablePlots && session.selectablePlots().length > 1;
-                    if (canPick && (harvesting || doneHere || !moreBeds)) {
-                        onStep(session.confirmCareHarvest());
-                        return;
-                    }
                     if (moreBeds && typeof session.selectNextPlant === 'function') {
                         const before = session.selectedPlot;
                         session.selectNextPlant();
