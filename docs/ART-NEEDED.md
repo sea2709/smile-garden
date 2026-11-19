@@ -39,22 +39,6 @@ Regrow crops (tomato, mint, cucumber, apple): **same canvas and soil line as sta
 
 Lettuce / sunflower are **pull** crops (no picked sprite; bed clears at harvest frame 5).
 
-### Decorations — `assets/decor/<id>-{day|night}.png`
-
-lantern, birdbath, bench, scarecrow, fairy-lights — natural sizes ~161–249px wide; night additive glow for lantern & fairy-lights in code.
-
-### Decoration spots (backdrop 1280×720, bottom-centre anchor + scale)
-
-| Spot id | x | y | scale |
-|---------|---|---|-------|
-| `nw-path` | 168 | 298 | 0.58 |
-| `ne-hedge` | 1110 | 310 | 0.55 |
-| `sw-corner` | 145 | 580 | 0.48 |
-| `se-path` | 1155 | 575 | 0.62 |
-| `mid-left` | 218 | 460 | 0.62 |
-
-Defined in `renderer/art.js` → `decorSpots`. Scale chosen so ~160–250px source art reads beside the beds (~100–120px on backdrop).
-
 ## Day clock, seasons, bedtime (v5 — Heily art)
 
 **Authoritative manifest:** `assets/time-manifest.json` (paths in `renderer/art.js`). Missing PNGs keep procedural fallbacks in `scene.js`.
@@ -74,7 +58,7 @@ Defined in `renderer/art.js` → `decorSpots`. Scale chosen so ~160–250px sour
 
 Arc centre **(160.6, 183.1)**, radius **150.6** in frame pixels (@2x).
 
-### Season overlays (above backdrop, below plants/decor)
+### Season overlays (above backdrop, below plants)
 
 | Path | Size | Notes |
 |------|------|--------|

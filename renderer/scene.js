@@ -75,10 +75,6 @@
             if (ps) pickedImgs[id] = loadImage(ps);
         }
 
-        const decorImgs = {};
-        if (ART.decor) for (const id of ART.decor.ids) {
-            decorImgs[id] = { day: loadImage(ART.decor.src(id, 'day')), night: loadImage(ART.decor.src(id, 'night')) };
-        }
         const readyStrips = { day: null, night: null };
         const harvestStrips = {};
         const genericHarvest = { day: null, night: null };
@@ -269,7 +265,6 @@
             })
             : null;
         let plots = new Array(8).fill(null);   // { plantId, stage, ready?, pickedSprite? }
-        let decorPlacements = {}; // spotId -> decorId
         const harvestAnims = []; // { plot, plantId, t0, pull }
         let basketFlash = 0;
         const anims = new Array(8).fill(null); // stage / plant transitions
@@ -424,10 +419,6 @@
             const pools = ART.seasons && ART.seasons.particlePools;
             if (!pools || !SP) return [];
             return SP.particlePool(season, overlayNightWeight(), pools);
-        }
-
-        function setDecor(decorState) {
-            decorPlacements = (decorState && decorState.placements) ? Object.assign({}, decorState.placements) : {};
         }
 
         /** plotsState: array of null | { plantId, stage, ready?, pickedSprite? }. */
@@ -1141,49 +1132,6 @@
             ctx.restore();
         }
 
-        function drawDecorations(t) {
-            if (!ART.decorSpots) return;
-            const night = lighting === 'night';
-            for (const spot of ART.decorSpots) {
-                const id = decorPlacements[spot.id];
-                if (!id) continue;
-                const pack = decorImgs[id];
-                const img = pack && (night ? pack.night : pack.day);
-                const w = 88;
-                let h = ART.decor.placeholderH;
-                const drawPlaceholder = !ready(img);
-                ctx.save();
-                ctx.translate(spot.x, spot.y);
-                if (drawPlaceholder) {
-                    ctx.fillStyle = night ? 'rgba(180, 170, 140, 0.75)' : 'rgba(120, 100, 70, 0.65)';
-                    ctx.beginPath();
-                    ctx.ellipse(0, -h * 0.4, w * 0.35, h * 0.12, 0, 0, TAU);
-                    ctx.fill();
-                    ctx.fillStyle = night ? 'rgba(220, 210, 180, 0.9)' : 'rgba(90, 70, 50, 0.85)';
-                    roundRect(ctx, -w / 2, -h, w, h * 0.85, 8);
-                    ctx.fill();
-                    ctx.font = '600 13px Nunito, sans-serif';
-                    ctx.textAlign = 'center';
-                    ctx.fillStyle = night ? '#fff8e8' : '#f7eed8';
-                    ctx.fillText(id.replace(/-/g, ' '), 0, -h * 0.45);
-                } else {
-                    const sc = spot.scale || 0.55;
-                    const iw = img.naturalWidth * sc;
-                    const ih = img.naturalHeight * sc;
-                    ctx.drawImage(img, -iw / 2, -ih, iw, ih);
-                    h = ih;
-                }
-                const def = (window.SmileVisit && window.SmileVisit.DECOR_UNLOCKS || []).find((d) => d.id === id);
-                if (night && def && def.nightGlow) {
-                    ctx.globalCompositeOperation = 'lighter';
-                    const pulse = 0.6 + 0.4 * Math.sin(t * 2.1 + spot.x * 0.01);
-                    glowDot(0, -h * 0.72, 18, [255, 220, 140], 0.22 * pulse);
-                    glowDot(0, -h * 0.72, 8, [255, 250, 220], 0.35 * pulse);
-                }
-                ctx.restore();
-            }
-        }
-
         function produceColor(id) {
             return (ART.produce && ART.produce.placeholder && ART.produce.placeholder[id]) || '#c4a574';
         }
@@ -1817,7 +1765,6 @@
             ctx.clearRect(0, 0, view.cssW, view.cssH);
             ctx.setTransform(view.dpr * view.s, 0, 0, view.dpr * view.s, view.dpr * view.ox, view.dpr * view.oy);
             drawBackdrop();
-            drawDecorations(t);
             drawSunShafts(t);
             drawTendedSoils();
             drawPlants(t);
@@ -1891,7 +1838,7 @@
             return plots.map((p, i) => (p ? { i, plantId: p.plantId, stage: p.stage, anim: anims[i] && anims[i].kind } : null)).filter(Boolean);
         }
 
-        return { resize, update, draw, setLighting, setLightingBlend, setSeason, setGardenClock, setBedtimeGlow, setBedtimeDark, setPlots, setDecor, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient, plotSnap,
+        return { resize, update, draw, setLighting, setLightingBlend, setSeason, setGardenClock, setBedtimeGlow, setBedtimeDark, setPlots, playHarvestAnim, playGrowth, playAbsorb, setEffects, setHighlight, setHover, setTendSelection, plotAt, plotClient, plotSnap,
             waitForHudArt, hudArtReady, sampleBackdrop, probeClockSunToken, probeClockMoonToken,
             get lighting() { return lighting; },
             get reducedMotion() { return reducedMotion; },

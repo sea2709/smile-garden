@@ -180,10 +180,6 @@ function buildSummaryData(ctx) {
         const name = plantById(u).name;
         garden.push({ kind: 'unlock', icon: 'bloom-stamp', name, meta: 'new seeds unlocked' });
     }
-    for (const id of out.decorUnlocks || []) {
-        const name = typeof ctx.decorLabel === 'function' ? ctx.decorLabel(id) : id;
-        garden.push({ kind: 'unlock', icon: 'bloom-stamp', name, meta: 'decoration unlocked' });
-    }
     if (!garden.length) {
         garden.push({
             kind: 'resting',

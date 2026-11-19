@@ -416,10 +416,6 @@ body[data-screen="visit"][data-step^="care-"] .mock-badge {
 .pantry-cubby-label { position: absolute; transform: translate(-50%, -50%); font-size: 0.85rem; font-weight: 700; color: #5c3d22; text-shadow: 0 1px 0 rgba(255, 248, 230, 0.8); pointer-events: none; }
 .produce-icon { width: 80px; height: 80px; margin: 0 auto 8px; display: flex; align-items: center; justify-content: center; position: relative; }
 .produce-icon .produce-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
-.decor-picks { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
-.decor-pick.on { outline: 2px solid var(--sage); }
-.decor-spots { display: flex; flex-direction: column; gap: 10px; }
-.decor-spot { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px dashed rgba(150, 120, 80, 0.2); }
 .unlock-card { width: min(380px, 92vw); text-align: center; padding: 0; overflow: hidden; background: transparent; box-shadow: none; border: none; }
 .unlock-art { position: relative; margin: 0 auto; width: min(320px, 88vw); aspect-ratio: 700 / 991; }
 .summary.summary-painted { width: min(380px, 92vw); padding: 0; background: transparent; border: none; box-shadow: none; }

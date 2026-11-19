@@ -222,7 +222,6 @@
             settings: { pace: 'standard', breaths: 4, chart: true, lighting: 'auto', offsetDays: 0,
                 realMsPerGardenMinute: D.DEFAULT_DAY_CONFIG.realMsPerGardenMinute },
             pantry: H.emptyPantry(),
-            decor: H.emptyDecor(),
             spareSeeds: H.emptySpareSeeds(),
             dayNumber: g.dayNumber,
             gardenMinutes: g.gardenMinutes,
@@ -317,11 +316,9 @@
         s.settings.lighting = LIGHTINGS.includes(st.lighting) ? st.lighting : 'auto';
         s.settings.offsetDays = Number.isFinite(Number(st.offsetDays)) ? Math.max(0, Math.round(Number(st.offsetDays))) : 0;
         s.pantry = H.sanitizePantry(obj.pantry);
-        s.decor = H.sanitizeDecor(obj.decor);
         s.spareSeeds = H.sanitizeSpareSeeds(obj.spareSeeds);
         if (obj.version === 3) {
             s.pantry = H.emptyPantry();
-            s.decor = H.emptyDecor();
             s.spareSeeds = H.emptySpareSeeds();
         }
         if (obj.version === 4) {
@@ -369,7 +366,6 @@
         s.version = STATE_VERSION;
         const todayKey = s.version >= 5 ? D.gardenDayKey(s.dayNumber) : dayKey(now instanceof Date ? now : new Date(now === undefined ? Date.now() : now));
         advanceRegrowPlots(s, todayKey);
-        H.syncDecorUnlocks(s);
         return s;
     }
 
@@ -1599,12 +1595,10 @@
         return out;
     }
 
-    function newUnlocksAfterHarvest(state, beforeSeeds, beforeDecor) {
-        H.syncDecorUnlocks(state);
+    function newUnlocksAfterHarvest(state, beforeSeeds) {
         const afterSeeds = unlockedPlants(state);
         const seeds = afterSeeds.filter((id) => !beforeSeeds.includes(id));
-        const decor = state.decor.unlocked.filter((id) => !beforeDecor.includes(id));
-        return { seeds, decor };
+        return { seeds };
     }
 
     /** Short human sentence for a waiting plant (no guilt, nothing wilts). */
@@ -1691,12 +1685,8 @@
         tendablePlotIndices: H.tendablePlotIndices,
         computeYield: H.computeYield,
         harvestPlot: (s, i, now) => H.harvestPlot(s, i, calendarKey(s, now), L.plantById),
-        placeDecor: H.placeDecor,
         makeAllReady: H.makeAllReady,
-        decorUnlocked: (s) => H.decorUnlocked(s),
-        syncDecorUnlocks: (s) => H.syncDecorUnlocks(s),
         SEED_UNLOCK: H.SEED_UNLOCK,
-        DECOR_UNLOCKS: H.DECOR_UNLOCKS,
         HARVEST_HOLD_SECONDS: H.HARVEST_HOLD_SECONDS,
         PLANT_HARVEST: H.PLANT_HARVEST,
         SmileDay: D,

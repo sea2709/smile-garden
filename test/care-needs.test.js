@@ -95,7 +95,6 @@ test('save v6 migration clears staked and bumps version', () => {
         journal: [],
         settings: {},
         pantry: {},
-        decor: {},
         spareSeeds: {},
     };
     const s = V.loadState(JSON.stringify(raw), new Date());

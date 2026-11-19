@@ -1,4 +1,4 @@
-// game/harvest.js — harvests, pantry, seed unlock milestones, decorations (pure logic).
+// game/harvest.js — harvests, pantry, seed unlock milestones (pure logic).
 (function (root, factory) {
     const api = factory();
     if (typeof module === 'object' && module.exports) module.exports = api;
@@ -32,24 +32,12 @@
         apple: Object.freeze({ harvests: 6, visits: 7 }),
     });
 
-  const DECOR_UNLOCKS = Object.freeze([
-        Object.freeze({ id: 'lantern', label: 'Lantern', harvests: 2, nightGlow: true }),
-        Object.freeze({ id: 'birdbath', label: 'Birdbath', harvests: 5, nightGlow: false }),
-        Object.freeze({ id: 'bench', label: 'Garden bench', harvests: 8, nightGlow: false }),
-        Object.freeze({ id: 'scarecrow', label: 'Scarecrow', harvests: 12, nightGlow: false }),
-        Object.freeze({ id: 'fairy-lights', label: 'Fairy lights', harvests: 16, nightGlow: true }),
-    ]);
-
     function plantHarvestCfg(plantId) {
         return PLANT_HARVEST[plantId] || Object.freeze({ mode: 'regrow', regrowDays: 2, baseYield: 1 });
     }
 
     function emptyPantry() {
         return { items: {}, totalHarvests: 0 };
-    }
-
-    function emptyDecor() {
-        return { placements: {}, unlocked: [] };
     }
 
     function emptySpareSeeds() {
@@ -69,19 +57,6 @@
             };
         }
         return p;
-    }
-
-    function sanitizeDecor(raw) {
-        const d = emptyDecor();
-        if (!raw || typeof raw !== 'object') return d;
-        const u = Array.isArray(raw.unlocked) ? raw.unlocked : [];
-        d.unlocked = u.filter((id) => DECOR_UNLOCKS.some((x) => x.id === id));
-        const pl = raw.placements && typeof raw.placements === 'object' ? raw.placements : {};
-        for (const [spot, id] of Object.entries(pl)) {
-            if (typeof id !== 'string' || !d.unlocked.includes(id)) continue;
-            d.placements[spot] = id;
-        }
-        return d;
     }
 
     function sanitizeSpareSeeds(raw) {
@@ -201,24 +176,6 @@
         return allPlantIds.filter((id) => isSeedUnlocked(state, id, visitCount));
     }
 
-    function decorUnlocked(state) {
-        const h = totalHarvests(state);
-        const have = new Set(state.decor?.unlocked || []);
-        for (const d of DECOR_UNLOCKS) {
-            if (h >= d.harvests) have.add(d.id);
-        }
-        return [...have];
-    }
-
-    function syncDecorUnlocks(state) {
-        if (!state.decor) state.decor = emptyDecor();
-        state.decor.unlocked = decorUnlocked(state);
-        const pl = state.decor.placements;
-        for (const spot of Object.keys(pl)) {
-            if (!state.decor.unlocked.includes(pl[spot])) delete pl[spot];
-        }
-    }
-
     function addToPantry(state, plantId, amount, day) {
         if (!state.pantry) state.pantry = emptyPantry();
         if (!state.pantry.items[plantId]) {
@@ -228,7 +185,6 @@
         item.count += Math.max(0, amount);
         if (!item.firstDay) item.firstDay = day;
         state.pantry.totalHarvests += Math.max(0, amount);
-        syncDecorUnlocks(state);
     }
 
     /**
@@ -287,18 +243,6 @@
         return r;
     }
 
-    function placeDecor(state, spotId, decorId) {
-        if (!state.decor) state.decor = emptyDecor();
-        syncDecorUnlocks(state);
-        if (!decorId) {
-            delete state.decor.placements[spotId];
-            return { ok: true, spot: spotId, decor: null };
-        }
-        if (!state.decor.unlocked.includes(decorId)) return { ok: false, reason: 'locked' };
-        state.decor.placements[spotId] = decorId;
-        return { ok: true, spot: spotId, decor: decorId };
-    }
-
     function makeAllReady(state) {
         const today = null;
         state.plots.forEach((p, i) => {
@@ -320,13 +264,10 @@
         HARVEST_HOLD_SECONDS,
         PLANT_HARVEST,
         SEED_UNLOCK,
-        DECOR_UNLOCKS,
         plantHarvestCfg,
         emptyPantry,
-        emptyDecor,
         emptySpareSeeds,
         sanitizePantry,
-        sanitizeDecor,
         sanitizeSpareSeeds,
         extendPlotSanitize,
         isPlotReady,
@@ -339,11 +280,8 @@
         totalHarvests,
         isSeedUnlocked,
         unlockedPlantsByHarvest,
-        decorUnlocked,
-        syncDecorUnlocks,
         addToPantry,
         harvestPlot,
-        placeDecor,
         makeAllReady,
     };
 });

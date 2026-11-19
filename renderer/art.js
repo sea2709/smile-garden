@@ -39,14 +39,6 @@
                 return '../assets/selection/ring-' + kind + '-bed' + i + '.png';
             },
         },
-        // Fixed decoration anchors (backdrop px, bottom-centre). Chosen clear of the 8 bed boxes in plots[].
-        decorSpots: [
-            Object.freeze({ id: 'nw-path', label: 'Northwest path', x: 168, y: 298, scale: 0.58 }),
-            Object.freeze({ id: 'ne-hedge', label: 'Northeast hedge', x: 1110, y: 310, scale: 0.55 }),
-            Object.freeze({ id: 'sw-corner', label: 'Southwest corner', x: 145, y: 580, scale: 0.48 }),
-            Object.freeze({ id: 'se-path', label: 'Southeast path', x: 1155, y: 575, scale: 0.62 }),
-            Object.freeze({ id: 'mid-left', label: 'Mid-left lawn', x: 218, y: 460, scale: 0.62 }),
-        ],
         produce: {
             size: 128,
             placeholder: Object.freeze({
@@ -59,11 +51,6 @@
         plantPickedSrc(id) {
             const dir = this.plants[id] && this.plants[id].dir;
             return dir ? '../assets/plants/' + dir + '/picked.png' : null;
-        },
-        decor: {
-            ids: ['lantern', 'birdbath', 'bench', 'scarecrow', 'fairy-lights'],
-            src(id, kind) { return '../assets/decor/' + id + '-' + kind + '.png'; },
-            placeholderH: 96,
         },
         pantry: Object.freeze({
             w: 1047,

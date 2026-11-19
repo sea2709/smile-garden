@@ -80,7 +80,7 @@
   },
   "bedsNote": "backdrop px (1280x720), on the lawn just in front of each bed's front-left rim corner; draw after plants (in front of the rim). Formula: soil-quad bottom-left + 13% along the front edge, +22 px (back) / +30 px (front) down past the rim.",
   "drawOrder": "depth-sort by row: back-row plants -> back-row tags -> front-row plants -> front-row tags (a back tag can be partly behind a tall front plant; lift the hovered/selected bed's tag to the top). Tag face content: up to 4 care icons at 0.75x (48 PNG px) along the top of faceBox, need dots at 16 PNG px under each; complete = bloom-stamp fitted to faceBox height; resting = resting-leaf fitted to faceBox.",
-  "nightNote": "night tint matches stake/decor night (blend 42% toward #34405F). At dawn/golden-hour use day."
+  "nightNote": "night tint matches stake night (blend 42% toward #34405F). At dawn/golden-hour use day."
  },
  "card": {
   "file": "ui/tag/needs-card.png",

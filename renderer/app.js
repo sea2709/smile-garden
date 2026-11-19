@@ -249,7 +249,6 @@
             };
         });
         scene.setPlots(view, instant ? { instant: true } : undefined);
-        scene.setDecor(state.decor);
         scene.setSeason(state.season);
     }
 
@@ -1774,13 +1773,11 @@
     async function endTendSession() {
         const result = session.result();
         const beforeSeeds = V.unlockedPlants(state);
-        const beforeDecor = V.decorUnlocked(state);
         const out = V.applyVisit(state, result, clock.now());
         const harvested = V.applySessionHarvests(state, result.harvestPlots, clock.now());
-        const unlocks = V.newUnlocksAfterHarvest(state, beforeSeeds, beforeDecor);
+        const unlocks = V.newUnlocksAfterHarvest(state, beforeSeeds);
         out.harvested = harvested;
         out.seedUnlocks = unlocks.seeds;
-        out.decorUnlocks = unlocks.decor;
         lastResult = Object.assign({}, out);
         save();
         await stopCamera();
@@ -1789,7 +1786,7 @@
         plotsForScene();
         renderHud();
         show('idle');
-        if (out.seedUnlocks.length || out.decorUnlocks.length) showUnlockReveal(out.seedUnlocks, out.decorUnlocks);
+        if (out.seedUnlocks.length) showUnlockReveal(out.seedUnlocks);
         else if (out.tended && out.tended.length) toast('Tending saved for tonight.');
     }
 
@@ -1807,13 +1804,11 @@
         const result = session.result();
         const before = state.plots.map((p) => (p ? { plantId: p.plantId, stage: p.stage } : null));
         const beforeSeeds = V.unlockedPlants(state);
-        const beforeDecor = V.decorUnlocked(state);
         const out = V.applyVisit(state, result, clock.now());
         const harvested = V.applySessionHarvests(state, result.harvestPlots, clock.now());
-        const unlocks = V.newUnlocksAfterHarvest(state, beforeSeeds, beforeDecor);
+        const unlocks = V.newUnlocksAfterHarvest(state, beforeSeeds);
         out.harvested = harvested;
         out.seedUnlocks = unlocks.seeds;
-        out.decorUnlocks = unlocks.decor;
         lastResult = Object.assign({}, out);
         save();
         await stopCamera();
@@ -1835,7 +1830,7 @@
         setTimeout(() => { plotsForScene({ instant: true }); document.body.dataset.revealed = '1'; }, 900 + out.grew.length * 650 + 2300);
         document.body.dataset.revealed = '0';
         document.body.dataset.grew = String(out.grew.length);
-        if (out.seedUnlocks.length || out.decorUnlocks.length) showUnlockReveal(out.seedUnlocks, out.decorUnlocks);
+        if (out.seedUnlocks.length) showUnlockReveal(out.seedUnlocks);
     }
 
     function summaryBuildCtx(out, opts) {
@@ -1857,7 +1852,6 @@
             waitingText: V.waitingText,
             seasonDay: state.seasonDay,
             daysPerSeason: D.DAYS_PER_SEASON,
-            decorLabel: (id) => (V.DECOR_UNLOCKS.find((x) => x.id === id) || { label: id }).label,
         };
     }
 
@@ -1919,14 +1913,10 @@
         await showMorningReveal(night);
     }
 
-    function showUnlockReveal(seeds, decor) {
+    function showUnlockReveal(seeds) {
         const parts = [];
         if (seeds.length) parts.push('New seeds: ' + seeds.map((id) => L.plantById(id).name).join(', '));
-        if (decor.length) {
-            const labels = decor.map((id) => (V.DECOR_UNLOCKS.find((d) => d.id === id) || { label: id }).label);
-            parts.push('New decorations: ' + labels.join(', '));
-        }
-        const title = seeds.length ? 'Fresh seeds for your journal' : 'Garden decorations';
+        const title = 'Fresh seeds for your journal';
         const body = parts.join(' · ');
         els.unlockTitle.textContent = title;
         els.unlockBody.textContent = body;
@@ -2001,23 +1991,6 @@
                 row.appendChild(span);
                 body.appendChild(row);
             }
-        } else if (tab === 'settings') {
-            const intro = document.createElement('p');
-            intro.textContent = 'Camera and permissions. Re-run setup if you changed cameras or lighting.';
-            body.appendChild(intro);
-            const row = document.createElement('div');
-            row.className = 'j-entry';
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'btn btn-primary';
-            btn.textContent = 'Check camera';
-            btn.addEventListener('click', () => {
-                closeJournal();
-                state.cameraCheckNote = null;
-                void openCameraCheck({ reopen: true });
-            });
-            row.appendChild(btn);
-            body.appendChild(row);
         } else if (tab === 'plants') {
             const any = state.plots.some(Boolean);
             if (!any) { const p = document.createElement('p'); p.className = 'j-empty'; p.textContent = 'No plants yet.'; body.appendChild(p); return; }
@@ -2113,62 +2086,6 @@
             foot.className = 'note';
             foot.textContent = `${total} harvest${total === 1 ? '' : 's'} so far · collection only (no cooking yet).`;
             body.appendChild(foot);
-        } else if (tab === 'decorate') {
-            V.syncDecorUnlocks(state);
-            const unlocked = state.decor.unlocked || [];
-            if (!unlocked.length) {
-                const p = document.createElement('p');
-                p.className = 'j-empty';
-                p.textContent = 'Decorations unlock as you harvest. Lantern unlocks after 2 total harvests.';
-                body.appendChild(p);
-                return;
-            }
-            const intro = document.createElement('p');
-            intro.className = 'note';
-            intro.textContent = 'Pick a decoration, then tap a spot in the list to place or swap. Remove with Clear.';
-            body.appendChild(intro);
-            const picks = document.createElement('div');
-            picks.className = 'decor-picks';
-            let activeDecor = unlocked[0];
-            for (const id of unlocked) {
-                const b = document.createElement('button');
-                b.type = 'button';
-                b.className = 'btn btn-soft btn-small decor-pick';
-                const def = V.DECOR_UNLOCKS.find((d) => d.id === id);
-                b.textContent = def ? def.label : id;
-                b.addEventListener('click', () => {
-                    activeDecor = id;
-                    picks.querySelectorAll('.decor-pick').forEach((x) => x.classList.toggle('on', x === b));
-                });
-                if (id === activeDecor) b.classList.add('on');
-                picks.appendChild(b);
-            }
-            body.appendChild(picks);
-            const spots = document.createElement('div');
-            spots.className = 'decor-spots';
-            for (const spot of ART.decorSpots) {
-                const row = document.createElement('div');
-                row.className = 'decor-spot';
-                const cur = state.decor.placements[spot.id];
-                const label = document.createElement('b');
-                label.textContent = spot.label;
-                const now = document.createElement('span');
-                now.className = 'note';
-                now.textContent = cur ? (V.DECOR_UNLOCKS.find((d) => d.id === cur) || { label: cur }).label : 'Empty';
-                const place = mkBtn('Place here', 'btn btn-soft btn-small', () => {
-                    const r = V.placeDecor(state, spot.id, activeDecor);
-                    if (r.ok) { save(); plotsForScene({ instant: true }); renderJournal('decorate'); toast('Decoration placed.'); }
-                });
-                const clear = mkBtn('Clear', 'btn btn-ghost btn-small', () => {
-                    V.placeDecor(state, spot.id, null);
-                    save();
-                    plotsForScene({ instant: true });
-                    renderJournal('decorate');
-                });
-                row.append(label, now, place, clear);
-                spots.appendChild(row);
-            }
-            body.appendChild(spots);
         } else {
             const grid = document.createElement('div');
             grid.className = 'lib-grid';

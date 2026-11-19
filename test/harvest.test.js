@@ -75,22 +75,7 @@ test('seed unlocks use harvest milestones with visit fallback', () => {
     assert.equal(V.isUnlocked(s3, 'sunflower'), true);
 });
 
-test('decor unlocks and placement persist', () => {
-    const s = V.createState(at(2026, 11, 16));
-    s.pantry.totalHarvests = 2;
-    H.syncDecorUnlocks(s);
-    assert.ok(s.decor.unlocked.includes('lantern'));
-    assert.equal(V.placeDecor(s, 'nw-path', 'lantern').ok, true);
-    const raw = V.serializeState(s);
-    const back = V.loadState(raw, at(2026, 11, 16));
-    assert.equal(back.decor.placements['nw-path'], 'lantern');
-    assert.equal(V.placeDecor(back, 'nw-path', 'birdbath').ok, false);
-    back.pantry.totalHarvests = 8;
-    H.syncDecorUnlocks(back);
-    assert.ok(back.decor.unlocked.includes('bench'));
-});
-
-test('loadState v3 migrates with empty pantry and decor', () => {
+test('loadState v3 migrates with empty pantry', () => {
     const now = at(2026, 11, 16);
     const legacy = {
         version: 3,
@@ -103,9 +88,9 @@ test('loadState v3 migrates with empty pantry and decor', () => {
     const s = V.loadState(JSON.stringify(legacy), now);
     assert.equal(s.version, V.STATE_VERSION);
     assert.equal(s.pantry.totalHarvests, 0);
-    assert.deepEqual(s.decor.placements, {});
     assert.equal(s.spareSeeds.mint || 0, 0);
     assert.equal(s.plots[0].plantId, 'mint');
+    assert.equal(s.decor, undefined);
 });
 
 test('completeCareHarvest clears regrow beds when CARE_HARVEST_BED_RESET is empty', () => {

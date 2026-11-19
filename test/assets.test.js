@@ -66,17 +66,6 @@ test('harvest art: ready loops, per-plant harvest strips, generic fallback, pant
     }
 });
 
-test('decoration art and per-spot scale', () => {
-    for (const id of ART.decor.ids) {
-        for (const kind of ['day', 'night']) {
-            assert.ok(fs.existsSync(fromRenderer(ART.decor.src(id, kind))), `${id} ${kind}`);
-        }
-    }
-    for (const spot of ART.decorSpots) {
-        assert.ok(typeof spot.scale === 'number' && spot.scale > 0 && spot.scale < 2, spot.id);
-    }
-});
-
 const CRITTER_FILES = {
     'butterfly-monarch': 'butterfly-monarch-strip.png',
     'butterfly-white': 'butterfly-white-strip.png',
