@@ -380,7 +380,7 @@ body[data-screen="visit"][data-step^="care-"] .mock-badge {
 .sum-wait li::before { content: '·'; font-size: 20px; line-height: 16px; }
 
 /* ---------- journal ---------- */
-.journal { width: min(980px, 92vw); max-width: none; height: min(640px, 84vh); display: flex; flex-direction: column; padding: 34px 46px 30px; }
+.journal { width: min(980px, 92vw); max-width: none; height: min(640px, 84vh); display: flex; flex-direction: column; padding: 48px 64px 42px; }
 .journal-head { display: flex; align-items: center; gap: 18px; margin-bottom: 10px; }
 .journal-head h1 { margin: 0; flex: none; }
 .tabs { display: flex; gap: 6px; flex: 1; }
