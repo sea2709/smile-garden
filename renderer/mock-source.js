@@ -52,6 +52,7 @@
         function paintPreviewFrame() {
             if (!previewCanvas) {
                 previewCanvas = document.createElement('canvas');
+                // 4:3 matches the warm-up preview (560×420) so object-fit:cover is 1:1.
                 previewCanvas.width = 400;
                 previewCanvas.height = 300;
             }
@@ -61,19 +62,22 @@
             g.addColorStop(1, '#c4d4e2');
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, 400, 300);
+            // Centre on camera-check face-outline (stage 640,256 → canvas 200,143).
+            const cx = 200;
+            const cy = 143;
             ctx.fillStyle = 'rgba(255, 235, 210, 0.92)';
             ctx.beginPath();
-            ctx.ellipse(200, 128, 72, 92, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx, cy, 72, 92, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.fillStyle = '#4a5560';
             ctx.beginPath();
-            ctx.ellipse(172, 112, 10, 7, 0, 0, Math.PI * 2);
-            ctx.ellipse(228, 112, 10, 7, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx - 28, cy - 16, 10, 7, 0, 0, Math.PI * 2);
+            ctx.ellipse(cx + 28, cy - 16, 10, 7, 0, 0, Math.PI * 2);
             ctx.fill();
             ctx.strokeStyle = '#7a4a45';
             ctx.lineWidth = 3;
             ctx.beginPath();
-            ctx.arc(200, 140, 28, 0.15, Math.PI - 0.15);
+            ctx.arc(cx, cy + 12, 28, 0.15, Math.PI - 0.15);
             ctx.stroke();
         }
 

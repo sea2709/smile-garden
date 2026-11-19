@@ -260,6 +260,29 @@
     color: #5a7a48;
 }
 
+.cc-howto-key {
+    color: #7a6652;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.cc-howto-keys {
+    margin: 0.55rem 0 0;
+    padding: 0.35rem 0.45rem;
+    border-radius: 8px;
+    background: rgba(90, 122, 72, 0.12);
+    border: 1px solid rgba(90, 122, 72, 0.22);
+    font-size: 0.72rem;
+    line-height: 1.35;
+    color: #3f5a2a;
+}
+
+.cc-howto-keys .kbd {
+    min-width: 16px;
+    padding: 0 4px;
+    font-size: 10px;
+}
+
 .cc-howto-tip {
     margin: 0.55rem 0 0;
     font-size: 0.72rem;
@@ -270,15 +293,16 @@
 .cc-prompt {
     position: absolute;
     left: 50%;
-    top: 412px;
+    top: 368px;
     transform: translateX(-50%);
     width: min(500px, 42%);
     margin: 0;
     padding: 0.4rem 0.85rem;
     border-radius: 999px;
-    background: rgba(255, 248, 232, 0.92);
-    border: 1px solid rgba(120, 90, 55, 0.22);
-    box-shadow: 0 4px 10px rgba(50, 35, 18, 0.12);
+    background: rgba(255, 248, 232, 0.55);
+    border: 1px solid rgba(120, 90, 55, 0.18);
+    box-shadow: 0 4px 10px rgba(50, 35, 18, 0.08);
+    backdrop-filter: blur(3px);
     font-size: 0.8rem;
     font-weight: 600;
     line-height: 1.25;

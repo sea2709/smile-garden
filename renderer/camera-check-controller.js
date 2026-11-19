@@ -96,6 +96,8 @@
                 }
             }
             const active = session && session.active;
+            const config = getConfig();
+            const keyboard = !!(config.keyboard || config.mock);
             if (CCUI) {
                 els.breathGuide.hidden = active !== 'breath';
                 els.stretchGuide.hidden = active !== 'stretch';
@@ -107,7 +109,9 @@
                 CCUI.renderPackets(els.ccPackets, snap, active, ART, artUrl, { denied: deniedDemo });
                 CCUI.renderPrompt(els.ccPrompt, snap, active, {
                     denied: deniedDemo || !!snap.cameraDenied || !!snap.noCamera,
+                    keyboard,
                 });
+                CCUI.renderHowtoKeys(els.ccHowto, { keyboard });
                 if (els.btnCcRetry) els.btnCcRetry.hidden = false;
             }
             if (els.ccFaceOutline) {

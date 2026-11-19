@@ -26,7 +26,16 @@
         stretch: 'Tip each ear toward a shoulder — this stakes plants that need support.',
     });
 
+    const KEYBOARD_ACTIVE_PROMPTS = Object.freeze({
+        smile: 'Hold S for a smile — in the garden this waters your plant.',
+        talk: 'Hold T to talk — talking fertilizes the bed.',
+        breath: 'Breathe packet listens on its own — calm breath harvests a fully grown crop.',
+        stretch: 'Hold [ or ] to tip each ear — this stakes plants that need support.',
+    });
+
     const IDLE_PROMPT = 'Tap a seed packet and hold the gesture so the camera learns you. Daylight fills sun needs by itself; when you tend, the camera applies smile, talk, breath, and stretch for you. Press Esc or go idle to stop.';
+
+    const KEYBOARD_IDLE_PROMPT = 'Tap a seed packet, then hold S to smile, T to talk, or [ / ] to tilt. Breathe runs on its own. Daylight fills sun needs by itself. Press Esc or go idle to stop.';
 
     const FALLBACK_ICON = Object.freeze({ smile: '☀', talk: '💬', breath: '🍃', stretch: '🌻' });
 
@@ -134,16 +143,29 @@
     function renderPrompt(el, snap, active, opts) {
         if (!el) return;
         const denied = !!(opts && opts.denied) || !!(snap && (snap.cameraDenied || snap.noCamera));
+        const keyboard = !!(opts && opts.keyboard);
         el.hidden = false;
         if (denied) {
             el.textContent = 'Fix the camera tip above, or skip for now and start the garden.';
             return;
         }
-        if (active && ACTIVE_PROMPTS[active]) {
-            el.textContent = ACTIVE_PROMPTS[active];
+        const activeMap = keyboard ? KEYBOARD_ACTIVE_PROMPTS : ACTIVE_PROMPTS;
+        if (active && activeMap[active]) {
+            el.textContent = activeMap[active];
             return;
         }
-        el.textContent = IDLE_PROMPT;
+        el.textContent = keyboard ? KEYBOARD_IDLE_PROMPT : IDLE_PROMPT;
+    }
+
+    /** Show per-check key hints in the howto panel when playing with the keyboard. */
+    function renderHowtoKeys(root, opts) {
+        if (!root) return;
+        const keyboard = !!(opts && opts.keyboard);
+        root.querySelectorAll('.cc-howto-key').forEach((el) => {
+            el.hidden = !keyboard;
+        });
+        const tip = root.querySelector('#cc-howto-keys') || root.querySelector('.cc-howto-keys');
+        if (tip) tip.hidden = !keyboard;
     }
 
     function renderPackets(container, snap, active, ART, artUrl, opts) {
@@ -213,10 +235,13 @@
         CHECKS,
         PACKET_CARE,
         ACTIVE_PROMPTS,
+        KEYBOARD_ACTIVE_PROMPTS,
         IDLE_PROMPT,
+        KEYBOARD_IDLE_PROMPT,
         mountPackets,
         renderPackets,
         renderStatus,
         renderPrompt,
+        renderHowtoKeys,
     });
 })();
