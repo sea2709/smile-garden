@@ -18,7 +18,7 @@ Smile Garden replaces the one-off “visit” loop with an in-game day that runs
 
 Authoritative file list: **`assets/time-manifest.json`** (wired in `renderer/art.js`; procedural fallbacks if a PNG is missing).
 
-- **Clock** — `assets/ui/clock/clock-frame-{day|night}.png`, `sun-token.png`, `moon-token.png`, `clock-front-{day|night}.png` (drawn **after** tokens). Arc in frame @2x: centre **(160.6, 183.1)**, radius **150.6**, **147° → 33°** (6:00 → 18:00); moon rests at the right end after 18:00. Season ribbon + label at **(640, 88)**.
+- **Clock (ribbon only)** — `assets/ui/clock/season-ribbon.png` and `season-ribbon-night.png` (**584×96** @2x → **292×48** display) centred at **(640, 36)** in the top bar. Label in **Lora 600 16px**, ink **#3E2A1A** day and night. The sun/moon arc frame and tokens are **not drawn** (assets may remain on disk for history).
 - **Seasons** — `assets/seasons/{season}-{day|night}.png`; particles under `assets/seasons/particles/` (25 sprites; summer night uses fireflies).
 - **Bedtime** — `assets/bedtime/window-glow.png` (+ optional `window-dark.png`); **morning** — `assets/bedtime/morning-card.png`; bed control icon `assets/ui/bed-button-icon.png`.
 
@@ -28,4 +28,4 @@ Authoritative file list: **`assets/time-manifest.json`** (wired in `renderer/art
 xvfb-run -a npm run screenshots
 ```
 
-Captures include `clock-dawn.png`, `clock-noon.png`, `clock-dusk.png`, `clock-night.png`, `season-*.png`, `bedtime-window-glow.png`, `morning-card.png`, `logo-{day,night}-full.png`, and `topbar-*-2x.png` under `docs/`.
+`SMILE_GARDEN_TIME_SHOTS=1` also writes `clock-ribbon-day.png`, `clock-ribbon-night.png`, and `clock-ribbon-crops.png` (longest label, layout widths). Legacy `clock-*.png` and `topbar-*` captures may still run in the time-shot harness.

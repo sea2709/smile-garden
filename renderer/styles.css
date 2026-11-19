@@ -89,7 +89,7 @@ body[data-painted-clock="1"] .topbar {
     grid-template-columns:
         calc(var(--hud-logo-width) + var(--hud-logo-gap))
         minmax(0, var(--hud-chips-max, 300px))
-        clamp(160px, 14.375vw, 200px)
+        clamp(292px, 22.8vw, 320px)
         minmax(8px, 1fr)
         auto;
     grid-template-rows: auto auto;
@@ -98,7 +98,7 @@ body[data-painted-clock="1"] .topbar {
     row-gap: 6px;
     min-height: 56px;
     height: auto;
-    padding: 8px 18px 52px;
+    padding: 8px 18px;
     pointer-events: none;
 }
 body[data-painted-clock="1"] .topbar .chip,
@@ -133,7 +133,18 @@ body[data-painted-clock="1"] .top-actions {
     body[data-painted-clock="1"] .chips {
         grid-column: 1 / 3;
         grid-row: 2;
+        margin-top: 6px;
         max-width: var(--hud-chips-max, calc(100vw - 36px));
+    }
+}
+@media (max-width: 960px) {
+    body[data-painted-clock="1"] .top-actions {
+        grid-column: 3 / 6;
+        grid-row: 1;
+        justify-self: end;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        max-width: calc(100vw - 36px);
     }
 }
 .btn-bed .btn-bed-icon { width: 28px; height: 28px; margin-right: 6px; vertical-align: middle; }

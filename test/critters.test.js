@@ -49,7 +49,7 @@ test('critterDayAlpha fades during day/night transition', () => {
 });
 
 test('wanderPosition keeps critters inside garden and below HUD band', () => {
-    const bounds = { width: 1280, height: 720, hudTop: 92, margin: 48 };
+    const bounds = { width: 1280, height: 720, hudTop: 64, margin: 48 };
     const entry = { anchor: [50, 50], phase: 0, ampX: 200, ampY: 40, pathSpeed: 0.3 };
     for (let t = 0; t < 20; t += 0.7) {
         const p = C.wanderPosition(entry, t, bounds);

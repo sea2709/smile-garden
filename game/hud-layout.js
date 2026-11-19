@@ -7,8 +7,8 @@
     else root.SmileHudLayout = api;
 })(typeof self !== 'undefined' ? self : this, function () {
     const BACKDROP = Object.freeze({ w: 1280, h: 720 });
-    /** Heily clock band at 1280×720 (frame + ribbon); chips must stop before left. */
-    const CLOCK_KEEP_OUT = Object.freeze({ left: 548, right: 732, top: 0, bottom: 108 });
+    /** Painted season ribbon in the top bar (no sun/moon arc). */
+    const CLOCK_KEEP_OUT = Object.freeze({ left: 486, right: 794, top: 8, bottom: 64 });
 
     function viewTransform(cssW, cssH) {
         const w = Math.max(1, Number(cssW) || BACKDROP.w);
@@ -56,6 +56,7 @@
             '.topbar .chip',
             '.topbar .top-actions',
             '.topbar .top-actions .btn',
+            '#pip',
             '#mock-badge',
         ];
         const hudRects = [];
