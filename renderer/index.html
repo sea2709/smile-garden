@@ -78,9 +78,12 @@
     </section>
 
     <!-- Camera preview (real mode) / demo badge (mock) -->
-    <div id="pip" class="pip" hidden>
-        <video id="preview" class="mirror-video" autoplay playsinline muted></video>
-        <div id="pip-label" class="pip-label">You</div>
+    <div id="pip-dock" class="pip-dock" hidden>
+        <div id="pip" class="pip">
+            <video id="preview" class="mirror-video" autoplay playsinline muted></video>
+            <div id="pip-label" class="pip-label">You</div>
+        </div>
+        <button id="btn-pip-mode" class="btn btn-soft btn-small pip-mode-btn" type="button" title="Switch to Keyboard mode">Switch to Keyboard mode</button>
     </div>
     <div id="mock-badge" class="mock-badge" hidden>
         <b id="mock-mode">Demo player</b>
@@ -327,6 +330,10 @@
                 <option value="midday">Midday</option>
                 <option value="night">Night</option>
             </select></label></div>
+        <div class="dev-row">
+            <button id="dev-input-mode" class="btn btn-soft btn-small" type="button">Switch to keyboard mode</button>
+        </div>
+        <p id="dev-input-note" class="note">Input: demo auto (S / T still take over).</p>
         <div class="dev-row"><button id="dev-sim" class="btn btn-soft btn-small" type="button">Simulate 5 good days</button></div>
         <div class="dev-row"><button id="dev-ready" class="btn btn-soft btn-small" type="button">Make all planted beds ready</button></div>
         <div class="dev-row"><button id="dev-fill" class="btn btn-soft btn-small" type="button">Fill empty beds</button></div>
