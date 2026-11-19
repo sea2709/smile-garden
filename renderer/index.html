@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="./breath-ui.css">
     <link rel="stylesheet" href="./stretch-ui.css">
     <link rel="stylesheet" href="./care-needs.css">
+    <link rel="stylesheet" href="./keyboard-hints.css">
+    <link rel="stylesheet" href="./farmer-pip.css">
     <link rel="stylesheet" href="./signal-panel-ui.css">
     <link rel="stylesheet" href="./camera-check-ui.css">
     <link rel="stylesheet" href="./summary-ui.css">
@@ -143,8 +145,10 @@
             <div id="tend-harvest-icon" class="tend-harvest-icon">
                 <img id="tend-harvest-img" alt="">
             </div>
-            <div>
-                <b>Ready to harvest</b>
+            <div class="tend-harvest-copy">
+                <div class="tend-harvest-title">
+                    <b>Ready to harvest</b>
+                </div>
                 <span>Breathe slowly to pick it</span>
             </div>
         </div>
@@ -379,6 +383,8 @@
 <script src="./summary-render.js"></script>
 <script src="./camera-check-ui.js"></script>
 <script src="./camera-check-controller.js"></script>
+<script src="./farmer-render.js"></script>
+<script src="./keyboard-hints-render.js"></script>
 <script src="./mock-source.js"></script>
 <script src="../game/care-needs-display.js"></script>
 <script src="./scene.js"></script>

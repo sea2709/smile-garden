@@ -1,0 +1,26 @@
+/* renderer/farmer-pip.css — keyboard-mode farmer in the camera .pip (Heily).
+ *
+ * The existing .pip rule in styles.css stays:
+ *   position:absolute; right:18px; top:66px; width:200px; height:150px;
+ *   border-radius:18px; overflow:hidden; border: 3px solid rgba(251,245,230,.9);
+ *   box-sizing:border-box;   (see the global * rule)
+ *
+ * The preview video is .mirror-video { inset:0; object-fit:cover; transform:scaleX(-1) }.
+ * Farmer frames are authored in screen space. SmileFarmer.paint() flips them
+ * onto the 400×300 capture canvas, so you can leave this mirror in place.
+ *
+ * If you would rather draw the frames unflipped, add .pip-farmer to #pip and
+ * turn the helper's preflip off:
+ *   paint(ctx, { ..., preflip: false });
+ */
+.pip.pip-farmer .mirror-video,
+#pip.pip-farmer video.mirror-video {
+    transform: none;
+}
+
+/* Keep the "You" label; do not use .pip-mock-capture (that CSS oval is only
+ * for screenshot capture when no stream is attached). */
+.pip.pip-farmer.pip-mock-capture::after {
+    content: none;
+    display: none;
+}

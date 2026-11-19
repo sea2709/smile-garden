@@ -26,7 +26,8 @@
             plant, beginVisit, onStep, renderNeedsCard, syncTendRing,
             show: showScreen, save, toast, mkBtn, gardenTodayKey,
             refreshLighting, renderHud, plotsForScene, syncPipVisibility,
-            restorePipHome, startCamera, ensureSource,
+            restorePipHome, startCamera, ensureSource, syncKeyboardStripMode,
+            ensureFarmerPipLive, waitForFarmerPipReady,
             primeSignalTraceForCapture, redrawSignalPanel,
             renderBreathRate, renderStretchHud, ensureStretchRingArt,
             renderSummary, renderMorningSummary, finishVisit,
@@ -802,6 +803,219 @@
                 careStats: { sunDots: 1.5, waterDots: 2, fertilizerDots: 0, stakes: 0, harvests: 0 },
             });
             show('summary');
+        },
+        async setKeyboardModeForCapture(on = true) {
+            config.keyboard = !!on;
+            if (on && source && source.setAuto) source.setAuto(false);
+            if (els.mockBadge) els.mockBadge.hidden = !on && !config.mock;
+            if (on) els.mockMode.textContent = 'Keyboard player';
+            syncKeyboardStripMode();
+            if (on) {
+                await ensureFarmerPipLive();
+            }
+            renderNeedsCard();
+            return config.keyboard;
+        },
+        setFarmerNightRestForCapture() {
+            syncFromApp();
+            if (source && source.setNight) source.setNight(true);
+            if (source && source.setAuto) source.setAuto(false);
+            if (source && source.setKeys) {
+                source.setKeys({
+                    smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false,
+                });
+            }
+            return true;
+        },
+        async ensureFarmerPipForCapture() {
+            try {
+                await hooks.setKeyboardModeForCapture(true);
+                await ensureFarmerPipLive();
+                await waitForFarmerPipReady(10000);
+                syncFromApp();
+                if (source && source.setNight) {
+                    source.setNight((document.body.dataset.lighting || '') === 'night');
+                }
+                return true;
+            } catch (e) {
+                console.error('[ensureFarmerPipForCapture]', e);
+                return false;
+            }
+        },
+        exportFarmerStateGridDataUrl() {
+            const SF = global.SmileFarmer;
+            if (!SF) return null;
+            const specs = [
+                {},
+                { smile: true },
+                { talk: true },
+                { tilt: 'left' },
+                { tilt: 'right' },
+                { face: false },
+            ];
+            const pipW = 200;
+            const pipH = 150;
+            const cols = 3;
+            const canvas = document.createElement('canvas');
+            canvas.width = pipW * cols;
+            canvas.height = pipH * 2;
+            const ctx = canvas.getContext('2d');
+            const off = document.createElement('canvas');
+            off.width = 400;
+            off.height = 300;
+            const t0 = performance.now() / 1000;
+            SF.preload('day');
+            for (let i = 0; i < specs.length; i++) {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                const octx = off.getContext('2d');
+                octx.clearRect(0, 0, 400, 300);
+                SF.paint(octx, Object.assign({ lighting: 'day', t: t0 + i * 0.2 }, specs[i]));
+                ctx.save();
+                ctx.translate(col * pipW + pipW, row * pipH);
+                ctx.scale(-1, 1);
+                ctx.drawImage(off, 0, 0, pipW, pipH);
+                ctx.restore();
+            }
+            return canvas.toDataURL('image/png');
+        },
+        farmerFrameMatchesLabel(label, frameName) {
+            const f = String(frameName || '');
+            if (label === 'rest') return f === 'rest' || f.startsWith('rest-blink');
+            if (label === 'smile') return f === 'smile';
+            if (label === 'talk') return f.startsWith('talk');
+            if (label === 'tilt [') return f === 'tilt-left';
+            if (label === 'tilt ]') return f === 'tilt-right';
+            if (label === 'hidden') return f === 'hidden';
+            return false;
+        },
+        async waitForFarmerFrameLabel(label, timeoutMs, prevHash) {
+            const deadline = performance.now() + (timeoutMs || 5000);
+            let stable = 0;
+            while (performance.now() < deadline) {
+                syncFromApp();
+                if (source && source.flushFarmerFrame) source.flushFarmerFrame();
+                if (source && source.requestPreviewFrame) source.requestPreviewFrame();
+                const frame = source && source.getFarmerFrame ? source.getFarmerFrame() : '';
+                const hash = hooks.pipFrameHash();
+                const nameOk = hooks.farmerFrameMatchesLabel(label, frame);
+                const hashOk = prevHash == null || (hash != null && hash !== prevHash);
+                if (nameOk && hashOk) {
+                    stable += 1;
+                    if (stable >= 6) return true;
+                } else {
+                    stable = 0;
+                }
+                await new Promise((r) => requestAnimationFrame(r));
+            }
+            return false;
+        },
+        pipFrameHash() {
+            const v = els.preview;
+            if (!v || v.readyState < 2 || !v.videoWidth) return null;
+            const c = document.createElement('canvas');
+            c.width = 16;
+            c.height = 16;
+            const ctx = c.getContext('2d');
+            try {
+                ctx.drawImage(v, 0, 0, 16, 16);
+            } catch {
+                return null;
+            }
+            const d = ctx.getImageData(0, 0, 16, 16).data;
+            let h = 0;
+            for (let i = 0; i < d.length; i += 4) h = (h * 31 + d[i] + d[i + 1] + d[i + 2]) >>> 0;
+            return h;
+        },
+        async exportFarmerStateGridFromLivePip() {
+            syncFromApp();
+            if (!els.preview || !els.preview.srcObject) await hooks.ensureFarmerPipForCapture();
+            if (source && source.setAuto) source.setAuto(false);
+            if (source && source.setNight) source.setNight(false);
+            refreshLighting();
+            const tiles = [
+                { label: 'rest', keys: { smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false } },
+                { label: 'smile', keys: { smile: true, talk: false, hide: false, tiltLeft: false, tiltRight: false } },
+                { label: 'talk', keys: { smile: false, talk: true, hide: false, tiltLeft: false, tiltRight: false } },
+                { label: 'tilt [', keys: { smile: false, talk: false, hide: false, tiltLeft: true, tiltRight: false } },
+                { label: 'tilt ]', keys: { smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: true } },
+                { label: 'hidden', keys: { smile: false, talk: false, hide: true, tiltLeft: false, tiltRight: false } },
+            ];
+            const pipW = 200;
+            const pipH = 150;
+            const labelH = 22;
+            const cols = 3;
+            const canvas = document.createElement('canvas');
+            canvas.width = pipW * cols;
+            canvas.height = (pipH + labelH) * 2;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#f0e6d2';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            const v = els.preview;
+            if (!v) return null;
+            const SF = global.SmileFarmer;
+            if (SF && SF.whenPreloaded) await SF.whenPreloaded('day');
+            const hashes = [];
+            let prevHash = null;
+            for (let i = 0; i < tiles.length; i++) {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                const spec = tiles[i];
+                if (SF && SF.freezeBlink) SF.freezeBlink(120);
+                if (source && source.setKeys) source.setKeys(spec.keys);
+                await hooks.waitForFarmerFrameLabel(spec.label, 8000, prevHash);
+                await waitForFarmerPipReady(3000);
+                const x = col * pipW;
+                const y = row * (pipH + labelH);
+                try {
+                    ctx.drawImage(v, x, y, pipW, pipH);
+                } catch { /* ignore */ }
+                const tileHash = hooks.pipFrameHash();
+                hashes.push(tileHash);
+                prevHash = tileHash;
+                ctx.fillStyle = '#3E2A1A';
+                ctx.font = 'bold 12px Nunito, system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(spec.label, x + pipW / 2, y + pipH + 16);
+            }
+            if (source && source.setKeys) {
+                source.setKeys({ smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false });
+            }
+            const uniq = new Set(hashes.filter((h) => h != null));
+            if (uniq.size < 4) {
+                console.warn('[exportFarmerStateGridFromLivePip] low pip frame diversity', uniq.size, hashes);
+            }
+            return canvas.toDataURL('image/png');
+        },
+        async prepKeyboardHintsStripShot(opts) {
+            try {
+                const plot = opts && opts.plot != null ? Number(opts.plot) : 4;
+                const progress = (opts && opts.progress) || { sun: 2, water: 1, fertilizer: 0, stake: false };
+                const channel = (opts && opts.channel) || 'water';
+                await hooks.setKeyboardModeForCapture(true);
+                hooks.setNeedsCardDemo(plot, progress);
+                syncFromApp();
+                if (opts && opts.lighting) setLightingOverride(opts.lighting);
+                else refreshLighting();
+                syncFromApp();
+                if (source && source.setNight) {
+                    source.setNight((document.body.dataset.lighting || '') === 'night');
+                }
+                if (opts && opts.harvest) {
+                    hooks.prepHarvestTendStripShot(plot);
+                } else {
+                    hooks.setTendStripActiveForCapture(channel);
+                }
+                document.body.dataset.demoCareChannel = channel;
+                renderNeedsCard();
+                await ensureFarmerPipLive();
+                await waitForFarmerPipReady(10000);
+                hooks.captureRedraw();
+                return true;
+            } catch (e) {
+                console.error('[prepKeyboardHintsStripShot]', e);
+                return false;
+            }
         },
         };
 

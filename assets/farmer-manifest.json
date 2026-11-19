@@ -1,0 +1,191 @@
+{
+  "name": "Keyboard-mode farmer (camera pip)",
+  "artist": "Heily",
+  "date": "2026-11-18",
+  "scale": 2,
+  "canvas": [
+    400,
+    300
+  ],
+  "canvasNote": "renderer/mock-source.js paintPreviewFrame() allocates a 400\u00d7300 canvas, paints a static peach oval once at start(), and captureStream(12) feeds <video id='preview' class='mirror-video'>. The oval never changes expression.",
+  "png": [
+    800,
+    600
+  ],
+  "pipCss": {
+    "selector": ".pip",
+    "width": 200,
+    "height": 150,
+    "right": 18,
+    "top": 66,
+    "x": 1062,
+    "y": 66,
+    "border": "3px solid rgba(251, 245, 230, 0.9)",
+    "radius": 18,
+    "boxSizing": "border-box",
+    "window": [
+      1280,
+      772
+    ]
+  },
+  "mirrored": true,
+  "authoredIn": "screen-space",
+  "mirrorNote": "The preview video uses CSS transform: scaleX(-1), like a selfie camera. Frames in this pack are painted as they should look on screen. SmileFarmer.paint() flips them when drawing onto the existing 400\u00d7300 capture canvas so hold [ still leans left after the CSS mirror. If you drop the CSS mirror for sprite mode, call paint(..., { preflip: false }).",
+  "ink": "#3E2A1A",
+  "softInk": "#6B4F36",
+  "noRed": true,
+  "keys": {
+    "smile": [
+      "s",
+      " "
+    ],
+    "talk": [
+      "t"
+    ],
+    "hide": [
+      "f"
+    ],
+    "tiltLeft": [
+      "["
+    ],
+    "tiltRight": [
+      "]"
+    ],
+    "auto": [
+      "a"
+    ]
+  },
+  "rollDeg": {
+    "tiltLeft": -20,
+    "tiltRight": 20,
+    "source": "renderer/mock-source.js emits SmileStretch.syntheticLandmarks(rollDeg); game/stretch.js tiltSide treats <= -15 as left, >= 15 as right."
+  },
+  "priority": [
+    "hidden",
+    "tilt",
+    "smile",
+    "talk",
+    "breathe",
+    "rest"
+  ],
+  "priorityNote": "Hide (F / no face) wins, then a neck tilt, then smile, then talk, then the optional breathe loop if the visit phase is a breath step, otherwise rest with an occasional blink. Harvest has no face state of its own.",
+  "states": {
+    "rest": {
+      "day": "ui/farmer/day/rest.png",
+      "night": "ui/farmer/night/rest.png",
+      "figureDay": "ui/farmer/figure/day/rest.png",
+      "figureNight": "ui/farmer/figure/night/rest.png",
+      "keys": null,
+      "blink": {
+        "frames": [
+          "ui/farmer/{lighting}/rest.png",
+          "ui/farmer/{lighting}/rest-blink-half.png",
+          "ui/farmer/{lighting}/rest-blink-closed.png",
+          "ui/farmer/{lighting}/rest-blink-half.png",
+          "ui/farmer/{lighting}/rest.png"
+        ],
+        "fps": 8,
+        "everySec": [
+          3.5,
+          6.5
+        ],
+        "note": "Play the strip once, then hold rest. Soft blink only."
+      }
+    },
+    "smile": {
+      "day": "ui/farmer/day/smile.png",
+      "night": "ui/farmer/night/smile.png",
+      "figureDay": "ui/farmer/figure/day/smile.png",
+      "figureNight": "ui/farmer/figure/night/smile.png",
+      "keys": [
+        "s",
+        " "
+      ],
+      "when": "keys.smile, or auto-mode happiness near 0.86"
+    },
+    "talk": {
+      "framesDay": [
+        "ui/farmer/day/talk-1.png",
+        "ui/farmer/day/talk-2.png",
+        "ui/farmer/day/talk-3.png"
+      ],
+      "framesNight": [
+        "ui/farmer/night/talk-1.png",
+        "ui/farmer/night/talk-2.png",
+        "ui/farmer/night/talk-3.png"
+      ],
+      "fps": 7,
+      "keys": [
+        "t"
+      ],
+      "when": "keys.talk or the talking flag from mock-source",
+      "note": "A small speech-leaf floats beside the mouth. Loop while talking, then return to rest."
+    },
+    "tilt-left": {
+      "day": "ui/farmer/day/tilt-left.png",
+      "night": "ui/farmer/night/tilt-left.png",
+      "figureDay": "ui/farmer/figure/day/tilt-left.png",
+      "figureNight": "ui/farmer/figure/night/tilt-left.png",
+      "keys": [
+        "["
+      ],
+      "rollDeg": -20,
+      "screen": "Head leans toward the left of the pip (the player's left in the mirrored preview), matching the stretch guide.",
+      "note": "Eyes-closed relaxed stretch. Head and hat lean 20\u00b0; shoulders stay level."
+    },
+    "tilt-right": {
+      "day": "ui/farmer/day/tilt-right.png",
+      "night": "ui/farmer/night/tilt-right.png",
+      "figureDay": "ui/farmer/figure/day/tilt-right.png",
+      "figureNight": "ui/farmer/figure/night/tilt-right.png",
+      "keys": [
+        "]"
+      ],
+      "rollDeg": 20,
+      "screen": "Head leans toward the right of the pip.",
+      "note": "Eyes-closed relaxed stretch. Head and hat lean 20\u00b0; shoulders stay level."
+    },
+    "hidden": {
+      "day": "ui/farmer/day/hidden.png",
+      "night": "ui/farmer/night/hidden.png",
+      "keys": [
+        "f"
+      ],
+      "validation": "NoFaceFound",
+      "note": "Empty garden with the farmer's straw hat resting on a fence post. No figure-only variant; the whole frame is the art."
+    },
+    "breathe": {
+      "framesDay": [
+        "ui/farmer/day/breathe-1.png",
+        "ui/farmer/day/breathe-2.png",
+        "ui/farmer/day/breathe-3.png",
+        "ui/farmer/day/breathe-2.png"
+      ],
+      "framesNight": [
+        "ui/farmer/night/breathe-1.png",
+        "ui/farmer/night/breathe-2.png",
+        "ui/farmer/night/breathe-3.png",
+        "ui/farmer/night/breathe-2.png"
+      ],
+      "fps": 4,
+      "keys": null,
+      "when": "phase is breathe, care-harvest, care-hub-breathe, or camera-check-breath. Keyboard mode has no breathe key; fertilizer is guided.",
+      "optional": true
+    },
+    "harvest": {
+      "note": "No dedicated face state. Harvest is confirmed with Enter or Space. Keep rest, or smile if you want a pleased look."
+    }
+  },
+  "backdrops": {
+    "day": "ui/farmer/day/backdrop.png",
+    "night": "ui/farmer/night/backdrop.png",
+    "note": "Full painted garden fills, for layering with the transparent figure-only PNGs in ui/farmer/figure/{day|night}/."
+  },
+  "wiring": {
+    "replace": "renderer/mock-source.js paintPreviewFrame()",
+    "helper": "renderer/farmer-render.js (SmileFarmer)",
+    "css": "renderer/farmer-pip.css",
+    "callEveryTick": true,
+    "note": "Today paintPreviewFrame() runs only once inside start(), so the stream is a still frame. Call SmileFarmer.paint(ctx, state) from tick() (or after each setKeys) and the 12 fps captureStream will pick up the new canvas. Do not rely on the .pip-mock-capture CSS oval; that path is only for screenshot capture when no stream is attached."
+  }
+}

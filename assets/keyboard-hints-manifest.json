@@ -1,0 +1,236 @@
+{
+  "name": "Keyboard-mode key-cap hints",
+  "artist": "Heily",
+  "date": "2026-11-18",
+  "scale": 2,
+  "game": [
+    1280,
+    720
+  ],
+  "window": [
+    1280,
+    772
+  ],
+  "note": "Cream paper key caps with a soft brown ink edge and Nunito letters in ink #3E2A1A. No red. 2x art, 26 CSS px tall. Day, night, and a pressed/active state that pairs with the .is-active row glow. Show only when #tend-strip has .is-keyboard. The 320px strip does not grow.",
+  "ink": "#3E2A1A",
+  "softInk": "#6B4F36",
+  "type": {
+    "letter": "Nunito 13 CSS / 800 (single letter, baked into the PNG at 26 px / 2x)",
+    "word": "Nunito 9\u201310 CSS / 700 (Enter, Space, Esc, baked)",
+    "nineSliceFallback": "Nunito 11 / 700, CSS text on .tend-key-slice"
+  },
+  "sizes": {
+    "cssHeight": 26,
+    "pngHeight": 52,
+    "letter": {
+      "css": [
+        26,
+        26
+      ],
+      "px": [
+        52,
+        52
+      ],
+      "ids": [
+        "s",
+        "t",
+        "f",
+        "a",
+        "arrow-left",
+        "arrow-right",
+        "arrow-up",
+        "arrow-down"
+      ]
+    },
+    "bracket": {
+      "css": [
+        21,
+        26
+      ],
+      "px": [
+        42,
+        52
+      ],
+      "ids": [
+        "bracket-left",
+        "bracket-right"
+      ],
+      "note": "Narrower so the pair fits the 44 CSS px key column (21+2+21)."
+    },
+    "esc": {
+      "css": [
+        36,
+        26
+      ],
+      "px": [
+        72,
+        52
+      ]
+    },
+    "enter": {
+      "css": [
+        52,
+        26
+      ],
+      "px": [
+        104,
+        52
+      ]
+    },
+    "space": {
+      "css": [
+        68,
+        26
+      ],
+      "px": [
+        136,
+        52
+      ]
+    },
+    "nineSlice": {
+      "src": "ui/keys/key-cap-9s(-active)(-night).png",
+      "px": [
+        96,
+        52
+      ],
+      "css": [
+        48,
+        26
+      ],
+      "slice": 18,
+      "drawSlice": 9,
+      "repeat": "stretch",
+      "note": "Use as a ::before border-image (see keyboard-hints.css) so the letter can sit in the full 26px height. Prefer the baked Enter/Space/Esc PNGs for those keys."
+    }
+  },
+  "states": {
+    "day": "no suffix, e.g. key-s.png",
+    "dayActive": "-active, e.g. key-s-active.png \u2014 warmer wash + gold rim, pairs with .is-active row glow",
+    "night": "-night, warmer cream paper (same family as the night tend strip), same ink #3E2A1A",
+    "nightActive": "-active-night"
+  },
+  "pathPattern": "assets/ui/keys/key-{id}(-active)(-night).png",
+  "ids": [
+    "s",
+    "t",
+    "f",
+    "a",
+    "bracket-left",
+    "bracket-right",
+    "esc",
+    "enter",
+    "space",
+    "arrow-left",
+    "arrow-right",
+    "arrow-up",
+    "arrow-down",
+    "cap-9s"
+  ],
+  "keyboardMode": {
+    "flag": "config.keyboard",
+    "howEnabled": [
+      "Camera cannot start: startCamera() sets config.keyboard = true and swaps in the mock source with auto: false.",
+      "Error banner button #btn-error-keyboard (\u201cPlay with keyboard instead\u201d) sets config.keyboard = true, destroys the SDK source, and restarts the mock.",
+      "Demo mode (config.mock) already uses the mock source with auto: true. Holding S / T / F / [ / ] calls source.setKeys and the badge becomes \u201cKeyboard player\u201d. A (config.mock only) calls setAuto(true) and returns to the simulated player."
+    ],
+    "appKnows": "Yes. Read config.keyboard, or in demo mode source.auto === false after a key is held. SmileKeyboardHints.isKeyboardMode(config, source) covers both. Toggle #tend-strip.is-keyboard from that.",
+    "note": "The camera-error copy mentions \u201cDemo tools \u2192 keyboard mode\u201d, but there is no keyboard-mode button in the demo drawer. The working entries are the error-banner button and the automatic camera fallback."
+  },
+  "bindings": {
+    "verifiedIn": [
+      "renderer/app.js  (manualKeys, tiltKeys, visit confirm, Esc, arrows, A)",
+      "renderer/mock-source.js  (setKeys: smile, talk, hide, tiltLeft, tiltRight; synthetic breathing)",
+      "game/visit.js  (confirmCareHarvest \u2014 instant pick on Enter / accessibility)",
+      "game/care-needs.js  (harvest.input is still 'breathe')"
+    ],
+    "careLogic": "smile waters, talk fertilizes, stretch stakes, breathe harvests, sun is automatic.",
+    "stripCaps": {
+      "water": {
+        "keys": [
+          "s"
+        ],
+        "hold": true,
+        "action": "smile \u2192 water"
+      },
+      "fertilizer": {
+        "keys": [
+          "t"
+        ],
+        "hold": true,
+        "action": "talk \u2192 fertilizer"
+      },
+      "stake": {
+        "keys": [
+          "bracket-left",
+          "bracket-right"
+        ],
+        "hold": true,
+        "action": "tilt left / right \u2192 stretch / stake"
+      },
+      "harvest": {
+        "keys": [
+          "enter"
+        ],
+        "hold": false,
+        "action": "instant pick via confirmCareHarvest()"
+      },
+      "sun": {
+        "keys": [],
+        "action": "automatic during daylight; no cap"
+      }
+    },
+    "allKeys": {
+      "s": "hold \u2192 smile (water). manualKeys.s",
+      " ": "hold \u2192 smile, except on pick / pick-harvest / harvest-hold / care-hub (when harvest-ready) / care-harvest, where it is intercepted first as confirm, same as Enter. Ambiguous; do not put a Space cap on the water row.",
+      "t": "hold \u2192 talk (fertilizer)",
+      "f": "hold \u2192 hide (look away / no face). Not on the strip.",
+      "[": "hold \u2192 tiltLeft (stretch / stake)",
+      "]": "hold \u2192 tiltRight (stretch / stake)",
+      "Enter": "on visit pick / pick-harvest / harvest-hold / care-hub when canCareHarvest / care-harvest: confirm. confirmCareHarvest() is an instant pick and skips waiting for the breath pacer.",
+      "ArrowLeft/Right/Up/Down": "move bed selection during pick, pick-harvest, and care-hub. Not on the strip.",
+      "Escape": "close journal, picker, camera-check (if returning to garden), and the demo drawer. Does not end the visit, despite the live line \u201cEsc ends the visit\u201d when a crop is ready.",
+      "a": "config.mock only: source.setAuto(true), back to the simulated player.",
+      "g": "toggle smile chart (all modes)",
+      "j": "toggle journal (all modes)",
+      "c": "open camera check (all modes)",
+      "d": "toggle demo tools (all modes)",
+      "n": "next day, only with demo tools open"
+    },
+    "harvestHowItTriggers": {
+      "camera": "Breathe with the guide. care-harvest starts a BreathPacer; a stable breathing signal completes the pick. Copy: \u201cBreathe slowly to pick it\u201d / \u201cBreathe with the guide to harvest this crop\u201d.",
+      "keyboard": "There is no key that emits a breathe action. Enter or Space calls session.confirmCareHarvest(), which instant-completes the harvest (visit.js: \u201cInstant pick from care-hub (Enter / accessibility); breath still works too.\u201d). In addition, mock-source.js still emits a synthetic breathing signal after ~25s of visit time, or immediately during phase breathe / care-harvest / care-hub-breathe / camera-check-breath, even when auto is false. So the guided pacer can still finish in keyboard mode without a key, from the mock breath, not from the player.",
+      "liveCopy": "When harvest-ready on care-hub: \u201cFully grown \u2014 breathe calmly to pick, or press Enter. Esc ends the visit.\u201d"
+    },
+    "mismatches": [
+      "Older toasts and the README still say \u201cS smile, T talk\u201d without saying that smile waters and talk fertilizes. The caps follow the current care logic, not those old labels.",
+      "README says \u201chold S or Space to smile, T to talk, F to look away, A back to the simulated player\u201d and never mentions [ / ] for stretch or Enter for harvest. Those bindings are in app.js and work.",
+      "Space is both an alt-smile and a harvest/pick confirm, because the confirm branch runs first during those visit steps and otherwise falls through to manualKeys[' '] = 'smile'.",
+      "The care-hub live line says \u201cEsc ends the visit\u201d, but the Escape handler never ends a visit.",
+      "Camera-error copy says \u201cUse Demo tools \u2192 keyboard mode\u201d, but the demo drawer has no such button.",
+      "There is no breathe key, even though harvest.input is 'breathe' and the harvest strip still says \u201cBreathe slowly to pick it\u201d. Keyboard harvest is Enter (instant) or the mock\u2019s synthetic breath."
+    ]
+  },
+  "placement": {
+    "stripWidth": 320,
+    "keyColumnCss": 44,
+    "rowBudget": "18 pad + 44 key column + 6 gap + 106 slot column + 10 gap + 117 \u201c2 more smiles\u201d + 18 pad = 319 CSS px.",
+    "care": "Left end of each .tend-care row, in .tend-keycol, before .tend-slots.",
+    "harvest": "Enter cap on the right of the \u201cReady to harvest\u201d title line (.tend-harvest-title). The subtitle stays \u201cBreathe slowly to pick it\u201d, wrapped to two lines (\u201cBreathe slowly to\u201d / \u201cpick it\u201d) so it does not run under the cap. The harvest strip grows from ~112 to 128 CSS px; the 9-slice paper supports this. The 320px width is unchanged.",
+    "visibility": "Only when #tend-strip has .is-keyboard. CSS hides .tend-keycol and .tend-harvest-key otherwise, so a camera-mode visit is unchanged."
+  },
+  "wiring": {
+    "css": "renderer/care-needs.css stays as is; append or link renderer/keyboard-hints.css (after it).",
+    "js": "Load renderer/keyboard-hints-render.js next to care-needs-render.js. In SmileTendStrip.render, call decorateCareRow for each care row and decorateHarvest for #tend-harvest. In app.js, toggle #tend-strip.is-keyboard with SmileKeyboardHints.isKeyboardMode(config, source) whenever the source or auto flag changes.",
+    "html": "No required markup change. decorateHarvest will wrap the existing <b> and <span> in .tend-harvest-copy the first time it runs. tend-strip-keys.html shows the after-render markup."
+  },
+  "files": {
+    "png": "assets/ui/keys/*.png (56 files: 14 ids \u00d7 day / day-active / night / night-active)",
+    "css": "keyboard-hints.css",
+    "helper": "keyboard-hints-render.js",
+    "html": "tend-strip-keys.html",
+    "manifest": "assets/keyboard-hints-manifest.json",
+    "script": "scripts/paint.py, scripts/make_keys.py, scripts/make_mockups.py",
+    "mockup": "mockups/keyboard-hints.png"
+  },
+  "stripHarvestHeight": 128
+}

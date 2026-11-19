@@ -47,38 +47,64 @@
         let visitT = 0;
         let previewCanvas = null;
         let previewStream = null;
+        let lastFarmerFrame = 'rest';
         const nowS = () => performance.now() / 1000;
 
-        function paintPreviewFrame() {
+        function ensurePreviewCanvas() {
             if (!previewCanvas) {
                 previewCanvas = document.createElement('canvas');
-                // 4:3 matches the warm-up preview (560×420) so object-fit:cover is 1:1.
                 previewCanvas.width = 400;
                 previewCanvas.height = 300;
             }
-            const ctx = previewCanvas.getContext('2d');
-            const g = ctx.createLinearGradient(0, 0, 0, 300);
-            g.addColorStop(0, '#6a8ba8');
-            g.addColorStop(1, '#c4d4e2');
-            ctx.fillStyle = g;
+            return previewCanvas;
+        }
+
+        const SMILE_PHASES = {
+            'camera-check-smile': true,
+            'care-hub-smile': true,
+            'care-smile': true,
+            smile: true,
+        };
+        const STRETCH_PHASES = {
+            'camera-check-stretch': true,
+            'care-hub-stretch': true,
+            stretch: true,
+        };
+
+        function farmerPaintState(face, talking) {
+            let tilt = null;
+            if (keys.tiltLeft) tilt = 'left';
+            else if (keys.tiltRight) tilt = 'right';
+            else if (auto && STRETCH_PHASES[phase]) {
+                const rollDeg = 20 * Math.sin(phaseT * 0.55);
+                if (rollDeg <= -15) tilt = 'left';
+                else if (rollDeg >= 15) tilt = 'right';
+            }
+            const smiling = keys.smile || (auto && SMILE_PHASES[phase] && h > 0.45);
+            return {
+                lighting: night ? 'night' : 'day',
+                face,
+                hide: keys.hide,
+                smile: smiling,
+                talk: talking,
+                tilt,
+                phase,
+                t: nowS(),
+            };
+        }
+
+        function paintPreviewFrame(face, talking) {
+            const canvas = ensurePreviewCanvas();
+            const ctx = canvas.getContext('2d');
+            const Farmer = typeof window !== 'undefined' ? window.SmileFarmer : null;
+            if (Farmer) {
+                const state = farmerPaintState(face, talking);
+                const painted = Farmer.paint(ctx, state);
+                if (painted) lastFarmerFrame = painted;
+                return;
+            }
+            ctx.fillStyle = '#c4d4e2';
             ctx.fillRect(0, 0, 400, 300);
-            // Centre on camera-check face-outline (stage 640,256 → canvas 200,143).
-            const cx = 200;
-            const cy = 143;
-            ctx.fillStyle = 'rgba(255, 235, 210, 0.92)';
-            ctx.beginPath();
-            ctx.ellipse(cx, cy, 72, 92, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#4a5560';
-            ctx.beginPath();
-            ctx.ellipse(cx - 28, cy - 16, 10, 7, 0, 0, Math.PI * 2);
-            ctx.ellipse(cx + 28, cy - 16, 10, 7, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#7a4a45';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.arc(cx, cy + 12, 28, 0.15, Math.PI - 0.15);
-            ctx.stroke();
         }
 
         function setValidation(code, hint) {
@@ -190,6 +216,7 @@
                 em.emit('noface', {});
             }
             em.emit('mockFace', { face, happiness: value, talking });
+            paintPreviewFrame(face, talking);
 
             // Synthetic breathing rate: appears after ~25 s of visit time, settles
             // near ~6 breaths/min (matches the guided standard pace).
@@ -217,7 +244,9 @@
                 await new Promise((r) => setTimeout(r, 200));
                 lastTick = nowS();
                 visitT = 0;
-                paintPreviewFrame();
+                paintPreviewFrame(true, false);
+                if (window.SmileFarmer) window.SmileFarmer.preload('day');
+                if (window.SmileFarmer) window.SmileFarmer.preload('night');
                 try {
                     if (!previewStream && previewCanvas && typeof previewCanvas.captureStream === 'function') {
                         previewStream = previewCanvas.captureStream(12);
@@ -243,9 +272,28 @@
                 if (p === 'camera-check-breath') visitT = Math.max(visitT, 32);
             },
             setNight(v) { night = !!v; if (!night) darkDone = false; },
-            setKeys(k) { Object.assign(keys, k); auto = false; },
+            setKeys(k) {
+                Object.assign(keys, k);
+                auto = false;
+                const Farmer = typeof window !== 'undefined' ? window.SmileFarmer : null;
+                if (Farmer && Farmer.freezeBlink) Farmer.freezeBlink(90);
+                paintPreviewFrame(!keys.hide, keys.talk);
+            },
             setAuto(v) { auto = !!v; },
             get auto() { return auto; },
+            getFarmerFrame() { return lastFarmerFrame; },
+            flushFarmerFrame() {
+                paintPreviewFrame(!keys.hide, keys.talk);
+                return lastFarmerFrame;
+            },
+            requestPreviewFrame() {
+                if (!previewStream) return;
+                try {
+                    for (const track of previewStream.getVideoTracks()) {
+                        if (track && typeof track.requestFrame === 'function') track.requestFrame();
+                    }
+                } catch { /* ignore */ }
+            },
         };
     }
 

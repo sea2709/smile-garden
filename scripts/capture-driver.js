@@ -441,7 +441,96 @@ async function runStakeArt(win, outDir) {
     await shot('garden-staked-sunflower.png');
 }
 
+async function runKeyboardFarmerArt(win, outDir) {
+    fs.mkdirSync(outDir, { recursive: true });
+    const wc = win.webContents;
+    const js = (code) => wc.executeJavaScript(code, true);
+    const G = (expr) => js(`(() => { const g = window.__smileGarden; return ${expr}; })()`);
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function writeDataUrl(name, dataUrl) {
+        if (!dataUrl || typeof dataUrl !== 'string') throw new Error(`no data url for ${name}`);
+        const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+        fs.writeFileSync(path.join(outDir, name), Buffer.from(base64, 'base64'));
+        console.log('[capture] wrote', name);
+    }
+    async function shot(name) {
+        const buf = await wc.capturePage();
+        fs.writeFileSync(path.join(outDir, name), buf.toPNG());
+        console.log('[capture] wrote', name, buf.getSize());
+    }
+    async function shotPip(name) {
+        const rect = await js(`(() => {
+            const el = document.getElementById('pip');
+            if (!el || el.hidden) return null;
+            const r = el.getBoundingClientRect();
+            return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+        })()`);
+        if (!rect) throw new Error('pip not visible for ' + name);
+        const buf = await wc.capturePage(rect);
+        fs.writeFileSync(path.join(outDir, name), buf.toPNG());
+        console.log('[capture] wrote', name, '(pip crop)');
+    }
+    const lightingTo = async (lit) => {
+        await G(`g.setLightingOverride('${lit}')`);
+        await sleep(400);
+    };
+
+    await G('g.prepCaptureGarden()');
+    await sleep(600);
+    await js('window.__smileGarden.setMockPipForCapture(true, { stream: true })');
+    const pipBoot = await G('g.ensureFarmerPipForCapture()');
+    if (!pipBoot) throw new Error('ensureFarmerPipForCapture failed during boot');
+    await lightingTo('midday');
+    async function prepStrip(channel, progress, harvest) {
+        await G('g.setKeyboardModeForCapture(true)');
+        await G(`g.setNeedsCardDemo(4, ${JSON.stringify(progress)})`);
+        if (harvest) {
+            await G('g.prepHarvestTendStripShot(4)');
+        } else {
+            await G(`g.setTendStripActiveForCapture('${channel}')`);
+            await js(`document.body.dataset.demoCareChannel='${channel}'`);
+        }
+        await G('g.ensureFarmerPipForCapture()');
+        await G('g.captureRedraw()');
+        await sleep(200);
+    }
+    await prepStrip('water', { sun: 2, water: 1, fertilizer: 0, stake: false }, false);
+    await shot('keyboard-hints-strip-day.png');
+    await lightingTo('night');
+    await G(`g.setLightingOverride('night')`);
+    await sleep(400);
+    await prepStrip('water', { sun: 1, water: 0, fertilizer: 0, stake: false }, false);
+    await shot('keyboard-hints-strip-night.png');
+    await lightingTo('midday');
+    await prepStrip('harvest', { sun: 3, water: 2, fertilizer: 1, stake: true }, true);
+    await shot('keyboard-hints-strip-harvest.png');
+
+    const gridUrl = await G('g.exportFarmerStateGridFromLivePip()');
+    await writeDataUrl('farmer-states-day.png', gridUrl);
+
+    await lightingTo('night');
+    await js('window.__smileGarden.setMockPipForCapture(true, { stream: true })');
+    await G('g.setNeedsCardDemo(4, {"sun":1,"water":0,"fertilizer":0,"stake":false})');
+    await G('g.ensureFarmerPipForCapture()');
+    await G('g.setFarmerNightRestForCapture()');
+    await sleep(400);
+    await G('g.captureRedraw()');
+    await sleep(200);
+    const pipVis = await G('!document.getElementById("pip").hidden');
+    if (!pipVis) throw new Error('pip hidden before farmer-night');
+    await shotPip('farmer-night.png');
+
+    await lightingTo('midday');
+    await prepStrip('water', { sun: 2, water: 1, fertilizer: 0, stake: false }, false);
+    await shot('farmer-in-app.png');
+}
+
 async function run(win, outDir) {
+    if (process.env.SMILE_GARDEN_KEYBOARD_FARMER_SHOTS === '1') {
+        await runKeyboardFarmerArt(win, outDir);
+        app.quit();
+        return;
+    }
     if (process.env.SMILE_GARDEN_TAGS_SHOTS === '1') {
         await runTagsArt(win, outDir);
         app.quit();

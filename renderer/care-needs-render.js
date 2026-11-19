@@ -54,8 +54,12 @@
     }
 
     function bindImg(img, src, artUrl, fallbackText) {
+        if (!img || !img.tagName || img.tagName.toLowerCase() !== 'img') return;
+        img.hidden = false;
+        img.removeAttribute('data-missing');
         img.onerror = () => {
-            if (fallbackText) img.replaceWith(document.createTextNode(fallbackText));
+            img.dataset.missing = '1';
+            img.alt = fallbackText || img.alt || '';
         };
         img.src = artUrl(src);
     }
@@ -65,9 +69,11 @@
    */
     function render(opts) {
         const {
-            strip, nameEl, stampEl, rowEl, harvestIconEl, harvestImgEl,
+            strip, nameEl, stampEl, rowEl, harvestEl, harvestIconEl, harvestImgEl,
             show, plot, state, session, lighting, ART, C, L, artUrl, nowMs,
         } = opts;
+        const KB = global.SmileKeyboardHints;
+        const keyboard = !!(strip && strip.classList.contains('is-keyboard'));
         if (!strip || !C) return;
         strip.hidden = !show || plot == null;
         document.body.dataset.tendStrip = show && plot != null ? '1' : '0';
@@ -136,7 +142,7 @@
                 harvestIconEl.insertBefore(harvestGlow, harvestImgEl);
             }
             bindImg(harvestGlow, rowGlowSrc('harvest', cardLight), artUrl, null);
-            bindImg(harvestImgEl, ART.needsIconSrc('harvest', 'midday'), artUrl, '🧺');
+            bindImg(harvestImgEl, ART.needsIconSrc('harvest', cardLight === 'night' ? 'night' : 'day'), artUrl, '🧺');
         } else if (harvestIconEl) {
             harvestIconEl.classList.remove('is-active');
         }
@@ -188,7 +194,23 @@
             remain.className = 'tend-remain';
             remain.textContent = disp('remainingLabel', spec.key, stat.left);
             row.appendChild(remain);
+            if (KB) {
+                KB.decorateCareRow(row, spec.key, {
+                    lighting: cardLight, active, artUrl, keyboard,
+                });
+            }
             rowEl.appendChild(row);
+        }
+
+        const harvestWrap = harvestEl || strip.querySelector('.tend-harvest');
+        if (KB && harvestWrap) {
+            const harvestActive = harvestReady && slotIsActive('harvest', activeCh, nowMs);
+            KB.decorateHarvest(harvestWrap, {
+                lighting: cardLight,
+                active: harvestActive,
+                artUrl,
+                keyboard,
+            });
         }
     }
 

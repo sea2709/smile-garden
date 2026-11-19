@@ -753,7 +753,7 @@
         else note = `Plants grow one stage on a day they get enough sun and water. ${V.weeklyVisits(state, now)} visits so far this week, and every one counts.`;
         els.greetNote.textContent = note;
         els.greetFine.textContent = config.mock
-            ? 'Demo mode: a simulated player smiles and chats. Hold S / T to take over with the keyboard.'
+            ? 'Demo mode: a simulated player smiles and chats. Hold S to smile (water), T to talk (fertilize), [ / ] to stretch, F to hide, Enter to pick. Space also smiles but confirms harvest when a crop is ready.'
             : (config.enableTelemetry ? 'SmartSpectra SDK telemetry is on (SMARTSPECTRA_TELEMETRY=0 to opt out). ' : '') + 'For fun and general wellness only.';
     }
     function renderIdle() {
@@ -878,8 +878,49 @@
         return ['care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'].includes(step);
     }
 
+    function syncKeyboardStripMode() {
+        if (!els.tendStrip || !window.SmileKeyboardHints) return;
+        els.tendStrip.classList.toggle(
+            'is-keyboard',
+            window.SmileKeyboardHints.isKeyboardMode(config, source),
+        );
+        if (els.pip) {
+            els.pip.classList.toggle('pip-farmer', !!(config.mock || config.keyboard));
+        }
+    }
+
+    async function ensureFarmerPipLive() {
+        if (!config.mock && !config.keyboard) return false;
+        syncKeyboardStripMode();
+        if (!(await ensureSource())) return false;
+        if (source && source.setNight) source.setNight(lighting === 'night');
+        if (!sourceReady) {
+            try { await startCamera(); } catch { return false; }
+        } else {
+            resumePipPreview();
+        }
+        return !!(els.preview && els.preview.srcObject);
+    }
+
+    function waitForFarmerPipReady(timeoutMs) {
+        const deadline = performance.now() + (timeoutMs || 6000);
+        return new Promise((resolve) => {
+            const step = () => {
+                const v = els.preview;
+                if (v && v.srcObject && v.readyState >= 2 && v.videoWidth > 0) {
+                    resolve(true);
+                    return;
+                }
+                if (performance.now() >= deadline) resolve(false);
+                else requestAnimationFrame(step);
+            };
+            step();
+        });
+    }
+
     function renderTendStrip() {
         if (!session || !els.tendStrip || !C || !window.SmileTendStrip) return;
+        syncKeyboardStripMode();
         const plot = session.selectedPlot;
         const show = tendStripVisibleStep(session.step);
         window.SmileTendStrip.render({
@@ -887,6 +928,7 @@
             nameEl: els.tendName,
             stampEl: els.tendStamp,
             rowEl: els.tendRow,
+            harvestEl: els.tendHarvest,
             harvestIconEl: els.tendHarvestIcon,
             harvestImgEl: els.tendHarvestImg,
             show,
@@ -995,17 +1037,19 @@
         source.on('status', (s) => { document.body.dataset.status = s; });
         source.on('error', (e) => handleSdkError(e));
         source.on('stream', (stream) => {
+            const farmerPip = els.pip && els.pip.classList.contains('pip-farmer');
             if (mockPipCapture) {
                 if (mockPipWantStream && stream) {
                     els.preview.srcObject = stream;
                     els.preview.removeAttribute('hidden');
                     if (els.preview.style) els.preview.style.removeProperty('visibility');
-                } else if (els.preview) {
+                } else if (els.preview && !farmerPip) {
                     els.preview.pause();
                     els.preview.srcObject = null;
                     els.preview.setAttribute('hidden', '');
                 }
-                els.pip.classList.toggle('pip-mock-capture', !mockPipWantStream || !els.preview.srcObject);
+                const hideOval = !farmerPip && (!mockPipWantStream || !els.preview.srcObject);
+                els.pip.classList.toggle('pip-mock-capture', hideOval);
                 syncPipVisibility();
                 return;
             }
@@ -1065,7 +1109,8 @@
         sourceReady = false;
         syncInputModeUi();
         if (!(await ensureSource())) return false;
-        toast('Camera unavailable — using keyboard (S smile, T talk).');
+        toast('Camera unavailable — keyboard mode (S smile, T talk, [ / ] stretch, F hide, Enter pick).');
+        syncKeyboardStripMode();
         return true;
     }
 
@@ -1107,11 +1152,12 @@
         syncPipVisibility();
         try {
             if (!(await ensurePlayableSource())) {
-                showError('Camera could not start', 'Use Demo tools → keyboard mode, or open Camera to retry.', true);
+                showError('Camera could not start', 'Tap Play with keyboard instead, or open Camera to retry.', true);
                 return;
             }
             await startCamera();
             syncPipVisibility();
+            syncKeyboardStripMode();
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
         }
@@ -1142,11 +1188,12 @@
         syncPipVisibility();
         try {
             if (!(await ensurePlayableSource())) {
-                showError('Camera could not start', 'Use Demo tools → keyboard mode, or open Camera to retry.', true);
+                showError('Camera could not start', 'Tap Play with keyboard instead, or open Camera to retry.', true);
                 return;
             }
             await startCamera();
             syncPipVisibility();
+            syncKeyboardStripMode();
         } catch (e) {
             showError('Camera could not start', String(e && e.message || e), !config.mock);
             CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
@@ -1663,7 +1710,9 @@
         } else if (step === 'care-hub') {
             const pl = state.plots[session.selectedPlot];
             if (pl && session.canCareHarvest(session.selectedPlot)) {
-                els.stepLive.textContent = 'Fully grown — breathe calmly to pick, or press Enter. Esc ends the visit.';
+                els.stepLive.textContent = config.keyboard
+                    ? 'Fully grown — breathe with the guide, or press Enter (Space also confirms).'
+                    : 'Fully grown — breathe calmly to pick, or press Enter (Space also confirms).';
             } else {
                 const all = pl && C.allNeedsMet(session.careProgressFor(session.selectedPlot), L.plantNeeds(pl.plantId), pl.staked);
                 const moreBeds = session.selectablePlots && session.selectablePlots().length > 1;
@@ -2424,11 +2473,13 @@
         config.keyboard = true;
         els.btnBegin.disabled = false;
         syncInputModeUi();
-        if (!quiet) toast('Keyboard mode: hold S to smile, T to talk, [ / ] to stretch.');
+        syncKeyboardStripMode();
+        if (!quiet) toast('Keyboard mode: S smile, T talk, [ / ] stretch, F hide, Enter pick (Space also confirms harvest).');
         const resume = screen === 'visit' || screen === 'camera-check';
         if (resume) {
             try {
-                await startCamera();
+                await ensureFarmerPipLive();
+                syncKeyboardStripMode();
                 applySourcePhaseAfterSwitch();
             } catch { /* ignore */ }
         }
@@ -2439,6 +2490,7 @@
         const quiet = !!(opts && opts.quiet);
         if (!config.keyboard && !(source && source.setAuto && source.auto === false && config.mock)) {
             syncInputModeUi();
+            syncKeyboardStripMode();
             return;
         }
         if (els.errorBanner) els.errorBanner.hidden = true;
@@ -2453,6 +2505,7 @@
                 sourceReady = false;
             }
             syncInputModeUi();
+            syncKeyboardStripMode();
             if (!quiet) toast('Demo auto player resumed (press A anytime).');
             if ((screen === 'visit' || screen === 'camera-check') && !sourceReady) {
                 try {
@@ -2471,6 +2524,7 @@
         sourceReady = false;
         config.keyboard = false;
         syncInputModeUi();
+        syncKeyboardStripMode();
         if (config.sdkLoadError || !config.hasApiKey) {
             els.btnBegin.disabled = true;
             showError(
@@ -2646,6 +2700,8 @@
                 config.keyboard = false;
                 source.setAuto(true);
                 syncInputModeUi();
+                syncKeyboardStripMode();
+                renderNeedsCard();
             } else {
                 // Real-mode keyboard fallback: A alone cannot restore the camera;
                 // Demo tools → regular mode (or the toggle) does that.
@@ -2656,12 +2712,16 @@
         if (tiltKeys[e.key] && source && source.setKeys && (config.mock || config.keyboard)) {
             source.setKeys({ [tiltKeys[e.key]]: true });
             els.mockMode.textContent = 'Keyboard player';
+            syncKeyboardStripMode();
+            renderNeedsCard();
             return;
         }
         if (manualKeys[k] && source && source.setKeys && (config.mock || config.keyboard)) {
             if (k === ' ') e.preventDefault();
             source.setKeys({ [manualKeys[k]]: true });
             els.mockMode.textContent = 'Keyboard player';
+            syncKeyboardStripMode();
+            renderNeedsCard();
         }
     });
     window.addEventListener('keyup', (e) => {
@@ -2758,6 +2818,7 @@
             }
             syncInputModeUi();
         }
+        syncKeyboardStripMode();
         if (state.morningPending && state.version >= 5) {
             const pending = state.morningPending;
             state.morningPending = null;
@@ -2824,7 +2885,8 @@
         primeSignalTraceForCapture, redrawSignalPanel,
         renderBreathRate, renderStretchHud, ensureStretchRingArt,
         renderSummary, renderMorningSummary, finishVisit,
-        syncGardenSeasonFromDay, syncHudChipClamp, toggleDev,
+        syncGardenSeasonFromDay, syncHudChipClamp, toggleDev, syncKeyboardStripMode,
+        ensureFarmerPipLive, waitForFarmerPipReady,
     });
 
 

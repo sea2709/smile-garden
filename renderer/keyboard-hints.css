@@ -1,0 +1,162 @@
+/* Keyboard-mode key-cap hints (Heily, 11-18).
+   Cream paper caps with a soft brown ink edge and Nunito letters in #3E2A1A.
+   Shown only when #tend-strip has .is-keyboard (toggle from config.keyboard,
+   or demo mode once the player has taken over with a key).
+   Art: assets/ui/keys/key-{id}(-active)(-night).png at 2x, 26 CSS px tall.
+   Placement: a 44px column at the left of each .tend-care row. With the
+   existing 18px padding, 106px slot column, 10px gap and 117px “2 more smiles”
+   label, the row is 319 CSS px — the 320px strip does not need to grow.
+   Harvest’s Enter cap sits on the right of the “Ready to harvest” title line,
+   because “Breathe slowly to pick it” already fills the subtitle. Sun has no
+   key (it fills by itself). Nothing here is tappable. */
+
+/* ---- visibility ---- */
+#tend-strip:not(.is-keyboard) .tend-keycol,
+#tend-strip:not(.is-keyboard) .tend-harvest-key,
+#tend-strip:not(.is-keyboard) .tend-key-slice {
+    display: none;
+}
+
+/* ---- care rows: 44px key column, slots still line up ---- */
+#tend-strip.is-keyboard .tend-keycol {
+    flex: 0 0 44px;
+    width: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 2px;
+    position: relative;
+    z-index: 1;
+}
+
+.tend-key {
+    height: 26px;
+    width: auto;
+    display: block;
+    object-fit: contain;
+    flex: 0 0 auto;
+    pointer-events: none;
+    user-select: none;
+}
+.tend-key[data-wide="false"] {
+    width: 26px;
+    height: 26px;
+}
+/* [ and ] are 21 CSS px wide so the pair fits the 44px column (21+2+21). */
+.tend-key[data-key="bracket-left"],
+.tend-key[data-key="bracket-right"] {
+    width: 21px;
+    height: 26px;
+}
+.tend-key[data-key="esc"] { width: 36px; height: 26px; }
+.tend-key[data-key="enter"] { width: 52px; height: 26px; }
+.tend-key[data-key="space"] { width: 68px; height: 26px; }
+
+/* When a row is live, the painted -active cap is swapped in by the render
+   helper. A tiny downward nudge keeps it in step with the slot hop. */
+.tend-care.is-active .tend-key,
+.tend-harvest-icon.is-active + .tend-harvest-copy .tend-harvest-key,
+.tend-harvest.is-active .tend-harvest-key,
+.tend-key.is-pressed {
+    transform: translateY(1px);
+}
+
+/* Let the row glow start under the caps too, so the active key sits in the wash. */
+#tend-strip.is-keyboard .tend-row-glow {
+    left: -8px;
+    width: 196px;
+}
+
+/* ---- harvest: Enter on the title line, right of “Ready to harvest” ---- */
+#tend-strip.is-keyboard .tend-harvest {
+    /* keep the 52px basket + title + Enter on one row without growing 320px */
+    gap: 10px;
+}
+#tend-strip.is-keyboard .tend-harvest-copy {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 0;
+    flex: 1 1 auto;
+    position: relative;
+}
+#tend-strip.is-keyboard .tend-harvest-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 26px;
+}
+#tend-strip.is-keyboard .tend-harvest-title b {
+    flex: 0 1 auto;
+    min-width: 0;
+    white-space: nowrap;
+}
+#tend-strip.is-keyboard .tend-harvest-key {
+    flex: 0 0 52px;
+    width: 52px;
+    height: 26px;
+    display: block;
+    object-fit: contain;
+    position: relative;
+    z-index: 1;
+}
+/* Subtitle wraps in the space left of the Enter cap (title line, right). */
+#tend-strip.is-keyboard .tend-harvest-copy > span {
+    white-space: normal;
+    padding-right: 0;
+    box-sizing: border-box;
+    max-width: 100%;
+    line-height: 20px;
+}
+#tend-strip.is-keyboard.tend-strip--harvest {
+    min-height: 128px;
+}
+
+/* ---- optional 9-slice cap for a key that has no baked PNG ----
+   The paper is a ::before so the Nunito letter can sit in the full 26px height
+   (a real border-image slice of 9px would leave only 8px inside). Slice is
+   18 px at 2x = 9 CSS px; corners (radius ~10px) sit inside that. */
+.tend-key-slice {
+    position: relative;
+    box-sizing: border-box;
+    height: 26px;
+    min-width: 26px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--sans, 'Nunito', system-ui, sans-serif);
+    font-weight: 700;
+    font-size: 11px;
+    line-height: 1;
+    color: #3E2A1A;
+    letter-spacing: 0.01em;
+    pointer-events: none;
+    user-select: none;
+}
+.tend-key-slice::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-style: solid;
+    border-width: 9px;
+    border-image-source: url('../assets/ui/keys/key-cap-9s.png');
+    border-image-slice: 18 fill;
+    border-image-width: 9px;
+    border-image-repeat: stretch;
+    z-index: 0;
+    pointer-events: none;
+}
+.tend-key-slice > span { position: relative; z-index: 1; }
+
+body[data-lighting='night'] .tend-key-slice::before {
+    border-image-source: url('../assets/ui/keys/key-cap-9s-night.png');
+}
+#tend-strip .tend-care.is-active .tend-key-slice::before,
+.tend-key-slice.is-pressed::before {
+    border-image-source: url('../assets/ui/keys/key-cap-9s-active.png');
+}
+body[data-lighting='night'] #tend-strip .tend-care.is-active .tend-key-slice::before,
+body[data-lighting='night'] .tend-key-slice.is-pressed::before {
+    border-image-source: url('../assets/ui/keys/key-cap-9s-active-night.png');
+}
