@@ -30,11 +30,22 @@ function pickSprite(pool, rnd) {
     return pool.length ? pool[Math.floor(rnd() * pool.length)] : null;
 }
 
-function newParticle({ pool, rnd, width, height, anywhere }) {
+function inKeepOut(pt, keepOut) {
+    if (!keepOut) return false;
+    return pt.x >= keepOut.left && pt.x <= keepOut.right
+        && pt.y >= keepOut.top && pt.y <= keepOut.bottom;
+}
+
+function newParticle({ pool, rnd, width, height, anywhere, keepOut }) {
+    let x = rnd() * width;
+    let y = anywhere ? rnd() * height * 0.72 : -20 - rnd() * 40;
+    if (keepOut && inKeepOut({ x, y }, keepOut)) {
+        y = keepOut.bottom + 12 + rnd() * 48;
+    }
     return {
         sprite: pickSprite(pool, rnd),
-        x: rnd() * width,
-        y: anywhere ? rnd() * height * 0.72 : -20 - rnd() * 40,
+        x,
+        y,
         vx: (rnd() - 0.5) * 22,
         vy: 12 + rnd() * 22,
         rot: rnd() * TAU,
@@ -51,9 +62,9 @@ function syncSpritesToPool(particles, pool, rnd) {
     }
 }
 
-function reseedAll(particles, { pool, rnd, width, height }) {
+function reseedAll(particles, { pool, rnd, width, height, keepOut }) {
     for (let i = 0; i < particles.length; i++) {
-        particles[i] = newParticle({ pool, rnd, width, height, anywhere: true });
+        particles[i] = newParticle({ pool, rnd, width, height, anywhere: true, keepOut });
     }
 }
 
@@ -64,6 +75,7 @@ function createEngine(opts) {
     const width = opts.width;
     const height = opts.height;
     const pools = opts.pools;
+    const keepOut = opts.keepOut || null;
     const count = opts.count || 12;
     const rnd = mulberry(opts.seed != null ? opts.seed : 42);
     let season = 'spring';
@@ -78,7 +90,7 @@ function createEngine(opts) {
         const s = next || 'spring';
         if (s === season) return false;
         season = s;
-        reseedAll(particles, { pool: particlePool(season, nightWeight, pools), rnd, width, height });
+        reseedAll(particles, { pool: particlePool(season, nightWeight, pools), rnd, width, height, keepOut });
         return true;
     }
 
@@ -96,7 +108,7 @@ function createEngine(opts) {
     function init() {
         particles.length = 0;
         for (let i = 0; i < count; i++) {
-            particles.push(newParticle({ pool: currentPool(), rnd, width, height, anywhere: true }));
+            particles.push(newParticle({ pool: currentPool(), rnd, width, height, anywhere: true, keepOut }));
         }
     }
 
@@ -109,8 +121,11 @@ function createEngine(opts) {
             p.x += (p.vx + wind) * dt;
             p.y += p.vy * dt;
             p.rot += p.vr * dt;
+            if (keepOut && inKeepOut(p, keepOut)) {
+                p.y = keepOut.bottom + 10 + rnd() * 36;
+            }
             if (p.y > height * 0.78 || p.x < -40 || p.x > width + 40) {
-                particles[i] = newParticle({ pool, rnd, width, height, anywhere: false });
+                particles[i] = newParticle({ pool, rnd, width, height, anywhere: false, keepOut });
             }
         }
     }
@@ -132,7 +147,7 @@ function createEngine(opts) {
         setNightWeight,
         update,
         applyLighting,
-        reseedAll: () => reseedAll(particles, { pool: currentPool(), rnd, width, height }),
+        reseedAll: () => reseedAll(particles, { pool: currentPool(), rnd, width, height, keepOut }),
     };
 }
 

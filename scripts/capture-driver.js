@@ -187,10 +187,10 @@ async function runTimeArt(win, outDir) {
     await shot('clock-dawn.png');
     await shotTopBar2x('topbar-dawn-6am-2x.png');
     await frame(async () => { await G('g.setGardenTime(12 * 60)'); });
-    const probeNoon = await G('g.probeClockSunToken()');
-    if (!probeNoon || !probeNoon.ok || (probeNoon.pixel && probeNoon.pixel.a < 48)) {
-        console.warn('[capture] clock sun probe', JSON.stringify(probeNoon));
-        throw new Error('sun token not visible on canvas at noon (probe failed)');
+    const probeNoon = await G('g.probeClockRibbon()');
+    if (!probeNoon || !probeNoon.ok || !probeNoon.paintedClock) {
+        console.warn('[capture] clock ribbon probe', JSON.stringify(probeNoon));
+        throw new Error('clock ribbon not painted at noon (probe failed)');
     }
     await shot('clock-noon.png');
     await shotTopBar2x('topbar-noon-2x.png');
@@ -200,10 +200,10 @@ async function runTimeArt(win, outDir) {
     await shot('clock-sunset-6pm.png');
     await shotTopBar2x('topbar-dusk-6pm-2x.png');
     await frame(async () => { await G('g.setGardenTime(22 * 60)'); });
-    const probeNight = await G('g.probeClockMoonToken()');
-    if (!probeNight || !probeNight.ok || probeNight.moonAlpha < 0.9 || (probeNight.pixel && probeNight.pixel.a < 48)) {
-        console.warn('[capture] clock moon probe', JSON.stringify(probeNight));
-        throw new Error('moon token not visible on canvas at 22:00 (probe failed)');
+    const probeNight = await G('g.probeClockRibbon()');
+    if (!probeNight || !probeNight.ok || !probeNight.paintedClock) {
+        console.warn('[capture] clock ribbon probe (night)', JSON.stringify(probeNight));
+        throw new Error('clock ribbon not painted at 22:00 (probe failed)');
     }
     await shot('clock-night.png');
     await shotTopBar2x('topbar-night-2x.png');
@@ -244,6 +244,88 @@ async function runTimeArt(win, outDir) {
     const legacyDawn = path.join(outDir, 'clock-dawn.png');
     const legacyAlias = path.join(outDir, 'clock-dawn-6am.png');
     if (fs.existsSync(legacyDawn)) fs.copyFileSync(legacyDawn, legacyAlias);
+
+    const prepLongLabel = async () => {
+        await G('g.setGardenDay(999)');
+        await G("g.setSeason('autumn')");
+        await G('g.setGardenTime(12 * 60)');
+    };
+    const ribbonCropRect = async () => G(`(() => {
+        const rb = window.SmileArt.clock.ribbonDisplay;
+        const H = window.SmileHudLayout.viewTransform(innerWidth, innerHeight);
+        const s = H.s, ox = H.ox, oy = H.oy;
+        const padX = 28, padY = 24;
+        return {
+            x: Math.max(0, Math.round((rb.cx - rb.w / 2 - padX) * s + ox)),
+            y: Math.max(0, Math.round((rb.cy - rb.h / 2 - padY) * s + oy)),
+            width: Math.round((rb.w + padX * 2) * s),
+            height: Math.round((rb.h + padY * 2) * s),
+        };
+    })()`);
+    await frame(async () => {
+        await prepLongLabel();
+        await lightingTo('midday');
+    });
+    win.setContentSize(1280, 800);
+    await waitHud();
+    await shot('clock-ribbon-day.png');
+    await frame(async () => {
+        await prepLongLabel();
+        await lightingTo('night');
+    });
+    await shot('clock-ribbon-night.png');
+    const cropSpecs = [
+        [1280, 'midday'],
+        [1280, 'night'],
+        [1100, 'midday'],
+        [960, 'midday'],
+    ];
+    const cropPngs = [];
+    for (const [w, lit] of cropSpecs) {
+        win.setMinimumSize(720, 640);
+        win.setContentSize(w, 800);
+        await sleep(450);
+        await assertHudLayouts([w]);
+        await lightingTo(lit);
+        await frame(prepLongLabel);
+        const rect = await ribbonCropRect();
+        const img = await wc.capturePage(rect);
+        cropPngs.push(img.toPNG());
+    }
+    const labels = ['day-1280', 'night-1280', 'day-1100', 'day-960'];
+    const py = `
+import sys
+from PIL import Image
+from io import BytesIO
+bufs = [open(p,'rb').read() for p in sys.argv[1:5]]
+ims = [Image.open(BytesIO(b)).convert('RGB') for b in bufs]
+mw = max(i.width for i in ims)
+mh = max(i.height for i in ims)
+cells = []
+for i, im in enumerate(ims):
+    c = Image.new('RGB', (mw, mh), (240, 230, 210))
+    c.paste(im, ((mw-im.width)//2, (mh-im.height)//2))
+    cells.append(c)
+w2, h2 = mw*2, mh*2
+out = Image.new('RGB', (w2, h2), (240, 230, 210))
+for idx, im in enumerate(cells):
+    out.paste(im, ((idx%2)*mw, (idx//2)*mh))
+for i, lab in enumerate(${JSON.stringify(labels)}):
+    from PIL import ImageDraw
+    d = ImageDraw.Draw(out)
+    x, y = (i%2)*mw+8, (i//2)*mh+8
+    d.text((x,y), lab, fill=(62,42,26))
+out.save(sys.argv[5])
+`;
+    const tmpCrop = cropPngs.map((_, i) => path.join(outDir, `_ribbon-crop-${i}.png`));
+    cropPngs.forEach((buf, i) => fs.writeFileSync(tmpCrop[i], buf));
+    const stitchOut = path.join(outDir, 'clock-ribbon-crops.png');
+    const { spawnSync } = require('child_process');
+    spawnSync('python3', ['-c', py, ...tmpCrop, stitchOut], { stdio: 'inherit' });
+    tmpCrop.forEach((p) => { try { fs.unlinkSync(p); } catch { /* ignore */ } });
+    console.log('[capture] wrote clock-ribbon-crops.png');
+    win.setContentSize(1280, 800);
+    await sleep(300);
 }
 
 async function runTagsArt(win, outDir) {

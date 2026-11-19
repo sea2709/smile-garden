@@ -15,7 +15,7 @@ test('clock keep-out band maps to centered viewport band', () => {
         const expRight = H.CLOCK_KEEP_OUT.right * s + ox;
         assert.ok(Math.abs(keep.left - expLeft) < 0.5, `left @${cssW}`);
         assert.ok(Math.abs(keep.right - expRight) < 0.5, `right @${cssW}`);
-        assert.ok(keep.width > 140, `width @${cssW}`);
+        assert.ok(keep.width > 280, `width @${cssW}`);
     }
 });
 
@@ -27,7 +27,7 @@ test('hud rects in the logo+chip and top-actions columns do not intersect keep-o
     const hudRects = [
         { id: 'brand', rect: { left: 18, top: 8, right: 18 + logoW, bottom: 52, width: logoW, height: 44 } },
         { id: 'chips', rect: { left: 18 + logoW + 10, top: 12, right: keep.left - 4, bottom: 44, width: keep.left - 4 - (18 + logoW + 10), height: 32 } },
-        { id: 'actions', rect: { left: cssW - 18 - 200, top: 8, right: cssW - 18, bottom: 48, width: 200, height: 40 } },
+        { id: 'actions', rect: { left: keep.right + 8, top: 8, right: cssW - 18, bottom: 48, width: cssW - 18 - (keep.right + 8), height: 40 } },
     ];
     const out = H.findClockOverlaps(cssW, cssH, hudRects);
     assert.equal(out.ok, true, JSON.stringify(out.hits));

@@ -92,8 +92,8 @@
             ribbonSrc(kind) {
                 return kind === 'night' ? '../assets/ui/clock/season-ribbon-night.png' : '../assets/ui/clock/season-ribbon.png';
             },
-            ribbonPixels: Object.freeze([280, 61]),
-            ribbonDisplay: Object.freeze({ w: 140, h: 30, cx: 640, cy: 88 }),
+            ribbonPixels: Object.freeze([584, 96]),
+            ribbonDisplay: Object.freeze({ w: 292, h: 48, cx: 640, cy: 36 }),
         }),
         bedtime: Object.freeze({
             bedButtonIcon: '../assets/ui/bed-button-icon.png',
@@ -123,7 +123,7 @@
         logoHud: Object.freeze({ x: 20, y: 20, w: 184, h: 49, srcPixels: Object.freeze([368, 98]) }),
         critters: Object.freeze({
             dir: '../assets/critters/',
-            bounds: Object.freeze({ width: 1280, height: 720, hudTop: 92, margin: 48 }),
+            bounds: Object.freeze({ width: 1280, height: 720, hudTop: 64, margin: 48 }),
             placeholder: Object.freeze({
                 butterfly: '#e8a050',
                 'butterfly-white': '#f4f2ea',

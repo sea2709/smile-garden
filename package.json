@@ -15,7 +15,7 @@
     "start:mock:fast": "electron . --mock --fast",
     "pack": "npm run build && electron-builder --dir --config electron-builder.config.js",
     "dist": "npm run build && electron-builder --config electron-builder.config.js",
-    "test": "node --test test/logic.test.js test/care-needs.test.js test/care-needs-display.test.js test/signal-panel.test.js test/visit.test.js test/harvest.test.js test/critters.test.js test/plant-meta.test.js test/day.test.js test/clock-layout.test.js test/hud-layout.test.js test/season-particles.test.js test/stretch.test.js test/camera-check.test.js test/summary-data.test.js test/assets.test.js test/keyboard-hints.test.js test/farmer-render.test.js test/farmer-mock-frame.test.js",
+    "test": "node --test test/logic.test.js test/care-needs.test.js test/care-needs-display.test.js test/signal-panel.test.js test/visit.test.js test/harvest.test.js test/critters.test.js test/plant-meta.test.js test/day.test.js test/clock-layout.test.js test/clock-ribbon-label.test.js test/hud-layout.test.js test/season-particles.test.js test/stretch.test.js test/camera-check.test.js test/summary-data.test.js test/assets.test.js test/keyboard-hints.test.js test/farmer-render.test.js test/farmer-mock-frame.test.js",
     "check": "node scripts/check-syntax.js",
     "screenshots": "node scripts/capture-screenshots.js",
     "screenshots:camera": "SMILE_GARDEN_CAPTURE_CAMERA_ONLY=1 node scripts/capture-screenshots.js",
