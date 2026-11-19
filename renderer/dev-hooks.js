@@ -26,7 +26,7 @@
             plant, beginVisit, onStep, renderNeedsCard, syncTendRing,
             show: showScreen, save, toast, mkBtn, gardenTodayKey,
             refreshLighting, renderHud, plotsForScene, syncPipVisibility,
-            restorePipHome, startCamera, ensureSource,
+            restorePipHome, startCamera, ensureSource, syncKeyboardStripMode,
             primeSignalTraceForCapture, redrawSignalPanel,
             renderBreathRate, renderStretchHud, ensureStretchRingArt,
             renderSummary, renderMorningSummary, finishVisit,
@@ -802,6 +802,95 @@
                 careStats: { sunDots: 1.5, waterDots: 2, fertilizerDots: 0, stakes: 0, harvests: 0 },
             });
             show('summary');
+        },
+        setKeyboardModeForCapture(on = true) {
+            config.keyboard = !!on;
+            if (on && source && source.setAuto) source.setAuto(false);
+            if (els.mockBadge) els.mockBadge.hidden = !on && !config.mock;
+            if (on) els.mockMode.textContent = 'Keyboard player';
+            syncKeyboardStripMode();
+            renderNeedsCard();
+            return config.keyboard;
+        },
+        exportFarmerStateGridDataUrl() {
+            const SF = global.SmileFarmer;
+            if (!SF) return null;
+            const specs = [
+                {},
+                { smile: true },
+                { talk: true },
+                { tilt: 'left' },
+                { tilt: 'right' },
+                { face: false },
+            ];
+            const pipW = 200;
+            const pipH = 150;
+            const cols = 3;
+            const canvas = document.createElement('canvas');
+            canvas.width = pipW * cols;
+            canvas.height = pipH * 2;
+            const ctx = canvas.getContext('2d');
+            const off = document.createElement('canvas');
+            off.width = 400;
+            off.height = 300;
+            const t0 = performance.now() / 1000;
+            SF.preload('day');
+            for (let i = 0; i < specs.length; i++) {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                const octx = off.getContext('2d');
+                octx.clearRect(0, 0, 400, 300);
+                SF.paint(octx, Object.assign({ lighting: 'day', t: t0 + i * 0.2 }, specs[i]));
+                ctx.save();
+                ctx.translate(col * pipW + pipW, row * pipH);
+                ctx.scale(-1, 1);
+                ctx.drawImage(off, 0, 0, pipW, pipH);
+                ctx.restore();
+            }
+            return canvas.toDataURL('image/png');
+        },
+        exportFarmerStateGridDataUrlWhenReady() {
+            const SF = global.SmileFarmer;
+            if (!SF) return Promise.resolve(null);
+            SF.preload('day');
+            const names = ['rest', 'smile', 'talk-1', 'tilt-left', 'tilt-right', 'hidden'];
+            return new Promise((resolve) => {
+                let left = names.length;
+                let failed = false;
+                const done = () => {
+                    if (!failed) resolve(hooks.exportFarmerStateGridDataUrl());
+                    else resolve(null);
+                };
+                for (const n of names) {
+                    const img = new Image();
+                    img.onload = () => { left -= 1; if (left <= 0) done(); };
+                    img.onerror = () => { failed = true; resolve(null); };
+                    img.src = SF.srcFor('day', n);
+                    if (img.complete && img.naturalWidth > 0) {
+                        left -= 1;
+                    }
+                }
+                if (left <= 0) done();
+            });
+        },
+        prepKeyboardHintsStripShot(opts) {
+            const plot = opts && opts.plot != null ? Number(opts.plot) : 4;
+            const progress = (opts && opts.progress) || { sun: 2, water: 1, fertilizer: 0, stake: false };
+            const channel = (opts && opts.channel) || 'water';
+            hooks.setKeyboardModeForCapture(true);
+            hooks.setNeedsCardDemo(plot, progress);
+            syncFromApp();
+            if (opts && opts.lighting) setLightingOverride(opts.lighting);
+            else refreshLighting();
+            if (opts && opts.harvest) {
+                hooks.prepHarvestTendStripShot(plot);
+            } else {
+                hooks.setTendStripActiveForCapture(channel);
+            }
+            document.body.dataset.demoCareChannel = channel;
+            renderNeedsCard();
+            hooks.captureRedraw();
+            return true;
         },
         };
 

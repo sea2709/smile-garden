@@ -441,7 +441,85 @@ async function runStakeArt(win, outDir) {
     await shot('garden-staked-sunflower.png');
 }
 
+async function runKeyboardFarmerArt(win, outDir) {
+    fs.mkdirSync(outDir, { recursive: true });
+    const wc = win.webContents;
+    const js = (code) => wc.executeJavaScript(code, true);
+    const G = (expr) => js(`(() => { const g = window.__smileGarden; return ${expr}; })()`);
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    async function writeDataUrl(name, dataUrl) {
+        if (!dataUrl || typeof dataUrl !== 'string') throw new Error(`no data url for ${name}`);
+        const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
+        fs.writeFileSync(path.join(outDir, name), Buffer.from(base64, 'base64'));
+        console.log('[capture] wrote', name);
+    }
+    async function shot(name) {
+        const buf = await wc.capturePage();
+        fs.writeFileSync(path.join(outDir, name), buf.toPNG());
+        console.log('[capture] wrote', name, buf.getSize());
+    }
+    async function shotPip(name) {
+        const rect = await js(`(() => {
+            const el = document.getElementById('pip');
+            if (!el || el.hidden) return null;
+            const r = el.getBoundingClientRect();
+            return { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+        })()`);
+        if (!rect) throw new Error('pip not visible for ' + name);
+        const buf = await wc.capturePage(rect);
+        fs.writeFileSync(path.join(outDir, name), buf.toPNG());
+        console.log('[capture] wrote', name, '(pip crop)');
+    }
+    const lightingTo = async (lit) => {
+        await G(`g.setLightingOverride('${lit}')`);
+        await sleep(400);
+    };
+
+    await G('g.prepCaptureGarden()');
+    await sleep(600);
+    await js('window.__smileGarden.setMockPipForCapture(true, { stream: true })');
+    await G('g.setKeyboardModeForCapture(true)');
+    await lightingTo('midday');
+    await G(`g.prepKeyboardHintsStripShot({ plot: 4, channel: 'water', progress: { sun: 2, water: 1, fertilizer: 0, stake: false } })`);
+    await sleep(500);
+    await G('g.captureRedraw()');
+    await shot('keyboard-hints-strip-day.png');
+    await lightingTo('night');
+    await G(`g.prepKeyboardHintsStripShot({ plot: 4, channel: 'water', progress: { sun: 1, water: 0, fertilizer: 0, stake: false }, lighting: 'night' })`);
+    await sleep(500);
+    await G('g.captureRedraw()');
+    await shot('keyboard-hints-strip-night.png');
+    await lightingTo('midday');
+    await G(`g.prepKeyboardHintsStripShot({ plot: 4, harvest: true, channel: 'harvest' })`);
+    await sleep(500);
+    await G('g.captureRedraw()');
+    await shot('keyboard-hints-strip-harvest.png');
+
+    const gridUrl = await js('window.__smileGarden.exportFarmerStateGridDataUrlWhenReady()');
+    await writeDataUrl('farmer-states-day.png', gridUrl);
+
+    await lightingTo('night');
+    await js(`(() => { const s = window.__smileGarden?.source; if (s) { s.setNight(true); s.setAuto(false); s.setKeys({ smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false }); } return true; })()`);
+    await sleep(400);
+    await G('g.captureRedraw()');
+    await sleep(200);
+    await shotPip('farmer-night.png');
+
+    await lightingTo('midday');
+    await G('g.setKeyboardModeForCapture(true)');
+    await G(`g.prepKeyboardHintsStripShot({ plot: 4, channel: 'water', progress: { sun: 2, water: 1, fertilizer: 0, stake: false } })`);
+    await js('window.__smileGarden.setMockPipForCapture(true, { stream: true })');
+    await G('g.captureRedraw()');
+    await sleep(300);
+    await shot('farmer-in-app.png');
+}
+
 async function run(win, outDir) {
+    if (process.env.SMILE_GARDEN_KEYBOARD_FARMER_SHOTS === '1') {
+        await runKeyboardFarmerArt(win, outDir);
+        app.quit();
+        return;
+    }
     if (process.env.SMILE_GARDEN_TAGS_SHOTS === '1') {
         await runTagsArt(win, outDir);
         app.quit();

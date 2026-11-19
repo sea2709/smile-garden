@@ -103,8 +103,9 @@ xvfb-run -a npm run screenshots   # regenerate docs/*.png (headless Linux; plain
 ```
 
 **Keys:** `G` smile chart (during visits) · `J` journal · `D` demo tools · `N` next day (with demo tools open) ·
-`Esc` close. In demo/keyboard mode: hold `S` or `Space` to smile, `T` to talk, `F` to look away, `A` back to the
-simulated player.
+`Esc` closes panels (journal, picker, demo tools, camera check). In demo/keyboard mode: hold `S` to smile (water),
+`T` to talk (fertilize), `[` / `]` to stretch (stake), `F` to look away, `Enter` to pick (and `Space` also confirms
+harvest when a crop is ready — otherwise it smiles like `S`), `A` back to the simulated player.
 
 **No key or camera?** Real mode shows a banner with **Play with keyboard instead**, which swaps in the
 keyboard player.

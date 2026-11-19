@@ -65,9 +65,11 @@
    */
     function render(opts) {
         const {
-            strip, nameEl, stampEl, rowEl, harvestIconEl, harvestImgEl,
+            strip, nameEl, stampEl, rowEl, harvestEl, harvestIconEl, harvestImgEl,
             show, plot, state, session, lighting, ART, C, L, artUrl, nowMs,
         } = opts;
+        const KB = global.SmileKeyboardHints;
+        const keyboard = !!(strip && strip.classList.contains('is-keyboard'));
         if (!strip || !C) return;
         strip.hidden = !show || plot == null;
         document.body.dataset.tendStrip = show && plot != null ? '1' : '0';
@@ -188,7 +190,23 @@
             remain.className = 'tend-remain';
             remain.textContent = disp('remainingLabel', spec.key, stat.left);
             row.appendChild(remain);
+            if (KB) {
+                KB.decorateCareRow(row, spec.key, {
+                    lighting: cardLight, active, artUrl, keyboard,
+                });
+            }
             rowEl.appendChild(row);
+        }
+
+        const harvestWrap = harvestEl || strip.querySelector('.tend-harvest');
+        if (KB && harvestWrap) {
+            const harvestActive = harvestReady && slotIsActive('harvest', activeCh, nowMs);
+            KB.decorateHarvest(harvestWrap, {
+                lighting: cardLight,
+                active: harvestActive,
+                artUrl,
+                keyboard,
+            });
         }
     }
 
