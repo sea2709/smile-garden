@@ -18,6 +18,7 @@ const timeOnly = process.env.SMILE_GARDEN_TIME_SHOTS === '1';
 const cameraOnly = process.env.SMILE_GARDEN_CAPTURE_CAMERA_ONLY === '1';
 const stakeOnly = process.env.SMILE_GARDEN_STAKE_SHOTS === '1';
 const tagsOnly = process.env.SMILE_GARDEN_TAGS_SHOTS === '1';
+const stripGlowOnly = process.env.SMILE_GARDEN_STRIP_GLOW_ONLY === '1';
 const keepPng = new Set([
     'breath-mockup.png', 'camera-check-mockup.png',
     '02-greeting-dawn.png', '08-summary-growth.png', '10-greeting-night.png', '11-night-light-hint.png',
@@ -34,7 +35,7 @@ const keepPng = new Set([
     'needs-tag-complete-soil-day.png', 'needs-tag-resting-morning-day.png', 'needs-tag-night.png', 'needs-garden-tags-midday.png',
     'plants-clean-mature-garden.png', 'plants-clean-picked-garden.png',
 ]);
-if (!timeOnly && !cameraOnly && !stakeOnly && !tagsOnly) {
+if (!timeOnly && !cameraOnly && !stakeOnly && !tagsOnly && !stripGlowOnly) {
     for (const f of fs.readdirSync(outDir)) {
         if (f.endsWith('.png') && !keepPng.has(f)) fs.unlinkSync(path.join(outDir, f));
     }
@@ -48,6 +49,7 @@ const env = Object.assign({}, process.env, {
     SMILE_GARDEN_TIME_SHOTS: timeOnly ? '1' : (process.env.SMILE_GARDEN_TIME_SHOTS || ''),
     SMILE_GARDEN_STAKE_SHOTS: stakeOnly ? '1' : (process.env.SMILE_GARDEN_STAKE_SHOTS || ''),
     SMILE_GARDEN_TAGS_SHOTS: tagsOnly ? '1' : (process.env.SMILE_GARDEN_TAGS_SHOTS || ''),
+    SMILE_GARDEN_STRIP_GLOW_ONLY: stripGlowOnly ? '1' : (process.env.SMILE_GARDEN_STRIP_GLOW_ONLY || ''),
 });
 const child = spawn(electron, ['.', '--mock', '--fast', '--no-sandbox'], { cwd: root, env, stdio: 'inherit' });
 child.on('exit', (code) => process.exit(code || 0));

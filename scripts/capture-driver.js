@@ -490,7 +490,7 @@ async function run(win, outDir) {
         await G('g.setChartForCapture(true)');
         if (o.channel) await G(`g.setTendStripActiveForCapture(${JSON.stringify(o.channel)})`);
         await G(`g.setSignalPanelDemoForCapture("${mode}")`);
-        if (o.channel) await waitTendStrip(wc);
+        if (o.channel && !o.skipTendStripWait) await waitTendStrip(wc);
         await sleep(200);
         await G('g.captureRedraw()');
         await sleep(350);
@@ -551,6 +551,55 @@ async function run(win, outDir) {
     }
     const lightingTo = async (l) => { await G(`g.setLightingOverride('${l}')`); await sleep(2000); };
 
+    if (process.env.SMILE_GARDEN_STRIP_GLOW_ONLY === '1') {
+        await waitFor('ready', (d) => d.ready === '1');
+        await G('g.reset()');
+        await lightingTo('midday');
+        await G('g.ackWellness()');
+        await sleep(300);
+        if ((await ds()).screen !== 'camera-check') await G('g.openCameraCheck()');
+        await waitFor('camera check', (d) => d.screen === 'camera-check', 25000);
+        await G('g.markAllCameraChecksPassed()');
+        await sleep(400);
+        await G('g.finishCameraCheck()');
+        await sleep(400);
+        await G('g.prepCaptureGarden()');
+        await G('g.show("idle")');
+        await sleep(300);
+        const daySmileProgress = { sun: 2, water: 1, fertilizer: 0, stake: false };
+        await G(`g.setNeedsCardDemo(4, ${JSON.stringify(daySmileProgress)})`);
+        await G('g.setChartForCapture(true)');
+        await G(`g.setSignalPanelDemoForCapture('smile')`);
+        await G(`g.setTendStripActiveForCapture('water')`);
+        await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-smile'); return true; })()`);
+        await G('g.setCaptureStripGlow(true)');
+        await G(`g.setSignalPanelDemoForCapture('smile')`);
+        await G(`g.setTendStripActiveForCapture('water')`);
+        await sleep(200);
+        await G('g.captureRedraw()');
+        await sleep(80);
+        await js(`(() => new Promise((resolve, reject) => {
+            const row = document.querySelector('.tend-care[data-need="water"]');
+            if (!row) return reject(new Error('no water row'));
+            if (!row.classList.contains('is-active')) {
+                return reject(new Error('water row not active demo=' + document.body.dataset.demoCareChannel + ' class=' + row.className));
+            }
+            const glow = row.querySelector('.tend-row-glow');
+            if (!glow) return reject(new Error('no tend-row-glow img'));
+            const done = () => {
+                if (glow.naturalWidth > 0) resolve(true);
+                else reject(new Error('glow image has zero size'));
+            };
+            if (glow.complete) done();
+            else { glow.onload = () => done(); glow.onerror = () => reject(new Error('glow image failed to load')); }
+        }))()`);
+        await G('g.captureRedraw()');
+        await sleep(120);
+        await shot('tend-strip-active-glow.png');
+        app.quit();
+        return;
+    }
+
     await waitFor('ready', (d) => d.ready === '1');
     await G('g.reset()');
     await lightingTo('dawn');
@@ -608,9 +657,9 @@ async function run(win, outDir) {
     await G('g.openPicker(4)');
     await sleep(1000);
     await shot('03-seed-picker.png');
-    await G(`g.plant('lettuce', 4)`);
+    await G(`g.plant('cucumber', 4)`);
     await G(`g.plant('mint', 5)`);
-    await G(`g.plant('cucumber', 1)`);
+    await G(`g.plant('lettuce', 1)`);
     await G('g.closePicker()');
     await sleep(1500);
 
@@ -622,6 +671,8 @@ async function run(win, outDir) {
     await G('g.setChartForCapture(true)');
     await sleep(800);
     await shot('03b-selection-ring-visit.png');
+    const cucumberPartial = { sun: 1, water: 1, fertilizer: 0, stake: false };
+    const cucumberAllSet = { sun: 2, water: 3, fertilizer: 2, stake: true };
     await G(`g.setCareHubProgressForCapture(4, { sun: 1, water: 0, fertilizer: 0, stake: false })`);
     await captureSignalPanel('smile', { channel: 'water' });
     await G(`g.setCareHubProgressForCapture(4, { sun: 2, water: 1, fertilizer: 0, stake: false })`);
@@ -637,6 +688,12 @@ async function run(win, outDir) {
         progress: daySmileProgress,
         mockPhase: 'care-hub-smile',
     });
+    await prepCareDocShot({
+        panel: 'smile',
+        channel: 'water',
+        progress: daySmileProgress,
+        mockPhase: 'care-hub-smile',
+    });
     await shot('04-care-smile-midday.png');
     await prepCareDocShot({
         panel: 'smile',
@@ -644,7 +701,34 @@ async function run(win, outDir) {
         progress: daySmileProgress,
         mockPhase: 'care-hub-smile',
     });
+    await G('g.setCaptureStripGlow(true)');
+    await G(`g.setSignalPanelDemoForCapture('smile')`);
+    await G(`g.setTendStripActiveForCapture('water')`);
+    await sleep(200);
+    await G('g.captureRedraw()');
+    await sleep(80);
+    await js(`(() => new Promise((resolve, reject) => {
+        const row = document.querySelector('.tend-care[data-need="water"]');
+        if (!row) return reject(new Error('no water row'));
+        if (!row.classList.contains('is-active')) {
+            return reject(new Error('water row not active (demo=' + document.body.dataset.demoCareChannel + ')'));
+        }
+        const glow = row.querySelector('.tend-row-glow');
+        if (!glow) return reject(new Error('no tend-row-glow img'));
+        const done = () => {
+            if (glow.naturalWidth > 0) resolve(true);
+            else reject(new Error('glow image has zero size'));
+        };
+        if (glow.complete) done();
+        else {
+            glow.onload = () => done();
+            glow.onerror = () => reject(new Error('glow image failed to load'));
+        }
+    }))()`);
+    await G('g.captureRedraw()');
+    await sleep(120);
     await shot('tend-strip-active-glow.png');
+    await G('g.setCaptureStripGlow(false)');
     await js('window.__smileGarden.setMockPipForCapture(true, { stream: false })');
     await prepCareDocShot({
         panel: 'smile',
@@ -675,18 +759,32 @@ async function run(win, outDir) {
     await shot('stake-guide-tilted.png');
     await G('g.setStretchHudDemo("done")');
     await G('g.clearStretchHudDemo()');
+    await sleep(250);
     await G('g.setSelectedPlot(4)');
     await G(`g.setCareHubProgressForCapture(4, { sun: 3, water: 2, fertilizer: 1, stake: true })`);
     await G('g.setSelectedPlot(4)');
     await G('g.primeCareHarvestForCapture(4)');
-    await captureSignalPanel('breathe', { channel: 'harvest' });
+    await captureSignalPanel('breathe', { channel: 'harvest', skipTendStripWait: true });
     await G(`g.setTendStripActiveForCapture('harvest')`);
     await G(`(() => { const s = window.__smileGarden?.source; if (s) s.setPhase('care-hub-breathe'); return true; })()`);
     await sleep(900);
     await G('g.captureRedraw()');
     await shot('07-care-harvest.png');
-    await waitTendStrip(wc, { plant: 'cucumber' });
-    await sleep(400);
+    await G('g.prepHarvestTendStripShot(4)');
+    await G('g.setTendStripActiveForCapture("harvest")');
+    await G('g.setCaptureStripGlow(false)');
+    const harvestOk = await js(`(() => {
+        const s = window.__smileGarden?.session;
+        const strip = document.getElementById('tend-strip');
+        if (!s || !strip || strip.hidden) return 'missing strip';
+        if (!s.canCareHarvest(4)) return 'canCareHarvest false';
+        if (!strip.classList.contains('tend-strip--harvest')) return 'no harvest class';
+        if (document.body.dataset.screen !== 'visit') return 'screen not visit';
+        return 'ok';
+    })()`);
+    if (harvestOk !== 'ok') throw new Error(`tend-strip-harvest preflight: ${harvestOk}`);
+    await sleep(350);
+    await G('g.captureRedraw()');
     await shot('tend-strip-harvest.png');
     await lightingTo('night');
     await G(`g.setCareHubProgressForCapture(4, { sun: 0, water: 1, fertilizer: 0, stake: false })`);
@@ -714,6 +812,37 @@ async function run(win, outDir) {
     await sleep(1200);
     await shot('08b-summary-quiet-night.png');
     await G(`g.show('idle')`);
+    await lightingTo('midday');
+    async function primeCucumberStripDemo(progress) {
+        const staked = !!(progress && progress.stake);
+        await js(`(() => {
+            const st = window.__smileGarden?.state;
+            const p = st?.plots?.[4];
+            if (p) {
+                p.stage = 3;
+                p.picked = false;
+                p.matureDay = null;
+                p.matureWater = 0;
+                p.matureFert = 0;
+                p.staked = ${staked};
+            }
+            return true;
+        })()`);
+        await G(`g.setNeedsCardDemo(4, ${JSON.stringify(progress)})`);
+        await sleep(600);
+    }
+    await primeCucumberStripDemo(cucumberPartial);
+    await shot('care-needs-strip-day.png');
+    await primeCucumberStripDemo(cucumberAllSet);
+    await shot('care-needs-strip-all-set.png');
+    await lightingTo('night');
+    await primeCucumberStripDemo(cucumberPartial);
+    await shot('care-needs-strip-night.png');
+    await lightingTo('midday');
+    await G('g.prepTagGardenDemo("garden")');
+    await sleep(900);
+    await G('g.captureRedraw()');
+    await shot('care-needs-tags-garden.png');
 
     // --- a few days later, golden hour ---
     await G('g.simulateDays(2)');
