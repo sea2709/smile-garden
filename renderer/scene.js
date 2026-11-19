@@ -263,6 +263,9 @@
                 width: ART.width,
                 height: ART.height,
                 pools: ART.seasons.particlePools,
+                keepOut: typeof window !== 'undefined' && window.SmileHudLayout
+                    ? window.SmileHudLayout.CLOCK_KEEP_OUT
+                    : { left: 486, right: 794, top: 8, bottom: 64 },
                 count: 12,
                 seed: 42,
             })
@@ -731,6 +734,16 @@
             }
         }
 
+        function clockRibbonKeepOut() {
+            const H = typeof window !== 'undefined' ? window.SmileHudLayout : null;
+            return H ? H.CLOCK_KEEP_OUT : { left: 486, right: 794, top: 8, bottom: 64 };
+        }
+
+        function pointInClockKeepOut(x, y) {
+            const k = clockRibbonKeepOut();
+            return x >= k.left && x <= k.right && y >= k.top && y <= k.bottom;
+        }
+
         function drawSeasonParticles(t) {
             if (!ART.seasons || !seasonParticleEngine || !particlePool().length) return;
             const scale = ART.seasons.particleScale || 0.5;
@@ -739,6 +752,7 @@
             ctx.save();
             ctx.globalAlpha = 0.55 + 0.35 * (1 - nightW);
             for (const p of seasonParticleEngine.particles) {
+                if (pointInClockKeepOut(p.x, p.y)) continue;
                 const img = p.sprite ? particleImgs[p.sprite] : null;
                 if (ready(img)) {
                     ctx.save();
@@ -805,6 +819,32 @@
             return true;
         }
 
+        function drawGardenClockRibbonLabel() {
+            if (!ART.clock || !gardenClockLabel) return;
+            const rb = ART.clock.ribbonDisplay;
+            const CRL = typeof window !== 'undefined' ? window.SmileClockRibbonLabel : null;
+            ctx.save();
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.filter = 'none';
+            ctx.shadowBlur = 0;
+            ctx.shadowColor = 'transparent';
+            ctx.fillStyle = '#3E2A1A';
+            const measure = (text, fontSize) => {
+                if (CRL) ctx.font = CRL.baseFontSpec(fontSize);
+                return ctx.measureText(text).width;
+            };
+            const spec = CRL
+                ? CRL.fontSizeForLabel(gardenClockLabel, measure)
+                : { font: '600 16px Lora, Georgia, serif' };
+            ctx.font = spec.font;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(gardenClockLabel, rb.cx, rb.cy + 1);
+            ctx.fillText(gardenClockLabel, rb.cx, rb.cy + 1);
+            ctx.restore();
+        }
+
         function drawGardenClockHud() {
             if (!ART.clock) return;
             const cfg = ART.clock;
@@ -818,23 +858,6 @@
             const ribbonDay = drawClockBitmap(clockRibbonImgs.day, ribNight ? 0 : 1, rx, ry, rw, rh);
             const ribbonNight = drawClockBitmap(clockRibbonImgs.night, ribNight ? 1 : 0, rx, ry, rw, rh);
             const ribbonReady = ribbonDay || ribbonNight;
-            if (gardenClockLabel) {
-                const CRL = typeof window !== 'undefined' ? window.SmileClockRibbonLabel : null;
-                ctx.save();
-                ctx.fillStyle = '#3E2A1A';
-                const measure = (text, fontSize) => {
-                    if (CRL) ctx.font = CRL.baseFontSpec(fontSize);
-                    return ctx.measureText(text).width;
-                };
-                const spec = CRL
-                    ? CRL.fontSizeForLabel(gardenClockLabel, measure)
-                    : { font: '600 16px Lora, Georgia, serif' };
-                ctx.font = spec.font;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(gardenClockLabel, rb.cx, rb.cy + 1);
-                ctx.restore();
-            }
             if (typeof document !== 'undefined' && document.body) {
                 document.body.dataset.paintedClock = ribbonReady ? '1' : '0';
             }
@@ -1698,11 +1721,18 @@
         }
 
         function drawVignette() {
+            const k = clockRibbonKeepOut();
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(0, 0, ART.width, ART.height);
+            ctx.rect(k.left, k.top, k.right - k.left, k.bottom - k.top);
+            ctx.clip('evenodd');
             const g = ctx.createRadialGradient(640, 380, 300, 640, 380, 820);
             g.addColorStop(0, 'rgba(60, 40, 20, 0)');
             g.addColorStop(1, lighting === 'night' ? 'rgba(5, 10, 30, 0.45)' : 'rgba(70, 50, 25, 0.22)');
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, ART.width, ART.height);
+            ctx.restore();
         }
 
         function draw(t) {
@@ -1720,10 +1750,11 @@
             drawParticles(t);
             drawHarvestAnims();
             drawBasketIcon(t);
-            drawGardenClockHud();
             drawBedtimeGlowLayer();
             drawVignette();
+            drawGardenClockHud();
             drawLogoHud();
+            drawGardenClockRibbonLabel();
         }
 
         function probeClockRibbon() {
