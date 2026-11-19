@@ -9,6 +9,25 @@ const vm = require('vm');
 const root = path.join(__dirname, '..');
 const farmer = require('../renderer/farmer-render.js');
 
+test('SmileFarmer pickName differs for keyboard-visible states', () => {
+    const t = 12;
+    const rest = farmer.pickName({ face: true }, t);
+    const smile = farmer.pickName({ face: true, smile: true }, t);
+    const talk = farmer.pickName({ face: true, talk: true }, t);
+    const left = farmer.pickName({ face: true, tilt: 'left' }, t);
+    const right = farmer.pickName({ face: true, tilt: 'right' }, t);
+    const hidden = farmer.pickName({ face: false }, t);
+    assert.equal(rest, 'rest');
+    assert.equal(smile, 'smile');
+    assert.ok(talk.startsWith('talk'));
+    assert.equal(left, 'tilt-left');
+    assert.equal(right, 'tilt-right');
+    assert.equal(hidden, 'hidden');
+    assert.notEqual(smile, rest);
+    assert.notEqual(hidden, rest);
+    assert.notEqual(left, right);
+});
+
 test('SmileFarmer state priority', () => {
     const t = 100;
     assert.equal(farmer.pickName({ face: false, smile: true, talk: true, tilt: 'left' }, t), 'hidden');

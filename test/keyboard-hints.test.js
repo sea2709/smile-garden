@@ -9,14 +9,14 @@ const vm = require('vm');
 const root = path.join(__dirname, '..');
 
 test('SmileKeyboardHints.isKeyboardMode', () => {
-    const sandbox = { window: globalThis, globalThis };
+    const sandbox = { window: {} };
     vm.runInNewContext(fs.readFileSync(path.join(root, 'renderer', 'keyboard-hints-render.js'), 'utf8'), sandbox);
-    const { isKeyboardMode } = sandbox.SmileKeyboardHints;
+    const { isKeyboardMode } = sandbox.window.SmileKeyboardHints;
     assert.equal(isKeyboardMode({ keyboard: true }, null), true);
     assert.equal(isKeyboardMode({}, null), false);
     assert.equal(isKeyboardMode({ mock: true }, { auto: true }), false);
     assert.equal(isKeyboardMode({ mock: true }, { auto: false, setKeys: () => {} }), true);
-    assert.equal(isKeyboardMode({ mock: true, keyboard: false }, { auto: false }), true);
+    assert.equal(isKeyboardMode({ mock: true, keyboard: false }, { auto: false, setKeys: () => {} }), true);
 });
 
 test('keyboard hint art ids exist on disk', () => {

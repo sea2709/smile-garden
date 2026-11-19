@@ -129,18 +129,49 @@
         const preflip = s.preflip !== false;
         const w = ctx.canvas ? ctx.canvas.width : CANVAS_W;
         const h = ctx.canvas ? ctx.canvas.height : CANVAS_H;
-        if (!img.complete || !img.naturalWidth) {
-            // Frame not ready yet; leave the previous picture in place.
-            return name;
+        const onReady = typeof s.onReady === 'function' ? s.onReady : null;
+        const draw = () => {
+            ctx.save();
+            ctx.fillStyle = '#c4d4e2';
+            ctx.fillRect(0, 0, w, h);
+            if (!img.complete || !img.naturalWidth) {
+                ctx.restore();
+                return false;
+            }
+            if (preflip) {
+                ctx.translate(w, 0);
+                ctx.scale(-1, 1);
+            }
+            ctx.drawImage(img, 0, 0, w, h);
+            ctx.restore();
+            if (onReady) onReady(name);
+            return true;
+        };
+        if (!draw()) {
+            img.addEventListener('load', () => draw(), { once: true });
+            return null;
         }
-        ctx.save();
-        if (preflip) {
-            ctx.translate(w, 0);
-            ctx.scale(-1, 1);
-        }
-        ctx.drawImage(img, 0, 0, w, h);
-        ctx.restore();
         return name;
+    }
+
+    function whenPreloaded(lighting) {
+        const lit = lighting === 'night' ? 'night' : 'day';
+        const waits = Object.keys(FILES).map((name) => {
+            const img = preloadImage(srcFor(lit, name));
+            if (img.complete && img.naturalWidth) return Promise.resolve();
+            return new Promise((resolve) => {
+                img.addEventListener('load', resolve, { once: true });
+                img.addEventListener('error', resolve, { once: true });
+            });
+        });
+        return Promise.all(waits);
+    }
+
+    /** Pause idle blinks (e.g. while capturing keyboard states). */
+    function freezeBlink(ms) {
+        const t = (typeof performance !== 'undefined' ? performance.now() : 0) / 1000;
+        blinkAt = 0;
+        nextBlink = t + (ms || 60);
     }
 
     /**
@@ -164,6 +195,8 @@
         FILES,
         srcFor,
         preload,
+        whenPreloaded,
+        freezeBlink,
         pickName,
         paint,
         installOn,

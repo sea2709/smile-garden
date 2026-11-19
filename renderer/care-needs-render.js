@@ -54,8 +54,12 @@
     }
 
     function bindImg(img, src, artUrl, fallbackText) {
+        if (!img || !img.tagName || img.tagName.toLowerCase() !== 'img') return;
+        img.hidden = false;
+        img.removeAttribute('data-missing');
         img.onerror = () => {
-            if (fallbackText) img.replaceWith(document.createTextNode(fallbackText));
+            img.dataset.missing = '1';
+            img.alt = fallbackText || img.alt || '';
         };
         img.src = artUrl(src);
     }

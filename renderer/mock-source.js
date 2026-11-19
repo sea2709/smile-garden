@@ -47,6 +47,7 @@
         let visitT = 0;
         let previewCanvas = null;
         let previewStream = null;
+        let lastFarmerFrame = 'rest';
         const nowS = () => performance.now() / 1000;
 
         function ensurePreviewCanvas() {
@@ -98,9 +99,8 @@
             const Farmer = typeof window !== 'undefined' ? window.SmileFarmer : null;
             if (Farmer) {
                 const state = farmerPaintState(face, talking);
-                // Frames are screen-space; the preview video is CSS-mirrored once.
-                state.preflip = false;
-                Farmer.paint(ctx, state);
+                const painted = Farmer.paint(ctx, state);
+                if (painted) lastFarmerFrame = painted;
                 return;
             }
             ctx.fillStyle = '#c4d4e2';
@@ -272,9 +272,28 @@
                 if (p === 'camera-check-breath') visitT = Math.max(visitT, 32);
             },
             setNight(v) { night = !!v; if (!night) darkDone = false; },
-            setKeys(k) { Object.assign(keys, k); auto = false; },
+            setKeys(k) {
+                Object.assign(keys, k);
+                auto = false;
+                const Farmer = typeof window !== 'undefined' ? window.SmileFarmer : null;
+                if (Farmer && Farmer.freezeBlink) Farmer.freezeBlink(90);
+                paintPreviewFrame(!keys.hide, keys.talk);
+            },
             setAuto(v) { auto = !!v; },
             get auto() { return auto; },
+            getFarmerFrame() { return lastFarmerFrame; },
+            flushFarmerFrame() {
+                paintPreviewFrame(!keys.hide, keys.talk);
+                return lastFarmerFrame;
+            },
+            requestPreviewFrame() {
+                if (!previewStream) return;
+                try {
+                    for (const track of previewStream.getVideoTracks()) {
+                        if (track && typeof track.requestFrame === 'function') track.requestFrame();
+                    }
+                } catch { /* ignore */ }
+            },
         };
     }
 

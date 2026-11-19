@@ -879,6 +879,54 @@
             }
             return canvas.toDataURL('image/png');
         },
+        farmerFrameMatchesLabel(label, frameName) {
+            const f = String(frameName || '');
+            if (label === 'rest') return f === 'rest' || f.startsWith('rest-blink');
+            if (label === 'smile') return f === 'smile';
+            if (label === 'talk') return f.startsWith('talk');
+            if (label === 'tilt [') return f === 'tilt-left';
+            if (label === 'tilt ]') return f === 'tilt-right';
+            if (label === 'hidden') return f === 'hidden';
+            return false;
+        },
+        async waitForFarmerFrameLabel(label, timeoutMs, prevHash) {
+            const deadline = performance.now() + (timeoutMs || 5000);
+            let stable = 0;
+            while (performance.now() < deadline) {
+                syncFromApp();
+                if (source && source.flushFarmerFrame) source.flushFarmerFrame();
+                if (source && source.requestPreviewFrame) source.requestPreviewFrame();
+                const frame = source && source.getFarmerFrame ? source.getFarmerFrame() : '';
+                const hash = hooks.pipFrameHash();
+                const nameOk = hooks.farmerFrameMatchesLabel(label, frame);
+                const hashOk = prevHash == null || (hash != null && hash !== prevHash);
+                if (nameOk && hashOk) {
+                    stable += 1;
+                    if (stable >= 6) return true;
+                } else {
+                    stable = 0;
+                }
+                await new Promise((r) => requestAnimationFrame(r));
+            }
+            return false;
+        },
+        pipFrameHash() {
+            const v = els.preview;
+            if (!v || v.readyState < 2 || !v.videoWidth) return null;
+            const c = document.createElement('canvas');
+            c.width = 16;
+            c.height = 16;
+            const ctx = c.getContext('2d');
+            try {
+                ctx.drawImage(v, 0, 0, 16, 16);
+            } catch {
+                return null;
+            }
+            const d = ctx.getImageData(0, 0, 16, 16).data;
+            let h = 0;
+            for (let i = 0; i < d.length; i += 4) h = (h * 31 + d[i] + d[i + 1] + d[i + 2]) >>> 0;
+            return h;
+        },
         async exportFarmerStateGridFromLivePip() {
             syncFromApp();
             if (!els.preview || !els.preview.srcObject) await hooks.ensureFarmerPipForCapture();
@@ -905,17 +953,26 @@
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             const v = els.preview;
             if (!v) return null;
+            const SF = global.SmileFarmer;
+            if (SF && SF.whenPreloaded) await SF.whenPreloaded('day');
+            const hashes = [];
+            let prevHash = null;
             for (let i = 0; i < tiles.length; i++) {
                 const col = i % cols;
                 const row = Math.floor(i / cols);
                 const spec = tiles[i];
+                if (SF && SF.freezeBlink) SF.freezeBlink(120);
                 if (source && source.setKeys) source.setKeys(spec.keys);
-                await waitForFarmerPipReady(6000);
+                await hooks.waitForFarmerFrameLabel(spec.label, 8000, prevHash);
+                await waitForFarmerPipReady(3000);
                 const x = col * pipW;
                 const y = row * (pipH + labelH);
                 try {
                     ctx.drawImage(v, x, y, pipW, pipH);
                 } catch { /* ignore */ }
+                const tileHash = hooks.pipFrameHash();
+                hashes.push(tileHash);
+                prevHash = tileHash;
                 ctx.fillStyle = '#3E2A1A';
                 ctx.font = 'bold 12px Nunito, system-ui, sans-serif';
                 ctx.textAlign = 'center';
@@ -923,6 +980,10 @@
             }
             if (source && source.setKeys) {
                 source.setKeys({ smile: false, talk: false, hide: false, tiltLeft: false, tiltRight: false });
+            }
+            const uniq = new Set(hashes.filter((h) => h != null));
+            if (uniq.size < 4) {
+                console.warn('[exportFarmerStateGridFromLivePip] low pip frame diversity', uniq.size, hashes);
             }
             return canvas.toDataURL('image/png');
         },
