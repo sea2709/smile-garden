@@ -18,14 +18,14 @@
     const $ = (id) => document.getElementById(id);
     const els = {};
     for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-camera-check', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-live',
-        'smile-chart', 'pip', 'preview', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
+        'smile-chart', 'pip-dock', 'pip', 'preview', 'btn-pip-mode', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
         'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'tend-strip', 'tend-name', 'tend-stamp', 'tend-row', 'tend-harvest', 'tend-harvest-icon', 'tend-harvest-img', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-prompt', 'cc-howto', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
-        'screen-summary', 'sum-card', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'btn-dev-close', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-sim',
+        'screen-summary', 'sum-card', 'screen-journal', 'journal-body', 'btn-journal-close', 'dev-drawer', 'btn-dev-close', 'dev-next-day', 'dev-day', 'dev-lighting', 'dev-input-mode', 'dev-input-note', 'dev-sim',
         'dev-ready', 'dev-fill', 'dev-reset', 'basket-chip', 'basket-count', 'screen-unlock', 'unlock-title', 'unlock-body', 'unlock-art', 'btn-unlock-ok',
         'brand-logo-day', 'brand-logo-night', 'brand-fallback',
         'error-banner', 'error-title', 'error-message', 'btn-error-retry', 'btn-error-keyboard', 'btn-error-dismiss']) {
@@ -101,7 +101,8 @@
     let pipHome = null;
     let mockPipCapture = false;
     let mockPipWantStream = false;
-    if (els.pip && els.pip.parentElement) pipHome = els.pip.parentElement;
+    if (els.pipDock) pipHome = els.pipDock;
+    else if (els.pip && els.pip.parentElement) pipHome = els.pip.parentElement;
     /** @type {ReturnType<typeof window.SmileCameraCheckController.create>|null} */
     let cameraCheck = null;
 
@@ -326,10 +327,18 @@
         }
     }
 
+    function pipInCameraCheck() {
+        return !!(els.ccPreviewWrap && els.pip && els.pip.parentElement === els.ccPreviewWrap);
+    }
+
     function syncPipVisibility() {
         if (!els.pip) return;
         const show = pipShouldShow();
+        const inCc = pipInCameraCheck();
+        // Garden dock (PiP + mode button) only when the preview lives in the HUD.
+        if (els.pipDock) els.pipDock.hidden = !show || inCc;
         els.pip.hidden = !show;
+        if (els.btnPipMode) els.btnPipMode.hidden = !show || inCc;
         if (els.preview) {
             if (show) resumePipPreview();
             else {
@@ -342,16 +351,23 @@
 
     function placePipForCameraCheck() {
         if (!els.ccPreviewWrap || !els.pip) return;
-        if (!pipHome) pipHome = els.pip.parentElement;
+        if (!pipHome) pipHome = els.pipDock || els.pip.parentElement;
         els.ccPreviewWrap.insertBefore(els.pip, els.ccPreviewWrap.firstChild);
         els.pip.hidden = false;
+        if (els.pipDock) els.pipDock.hidden = true;
+        if (els.btnPipMode) els.btnPipMode.hidden = true;
         if (els.preview) els.preview.style.removeProperty('visibility');
-        if (els.ccMockSlot) els.ccMockSlot.hidden = !config.mock;
+        if (els.ccMockSlot) els.ccMockSlot.hidden = !(config.mock || config.keyboard);
     }
 
     function restorePipHome() {
         if (pipHome && els.pip && els.pip.parentElement !== pipHome) {
-            pipHome.appendChild(els.pip);
+            // Keep the mode button after the video frame inside the dock.
+            if (els.btnPipMode && els.btnPipMode.parentElement === pipHome) {
+                pipHome.insertBefore(els.pip, els.btnPipMode);
+            } else {
+                pipHome.appendChild(els.pip);
+            }
         }
         syncPipVisibility();
     }
@@ -1089,10 +1105,9 @@
         if (await ensureSource()) return true;
         if (config.mock || config.keyboard) return false;
         config.keyboard = true;
-        els.mockBadge.hidden = false;
-        els.mockMode.textContent = 'Keyboard player';
         source = null;
         sourceReady = false;
+        syncInputModeUi();
         if (!(await ensureSource())) return false;
         toast('Camera unavailable — keyboard mode (S smile, T talk, [ / ] stretch, F hide, Enter pick).');
         syncKeyboardStripMode();
@@ -2401,8 +2416,54 @@
     if (els.btnErrorRetry) {
         els.btnErrorRetry.addEventListener('click', () => { void retryAfterSdkError(); });
     }
-    els.btnErrorKeyboard.addEventListener('click', () => {
-        els.errorBanner.hidden = true;
+    function syncInputModeUi() {
+        const keyboard = !!config.keyboard;
+        const regularLabel = config.mock ? 'Switch to Demo auto mode' : 'Switch to Camera mode';
+        const keyboardLabel = 'Switch to Keyboard mode';
+        if (els.devInputMode) {
+            els.devInputMode.textContent = keyboard ? regularLabel : keyboardLabel;
+        }
+        if (els.btnPipMode) {
+            els.btnPipMode.textContent = keyboard ? regularLabel : keyboardLabel;
+            els.btnPipMode.title = keyboard
+                ? regularLabel
+                : 'Switch to Keyboard mode (S smile, T talk, [ / ] stretch)';
+            els.btnPipMode.setAttribute('aria-pressed', keyboard ? 'true' : 'false');
+        }
+        if (els.devInputNote) {
+            els.devInputNote.textContent = keyboard
+                ? 'Input: keyboard (hold S smile, T talk, [ / ] stretch).'
+                : (config.mock
+                    ? 'Input: demo auto (S / T still take over).'
+                    : 'Input: camera (SmartSpectra).');
+        }
+        if (keyboard) {
+            els.mockBadge.hidden = false;
+            els.mockMode.textContent = 'Keyboard player';
+        } else if (config.mock) {
+            els.mockBadge.hidden = false;
+            els.mockMode.textContent = 'Demo player (auto)';
+        } else {
+            els.mockBadge.hidden = true;
+        }
+        if (els.ccMockSlot && screen === 'camera-check') {
+            els.ccMockSlot.hidden = !(config.mock || config.keyboard);
+        }
+    }
+
+    function applySourcePhaseAfterSwitch() {
+        if (!source || !source.setPhase) return;
+        if (screen === 'visit' && session) {
+            source.setPhase(session.step === 'care-hub' ? careHubMockPhase() : session.step);
+        } else if (screen === 'camera-check') {
+            source.setPhase('camera-check-smile');
+        }
+    }
+
+    /** Tear down whatever is running and start the keyboard mock player. */
+    async function enterKeyboardMode(opts) {
+        const quiet = !!(opts && opts.quiet);
+        if (els.errorBanner) els.errorBanner.hidden = true;
         if (els.btnErrorRetry) els.btnErrorRetry.hidden = true;
         // Tear down the real SDK fully — including sourceReady — so startCamera()
         // actually starts the mock tick loop (otherwise S/T appear dead).
@@ -2410,28 +2471,95 @@
         source = null;
         sourceReady = false;
         config.keyboard = true;
-        els.mockBadge.hidden = false;
-        els.mockMode.textContent = 'Keyboard player';
         els.btnBegin.disabled = false;
-        toast('Keyboard mode: S smile, T talk, [ / ] stretch, F hide, Enter pick (Space also confirms harvest).');
+        syncInputModeUi();
         syncKeyboardStripMode();
+        if (!quiet) toast('Keyboard mode: S smile, T talk, [ / ] stretch, F hide, Enter pick (Space also confirms harvest).');
         const resume = screen === 'visit' || screen === 'camera-check';
         if (resume) {
-            ensureFarmerPipLive().then(() => {
+            try {
+                await ensureFarmerPipLive();
                 syncKeyboardStripMode();
-                if (!source || !source.setPhase) return;
-                if (screen === 'visit' && session) {
-                    source.setPhase(session.step === 'care-hub' ? careHubMockPhase() : session.step);
-                } else if (screen === 'camera-check') {
-                    source.setPhase('camera-check-smile');
-                }
-            }).catch(() => {});
+                applySourcePhaseAfterSwitch();
+            } catch { /* ignore */ }
         }
-    });
+    }
+
+    /** Leave keyboard fallback: demo auto when started with --mock, else camera SDK. */
+    async function enterRegularMode(opts) {
+        const quiet = !!(opts && opts.quiet);
+        if (!config.keyboard && !(source && source.setAuto && source.auto === false && config.mock)) {
+            syncInputModeUi();
+            syncKeyboardStripMode();
+            return;
+        }
+        if (els.errorBanner) els.errorBanner.hidden = true;
+        if (els.btnErrorRetry) els.btnErrorRetry.hidden = true;
+
+        if (config.mock) {
+            config.keyboard = false;
+            if (source && source.setAuto) source.setAuto(true);
+            else {
+                if (source) { try { source.destroy(); } catch { /* ignore */ } }
+                source = null;
+                sourceReady = false;
+            }
+            syncInputModeUi();
+            syncKeyboardStripMode();
+            if (!quiet) toast('Demo auto player resumed (press A anytime).');
+            if ((screen === 'visit' || screen === 'camera-check') && !sourceReady) {
+                try {
+                    await startCamera();
+                    applySourcePhaseAfterSwitch();
+                } catch { /* ignore */ }
+            } else {
+                applySourcePhaseAfterSwitch();
+            }
+            return;
+        }
+
+        // Real mode: drop the keyboard mock and rebuild the SDK source.
+        if (source) { try { source.destroy(); } catch { /* ignore */ } }
+        source = null;
+        sourceReady = false;
+        config.keyboard = false;
+        syncInputModeUi();
+        syncKeyboardStripMode();
+        if (config.sdkLoadError || !config.hasApiKey) {
+            els.btnBegin.disabled = true;
+            showError(
+                config.sdkLoadError ? 'SmartSpectra SDK could not load' : 'Missing API key',
+                (config.sdkLoadError || 'Set SMARTSPECTRA_API_KEY in `.env` (or your environment) and restart.') +
+                ' You can still play with the keyboard.',
+                true,
+            );
+            return;
+        }
+        els.btnBegin.disabled = false;
+        if (!quiet) toast('Camera mode: restarting SmartSpectra…');
+        const resume = screen === 'visit' || screen === 'camera-check';
+        if (!resume) return;
+        try {
+            await startCamera();
+            applySourcePhaseAfterSwitch();
+            if (!quiet) toast('Camera mode ready.');
+        } catch (e) {
+            showError('Camera could not start', String(e && e.message || e), true, true);
+        }
+    }
+
+    function toggleInputMode() {
+        if (config.keyboard) void enterRegularMode();
+        else void enterKeyboardMode();
+    }
+    els.btnErrorKeyboard.addEventListener('click', () => { void enterKeyboardMode(); });
+    if (els.devInputMode) els.devInputMode.addEventListener('click', toggleInputMode);
+    if (els.btnPipMode) els.btnPipMode.addEventListener('click', toggleInputMode);
     function toggleDev(on) {
         devOpen = on === undefined ? !devOpen : !!on;
         els.devDrawer.hidden = !devOpen;
         els.mockBadge.style.visibility = devOpen ? 'hidden' : '';
+        if (devOpen) syncInputModeUi();
     }
     els.devNextDay.addEventListener('click', nextDay);
     els.devLighting.addEventListener('change', () => setLightingOverride(els.devLighting.value));
@@ -2567,11 +2695,18 @@
                 return;
             }
         }
-        if (k === 'a' && source && source.setAuto && config.mock) {
-            source.setAuto(true);
-            els.mockMode.textContent = 'Demo player (auto)';
-            syncKeyboardStripMode();
-            renderNeedsCard();
+        if (k === 'a' && source && source.setAuto && (config.mock || config.keyboard)) {
+            if (config.mock) {
+                config.keyboard = false;
+                source.setAuto(true);
+                syncInputModeUi();
+                syncKeyboardStripMode();
+                renderNeedsCard();
+            } else {
+                // Real-mode keyboard fallback: A alone cannot restore the camera;
+                // Demo tools → regular mode (or the toggle) does that.
+                toast('Use Demo tools to switch back to camera mode.');
+            }
             return;
         }
         if (tiltKeys[e.key] && source && source.setKeys && (config.mock || config.keyboard)) {
@@ -2669,18 +2804,19 @@
             showError('Startup error', 'Could not read app config: ' + (e && e.message));
         }
         if (config.mock) {
-            els.mockBadge.hidden = false;
-            els.mockMode.textContent = 'Demo player (auto)';
+            syncInputModeUi();
         } else if (config.sdkLoadError || !config.hasApiKey) {
             els.btnBegin.disabled = true;
             showError(config.sdkLoadError ? 'SmartSpectra SDK could not load' : 'Missing API key',
                 (config.sdkLoadError || 'Set SMARTSPECTRA_API_KEY in `.env` (or your environment) and restart (free key: https://physiology.presagetech.com/auth/register).') +
                 ' You can still play with the keyboard.', true);
+            syncInputModeUi();
         } else {
             try { await loadScript('../dist/sdk-source.bundle.js'); } catch {
                 els.btnBegin.disabled = true;
                 showError('Renderer bundle missing', 'Run `npm run build` (or `npm start`) first. You can still play with the keyboard.', true);
             }
+            syncInputModeUi();
         }
         syncKeyboardStripMode();
         if (state.morningPending && state.version >= 5) {

@@ -290,6 +290,32 @@ body[data-lighting="night"] .hint { background: rgba(240, 236, 214, 0.95); borde
 
 /* ---------- chart, pip, badge ---------- */
 /* Left signal panel: renderer/signal-panel-ui.css (Heily adaptive panel). */
+.pip-dock {
+    position: absolute;
+    right: 18px;
+    top: 66px;
+    z-index: 18;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 200px;
+}
+.pip-dock .pip { position: relative; right: auto; top: auto; width: 100%; height: 150px; }
+.pip-mode-btn {
+    display: inline-flex;
+    width: 100%;
+    box-sizing: border-box;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 11px;
+    line-height: 1.25;
+    padding: 7px 8px;
+    white-space: normal;
+}
+.pip-dock[hidden],
+.pip-mode-btn[hidden] { display: none !important; }
 .pip { position: absolute; right: 18px; top: 66px; z-index: 18; width: 200px; height: 150px; border-radius: 18px; overflow: hidden; box-shadow: var(--shadow); border: 3px solid rgba(251, 245, 230, 0.9); contain: layout paint; background: #2a2118; }
 .pip .mirror-video,
 #pip video.mirror-video {

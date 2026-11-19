@@ -108,10 +108,11 @@ xvfb-run -a npm run screenshots   # regenerate docs/*.png (headless Linux; plain
 harvest when a crop is ready — otherwise it smiles like `S`), `A` back to the simulated player.
 
 **No key or camera?** Real mode shows a banner with **Play with keyboard instead**, which swaps in the
-keyboard player.
+keyboard player. During a visit (or warm-up), a **Switch to Keyboard mode** / **Switch to Camera mode**
+(or **Switch to Demo auto mode**) button under the PiP toggles the same modes; Demo tools has the same switch.
 
 **Demo tools (⚙︎ Demo):** ⏭ Next day (moves the game clock one day; real growth rules still apply),
-lighting override, simulate 5 good days, fill empty beds, reset garden.
+lighting override, keyboard ↔ regular input toggle, simulate 5 good days, fill empty beds, reset garden.
 
 **Saved state:** `localStorage` key `smile-garden.v3` (versioned JSON: beds, visit days, journal,
 settings, demo day offset). The screenshot run uses a throwaway profile and never touches your garden.
