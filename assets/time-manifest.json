@@ -66,23 +66,28 @@
     "day": "ui/clock/season-ribbon.png",
     "night": "ui/clock/season-ribbon-night.png",
     "size": [
-     280,
-     61
+     584,
+     96
     ],
     "display": {
-     "w": 140,
-     "h": 30,
+     "w": 292,
+     "h": 48,
      "centerX": 640,
-     "centerY": 88
+     "centerY": 36
     },
     "textSafe2x": [
-     80,
-     14,
-     200,
-     44
+     76,
+     16,
+     508,
+     80
     ],
-    "text": "e.g. 'Spring · Day 3' in Lora, brown ink #6b4a2f day / #4a3a2a on night ribbon too (ribbon stays cream)"
+    "textSafeDisplay": {
+     "w": 216,
+     "h": 32
+    },
+    "text": "Day N · Season · time — 600 16px Lora #3E2A1A day and night; crossfade day/night ribbon bitmaps"
    },
+   "arcLegacy": "frame/front/sun/moon assets remain on disk but are no longer drawn (ribbon-only HUD)",
    "plaqueAlt": {
     "file": "ui/clock/season-plaque.png",
     "size": [

@@ -647,6 +647,17 @@
             refreshLighting();
             renderHud();
         },
+        setGardenDay(n) {
+            const day = Math.max(1, Math.round(Number(n) || 1));
+            state.dayNumber = day;
+            hudSeasonOverride = false;
+            state.season = D.seasonForDayNumber(day);
+            state.seasonDay = D.seasonDayNumber(day);
+            scene.setSeason(state.season);
+            gardenClock.pause();
+            refreshLighting();
+            renderHud();
+        },
         setSeason(season) {
             if (!D.SEASONS.includes(season)) return;
             hudSeasonOverride = true;
@@ -658,6 +669,10 @@
         },
         clearSeasonOverride() { hudSeasonOverride = false; syncGardenSeasonFromDay(); renderHud(); },
         waitForHudArt: (ms) => scene.waitForHudArt(ms),
+        probeClockRibbon() {
+            scene.draw(performance.now() / 1000);
+            return scene.probeClockRibbon();
+        },
         probeClockSunToken() {
             scene.draw(performance.now() / 1000);
             return scene.probeClockSunToken();

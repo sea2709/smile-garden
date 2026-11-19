@@ -89,7 +89,7 @@ body[data-painted-clock="1"] .topbar {
     grid-template-columns:
         calc(var(--hud-logo-width) + var(--hud-logo-gap))
         minmax(0, var(--hud-chips-max, 300px))
-        clamp(160px, 14.375vw, 200px)
+        clamp(292px, 22.8vw, 320px)
         minmax(8px, 1fr)
         auto;
     grid-template-rows: auto auto;
@@ -98,8 +98,30 @@ body[data-painted-clock="1"] .topbar {
     row-gap: 6px;
     min-height: 56px;
     height: auto;
-    padding: 8px 18px 52px;
+    padding: 8px 18px;
     pointer-events: none;
+    /* Clock ribbon + label are on canvas; keep the bar clear over CLOCK_KEEP_OUT (left ≥ ~486). */
+    background: transparent;
+    isolation: isolate;
+}
+/* Soft cream over logo + stat chips only (left of the painted clock keep-out). */
+body[data-painted-clock="1"] .topbar::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: min(
+        468px,
+        calc(var(--hud-logo-width) + var(--hud-logo-gap) + var(--hud-chips-max, 300px) + 36px)
+    );
+    background: linear-gradient(to bottom, rgba(251, 245, 230, 0.82), rgba(251, 245, 230, 0));
+    pointer-events: none;
+    z-index: 0;
+}
+body[data-painted-clock="1"] .topbar > * {
+    position: relative;
+    z-index: 1;
 }
 body[data-painted-clock="1"] .topbar .chip,
 body[data-painted-clock="1"] .topbar .btn { pointer-events: auto; }
@@ -133,7 +155,18 @@ body[data-painted-clock="1"] .top-actions {
     body[data-painted-clock="1"] .chips {
         grid-column: 1 / 3;
         grid-row: 2;
+        margin-top: 6px;
         max-width: var(--hud-chips-max, calc(100vw - 36px));
+    }
+}
+@media (max-width: 960px) {
+    body[data-painted-clock="1"] .top-actions {
+        grid-column: 3 / 6;
+        grid-row: 1;
+        justify-self: end;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+        max-width: calc(100vw - 36px);
     }
 }
 .btn-bed .btn-bed-icon { width: 28px; height: 28px; margin-right: 6px; vertical-align: middle; }

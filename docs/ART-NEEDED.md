@@ -43,20 +43,15 @@ Lettuce / sunflower are **pull** crops (no picked sprite; bed clears at harvest 
 
 **Authoritative manifest:** `assets/time-manifest.json` (paths in `renderer/art.js`). Missing PNGs keep procedural fallbacks in `scene.js`.
 
-### HUD garden clock (canvas draw order: frame → token → front)
+### HUD garden clock (ribbon only — no arc)
 
 | Path | Size (@2x) | Display | Anchor |
 |------|------------|---------|--------|
-| `ui/clock/clock-frame-day.png` | **320×128** | 160×64 | backdrop centre **(640, 40)** |
-| `ui/clock/clock-frame-night.png` | **320×128** | 160×64 | same |
-| `ui/clock/sun-token.png` | **64×64** | 32×32 | arc 147° → 33° (6:00–18:00) |
-| `ui/clock/moon-token.png` | **64×64** | 32×32 | rests at right end after 18:00 |
-| `ui/clock/clock-front-day.png` | **320×128** | 160×64 | after token (hill mask) |
-| `ui/clock/clock-front-night.png` | **320×128** | 160×64 | same |
-| `ui/clock/season-ribbon.png` | **280×61** | 140×30 | centre **(640, 88)** |
-| `ui/clock/season-ribbon-night.png` | **280×61** | 140×30 | same |
+| `ui/clock/season-ribbon.png` | **584×96** | 292×48 | backdrop centre **(640, 36)** |
+| `ui/clock/season-ribbon-night.png` | **584×96** | 292×48 | same |
 
-Arc centre **(160.6, 183.1)**, radius **150.6** in frame pixels (@2x).
+Label: **600 16px Lora**, **#3E2A1A** day and night; text-safe **216×32** inside the ribbon.  
+Legacy arc assets (`clock-frame-*`, `clock-front-*`, `sun-token`, `moon-token`) stay in the tree but are **not painted**.
 
 ### Season overlays (above backdrop, below plants)
 
