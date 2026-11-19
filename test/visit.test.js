@@ -349,6 +349,22 @@ test('after tending, keyboard can move to another planted bed', () => {
     assert.equal(s.selectedPlot, 1);
 });
 
+test('mid-tend switch keeps partial care on the first bed', () => {
+    const plots = mkPlots([[0, 'lettuce'], [2, 'mint']]);
+    const s = new V.VisitSession({ plots, plantedBeds: [0, 2], gardenDay: 1 });
+    s.begin();
+    s.setCareProgress(0, { sun: 0, water: 0.45, fertilizer: 0, stake: false });
+    s.activeCareChannel = 'water';
+    s.pacer = { total: 10 };
+    s.breathT = 1;
+    assert.equal(s.moveSelection('right'), 2);
+    assert.equal(s.selectedPlot, 2);
+    assert.equal(s.activeCareChannel, null);
+    assert.equal(s.pacer, null);
+    assert.ok(s.careProgressFor(0).water >= 0.44 && s.careProgressFor(0).water <= 0.46);
+    assert.equal(s.step, 'care-hub');
+});
+
 test('applyVisit records per-bed care; only allMet beds grow overnight', () => {
     const d = at(2026, 11, 16);
     const s = V.createState(d);

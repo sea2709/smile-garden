@@ -2224,14 +2224,15 @@
         const i = scene.plotAt(e.clientX, e.clientY);
         scene.setHover(i);
         if (screen === 'visit') {
-            const pickStep = session && (session.step === 'pick' || session.step === 'pick-harvest' || session.step === 'care-hub');
+            const pickStep = session && ['pick', 'pick-harvest', 'care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'].includes(session.step);
             const canSelect = pickStep && i !== null && session.selectablePlots().includes(i);
             els.garden.style.cursor = canSelect ? 'pointer' : '';
             if (canSelect && state.plots[i]) {
                 const kind = L.plantById(state.plots[i].plantId);
                 els.plotTip.textContent = '';
                 const b = document.createElement('b'); b.textContent = kind.name;
-                const action = session.step === 'pick-harvest' ? 'pick' : 'tend';
+                const action = session.step === 'pick-harvest' ? 'pick'
+                    : (session.selectedPlot === i ? 'selected' : 'switch');
                 els.plotTip.append(b, document.createTextNode(` · bed ${i + 1} — click to ${action}`));
                 const c = scene.plotClient(i);
                 els.plotTip.style.left = `${c.x}px`;

@@ -1285,11 +1285,13 @@
             this._loadCareProgress(i);
             this._syncLiveFromTally();
             this.events.push({ type: 'select', plot: i });
-            if (changed) this._clearActiveCareInput();
-            // Leaving a focused stretch / single-need step returns to the free care hub.
-            if (this.step === 'care-smile' || this.step === 'care-talk' || this.step === 'care-harvest'
-                || this.step === 'stretch-offer' || this.step === 'stretch') {
-                this.go('care-hub');
+            if (changed) {
+                this._clearActiveCareInput();
+                // Leaving a focused stretch / single-need step returns to the free care hub.
+                if (this.step === 'care-smile' || this.step === 'care-talk' || this.step === 'care-harvest'
+                    || this.step === 'stretch-offer' || this.step === 'stretch') {
+                    this.go('care-hub');
+                }
             }
             return true;
         }
