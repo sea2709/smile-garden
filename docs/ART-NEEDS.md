@@ -6,9 +6,9 @@ Authoritative layout: **`assets/tags-manifest.json`** (tags, needs card, care ic
 
 | Need | Real-time per dot |
 |------|-------------------|
-| Sun | ~10 s smiling |
-| Water | ~10 s talking |
-| Fertilizer | ~15 s guided breath |
+| Sun | ~10 s automatic daylight (garden clock) |
+| Water | ~10 s smiling |
+| Fertilizer | ~15 s talking |
 | Stake | one completed neck stretch (persists until harvest) |
 
 ---

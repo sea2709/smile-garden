@@ -5,7 +5,7 @@ Smile Garden replaces the one-off “visit” loop with an in-game day that runs
 ## Loop
 
 1. **Daytime (6:00 → ~23:00 garden time)** — clock ticks in real time (default: 1 real minute ≈ 1 garden hour; ~18 real minutes to late evening). Backdrop lighting **crossfades** dawn → midday → night. Critters appear in daylight only.
-2. **Tend** — per bed, once per day: smile (sun), talk (water), optional breathe (fertilizer). Harvest anytime when mature. Growth is **deferred until bed**.
+2. **Tend** — per bed, once per day: smile (water), talk (fertilizer), stretch (stake when needed); sun dots fill automatically in daylight. Harvest anytime when mature. Growth is **deferred until bed**.
 3. **Go to bed** — always available; from evening (~18:00) the UI gently suggests it. Clock does not force the day to end. Bedtime dims to night, then **morning reveal** lists overnight growth and crops ready to pick. New day starts at 6:00.
 4. **Seasons** — 7 garden days per season (spring → summer → autumn → winter, loop). Seeds declare allowed seasons in `game/day.js` (`PLANT_SEASONS`). Out-of-season plants pause growth; they never die.
 

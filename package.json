@@ -2,7 +2,7 @@
   "name": "smile-garden",
   "version": "0.3.0",
   "private": true,
-  "description": "Smile Garden: a calm daily garden visit. Smile for sunlight, talk for water, breathe for fertilizer (Presage SmartSpectra Node/Electron SDK).",
+  "description": "Smile Garden: a calm daily garden visit. Smile for water, talk for fertilizer, stretch to stake; sunlight fills with daylight (Presage SmartSpectra Node/Electron SDK).",
   "main": "main.js",
   "license": "UNLICENSED",
   "engines": {

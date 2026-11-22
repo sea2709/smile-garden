@@ -13,7 +13,7 @@ Pre-game **Camera check** (`#screen-camera-check`). Full-screen stage **1280×72
 7. **Labels** — code text **y = 610–650**: `ready`, `listening…`, `next`
 8. **Buttons** — 9-slice pills, **exactly 44 px** tall (`border-image-slice: 40 44 fill`; `border-image-width: 20px 22px`)
 
-## Packets (smile / talk / breathe / stretch)
+## Packets (smile / talk / stretch; harvest art may reuse a legacy `breathe` stem)
 
 | State | Art | When |
 |-------|-----|------|
@@ -21,7 +21,7 @@ Pre-game **Camera check** (`#screen-camera-check`). Full-screen stage **1280×72
 | listening | `packet-{kind}-listening.png` | Active check |
 | sprouted | `packet-{kind}-sprouted.png` | Passed |
 
-Game key `breath` → filename stem **`breathe`**.
+Garden care: **smile → water**, **talk → fertilizer**, **stretch → stake**. Daylight fills sun. A legacy `breathe` / harvest packet filename may still exist in art; breathing no longer drives fertilizer.
 
 ## Buttons
 
@@ -36,11 +36,10 @@ Text colours: primary **#3f5a2a**, secondary **#7a6652**.
 
 ## Care UI during check
 
-- **Howto card** (left of window): explains each packet action and its garden purpose (sunlight / water / fertilizer / stake).
+- **Howto card** (left of window): smile waters, talk fertilizes, stretch stakes; daylight fills sun; click to harvest.
 - **Prompt pill** (lower window): idle tip, or a live how-to for the active check.
-- **Packet labels:** title + purpose (`for sunlight` …) + status (`ready` / `listening…` / `next`).
+- **Packet labels:** title + purpose (`for water` / `for fertilizer` / …) + status (`ready` / `listening…` / `next`).
 - **Smile / talk:** meter under `listening…` on the active packet label.
-- **Breathe:** centre breath guide + pill text when active.
 - **Stretch:** stretch HUD + tilt hints; packet label `next` until selected.
 
 ## Code fallbacks
