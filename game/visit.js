@@ -81,12 +81,12 @@
         lettuce: Object.freeze([
             'Smile three times to fill its water for the day — lettuce is the thirstiest easy bed.',
             'One short chat adds the fertilizer it needs; no stretch or stake.',
-            'When it is mature, breathe slowly to harvest the leaves.',
+            'When it is mature, click the bed to harvest the leaves.',
         ]),
         mint: Object.freeze([
             'Three smiles keep mint watered; it likes a moist bed every visit.',
             'One chat of fertilizer is enough — soft stems do not need staking.',
-            'Breathe to harvest once mature; it regrows for another pick later.',
+            'Click to harvest once mature; it regrows for another pick later.',
         ]),
         cucumber: Object.freeze([
             'Three smiles of water and two chats of fertilizer keep the vine growing.',
@@ -220,7 +220,7 @@
             plots: new Array(PLOTS).fill(null),
             visitDays: [],
             journal: [],
-            settings: { pace: 'standard', breaths: 4, chart: true, lighting: 'auto', offsetDays: 0,
+            settings: { pace: 'standard', breaths: 4, lighting: 'auto', offsetDays: 0,
                 realMsPerGardenMinute: D.DEFAULT_DAY_CONFIG.realMsPerGardenMinute },
             pantry: H.emptyPantry(),
             spareSeeds: H.emptySpareSeeds(),
@@ -313,8 +313,8 @@
         const st = obj.settings || {};
         s.settings.pace = st.pace === 'gentle' ? 'gentle' : 'standard';
         s.settings.breaths = clampBreaths(st.breaths);
-        s.settings.chart = st.chart !== false;
         s.settings.lighting = LIGHTINGS.includes(st.lighting) ? st.lighting : 'auto';
+        delete s.settings.chart;
         s.settings.offsetDays = Number.isFinite(Number(st.offsetDays)) ? Math.max(0, Math.round(Number(st.offsetDays))) : 0;
         s.pantry = H.sanitizePantry(obj.pantry);
         s.spareSeeds = H.sanitizeSpareSeeds(obj.spareSeeds);
@@ -710,7 +710,17 @@
                 if (needs.stake && b.progress && b.progress.stake) p.staked = true;
                 if (C.allNeedsMet(b.progress, needs, p.staked)) p.tagResting = false;
                 const kind = L.plantById(p.plantId);
-                tended.push({ plot: b.plot, plantId: p.plantId, name: kind.name });
+                const prog = Object.assign(C.emptyProgress(), b.progress || {});
+                const sun = Number(prog.sun) || 0;
+                const water = Number(prog.water) || 0;
+                const fertilizer = Number(prog.fertilizer) || 0;
+                const stake = !!(needs.stake && (prog.stake || p.staked));
+                if (sun > 0 || water > 0 || fertilizer > 0 || stake) {
+                    tended.push({
+                        plot: b.plot, plantId: p.plantId, name: kind.name,
+                        careDots: true, sun, water, fertilizer, stake,
+                    });
+                }
             }
         } else if (state.version >= 5) {
             D.recordDayTending(state, bedResults, state.dayNumber, (id) => L.plantById(id));
@@ -735,15 +745,25 @@
         }
         const unlocked = unlockedPlants(state).filter((id) => !before.includes(id));
 
-        const sumSun = tended.reduce((s, t) => s + t.sunHours, 0);
-        const sumWater = tended.length ? tended.reduce((s, t) => s + t.water, 0) / tended.length : 0;
-        const sumFert = tended.length ? tended.reduce((s, t) => s + t.fertilizer, 0) / tended.length : 0;
-        const parts = tended.map((t) => `bed ${t.plot + 1}: ${round1(t.sunHours)} h sun, ${Math.round(t.water * 100)}% water` +
-            (t.fertilizer > 0 ? `, ${Math.round(t.fertilizer * 100)}% fertilizer` : ''));
+        const sumSun = tended.reduce((s, t) => s + (Number(t.careDots ? t.sun : t.sunHours) || 0), 0);
+        const sumWater = tended.length ? tended.reduce((s, t) => s + (Number(t.water) || 0), 0) / tended.length : 0;
+        const sumFert = tended.length ? tended.reduce((s, t) => s + (Number(t.fertilizer) || 0), 0) / tended.length : 0;
+        const parts = tended.map((t) => {
+            if (t.careDots) {
+                const bits = [];
+                if (t.sun > 0) bits.push(`${round1(t.sun)} sun`);
+                if (t.water > 0) bits.push(`${round1(t.water)} water`);
+                if (t.fertilizer > 0) bits.push(`${round1(t.fertilizer)} fertilizer`);
+                if (t.stake) bits.push('staked');
+                return `bed ${t.plot + 1}: ${bits.join(', ') || 'tended'}`;
+            }
+            return `bed ${t.plot + 1}: ${round1(t.sunHours)} h sun, ${Math.round((Number(t.water) || 0) * 100)}% water` +
+                (t.fertilizer > 0 ? `, ${Math.round((Number(t.fertilizer) || 0) * 100)}% fertilizer` : '');
+        });
         addJournal(state, {
             day, ts: d.getTime(), kind: 'visit',
             sunHours: round1(sumSun), water: round2(sumWater), fertilizer: round2(sumFert),
-            breaths: tended.reduce((s, t) => s + (byPlot[t.plot].breaths || 0), 0),
+            breaths: tended.reduce((s, t) => s + ((byPlot[t.plot] && byPlot[t.plot].breaths) || 0), 0),
             text: parts.length ? `Visit per plant: ${parts.join('; ')}.` : 'Visit: a quiet hello to the garden.',
         });
         for (const id of unlocked) {
@@ -889,7 +909,7 @@
                 ? o.harvestQueue.slice()
                 : H.readyPlotIndices(this.plots, this.today);
             // Care remap: mature ready beds stay selectable so the player can
-            // finish today's needs, then breathe to harvest on care-hub.
+            // finish today's needs, then click to harvest on care-hub.
             if (Array.isArray(o.plantedBeds)) {
                 this.plantedBeds = o.plantedBeds.slice();
             } else {
@@ -949,6 +969,8 @@
         _loadCareProgress(plot) {
             const p = this.plots[plot];
             if (!p || !C) return;
+            // Keep in-session progress when re-selecting a bed mid-tend.
+            if (this.careProgress[plot]) return;
             const needs = L.plantNeeds(p.plantId);
             const ext = this.dailyTendsSeed && this.dailyTendsSeed[plot];
             const rec = ext && ext.day === this.gardenDay ? ext : null;
@@ -994,11 +1016,7 @@
                 return this.go('care-talk');
             }
             if (needKey === 'harvest' && this.canCareHarvest(this.selectedPlot)) {
-                this.pacer = new BreathPacer({ pace: this.pace, breaths: 1, easeIn: false });
-                this.breathT = 0;
-                this.breathsDone = 0;
-                this._careBreathRaw = 0;
-                return this.go('care-harvest');
+                return this.confirmCareHarvest();
             }
             return this.step;
         }
@@ -1014,14 +1032,15 @@
             if (this.pendingHarvests.includes(plot)) return false;
             if (p.stage < MAX_STAGE) return false;
             const today = this.careGardenDayKey();
-            // Mature + ready is enough — matching “breathe when fully grown”.
+            // Mature + ready is enough — click (or Enter) when fully grown.
             // Daily need dots are for growth, not a second gate on picking.
             return !!(today && H.isPlotReady(p, today));
         }
 
-        /** Instant pick from care-hub (Enter / accessibility); breath still works too. */
+        /** Instant pick from care-hub (click / Enter / Space). */
         confirmCareHarvest() {
-            if (this.step !== 'care-hub' && this.step !== 'care-harvest') return this.step;
+            const harvestSteps = ['care-hub', 'care-harvest', 'care-smile', 'care-talk', 'stretch-offer', 'stretch'];
+            if (!harvestSteps.includes(this.step)) return this.step;
             if (this.selectedPlot == null || !this.canCareHarvest(this.selectedPlot)) return this.step;
             return this._completeCareHarvest();
         }
@@ -1041,7 +1060,7 @@
         _completeCareHarvest() {
             if (this.selectedPlot == null) return this.go('care-hub');
             const done = this.selectedPlot;
-            this.pendingHarvests.push(done);
+            if (!this.pendingHarvests.includes(done)) this.pendingHarvests.push(done);
             this.events.push({ type: 'harvest-ready', plot: done });
             this.pacer = null;
             this.breathT = 0;
@@ -1052,8 +1071,10 @@
                 this.selectedPlot = next;
                 this._loadCareProgress(next);
                 this._syncLiveFromTally();
+                return this.go('care-hub');
             }
-            return this.go('care-hub');
+            // Nothing left to tend or pick — end the visit instead of sitting on a harvested bed.
+            return this.go('summary');
         }
 
         finishCareHub() {
@@ -1233,7 +1254,8 @@
                 this.harvestSmile = 0;
             }
             if (step === 'care-harvest') {
-                this.pacer = new BreathPacer({ pace: this.pace, breaths: 1, easeIn: false });
+                // Legacy step: harvest is click-instant now.
+                this.pacer = null;
                 this.breathT = 0;
                 this.breathsDone = 0;
             }
@@ -1274,12 +1296,30 @@
             return this._completeHarvest();
         }
 
+        /**
+         * Make a planted bed selectable mid-visit (e.g. opened from a single-bed
+         * click path that previously omitted siblings).
+         */
+        ensurePlantedBed(plot) {
+            const i = Number(plot);
+            if (!(i >= 0 && i < PLOTS) || !this.plots[i]) return false;
+            if (this.pendingHarvests.includes(i)) return false;
+            if (!this.plantedBeds.includes(i)) {
+                this.plantedBeds = this.plantedBeds.concat([i]).sort((a, b) => a - b);
+            }
+            this._loadCareProgress(i);
+            return true;
+        }
+
         setSelectedPlot(plot) {
             const i = Number(plot);
-            const list = this.selectablePlots();
-            if (!(i >= 0 && i < PLOTS) || !list.includes(i)) return false;
             const careSteps = ['pick', 'pick-harvest', 'care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
             if (!careSteps.includes(this.step)) return false;
+            // Care-hub (and focused care steps): pull sibling planted beds into the
+            // visit if a single-bed open path omitted them.
+            if (this.step !== 'pick-harvest' && this.step !== 'pick') this.ensurePlantedBed(i);
+            const list = this.selectablePlots();
+            if (!(i >= 0 && i < PLOTS) || !list.includes(i)) return false;
             const changed = this.selectedPlot !== i;
             this.selectedPlot = i;
             this._loadCareProgress(i);
@@ -1318,11 +1358,37 @@
         /** Cycle to the next selectable bed (Enter / keyboard) — works mid-tend. */
         selectNextPlant() {
             const list = this.selectablePlots();
-            if (list.length < 2 || this.selectedPlot == null) return this.selectedPlot;
+            if (!list.length || this.selectedPlot == null) return this.selectedPlot;
             const idx = list.indexOf(this.selectedPlot);
-            const next = list[(Math.max(0, idx) + 1) % list.length];
+            // After a harvest, selection may still sit on a pending bed — jump back onto the list.
+            if (idx < 0) {
+                this.setSelectedPlot(list[0]);
+                return this.selectedPlot;
+            }
+            if (list.length < 2) return this.selectedPlot;
+            const next = list[(idx + 1) % list.length];
             if (next !== this.selectedPlot) this.setSelectedPlot(next);
             return this.selectedPlot;
+        }
+
+        /**
+         * Care-hub Enter key: harvest when picking is intentional, otherwise switch beds
+         * so mid-tend players are not stuck on a mature plant. Finish when this bed is
+         * done and nothing else remains to tend or pick.
+         * @returns {'harvest'|'switch'|'finish'|'noop'}
+         */
+        careHubEnterAction() {
+            const selectable = this.selectablePlots();
+            const onSelectable = this.selectedPlot != null && selectable.includes(this.selectedPlot);
+            const doneHere = onSelectable && this.allNeedsMetForPlot(this.selectedPlot);
+            const canPick = onSelectable && this.canCareHarvest(this.selectedPlot);
+            if (!selectable.length) return 'finish';
+            // Sitting on a harvested / non-selectable bed with others left — move first.
+            if (!onSelectable) return 'switch';
+            if (canPick && (doneHere || selectable.length === 1)) return 'harvest';
+            if (selectable.length > 1) return 'switch';
+            if (doneHere) return 'finish';
+            return 'noop';
         }
 
         _completeHarvest() {
@@ -1483,20 +1549,15 @@
                     || (stretchSnap.leftProgress || 0) > 0.05
                     || (stretchSnap.rightProgress || 0) > 0.05
                 ));
-                const breathingFresh = !!(inp.breathing && inp.breathing.fresh);
-                const harvestStarted = this.breathT > 0.05 || !!this.pacer;
                 const channel = C.pickAutoCareChannel({
                     faceVisible,
                     poorReading: this.poorReading,
                     smiling: this.smiling,
                     talking: this.talking,
-                    breathingFresh,
                     stretchEngaged,
                     needs,
                     progress: this.careProgressFor(plot),
                     plotStaked: p.staked,
-                    canHarvest: this.canCareHarvest(plot),
-                    harvestBreathStarted: harvestStarted,
                 });
                 this.activeCareChannel = channel;
                 if (channel === 'water' && !this.poorReading) {
@@ -1505,24 +1566,6 @@
                 } else if (channel === 'fertilizer' && !this.poorReading) {
                     const prog = C.addDotTime(this.careProgressFor(plot), 'fertilizer', step, needs);
                     this.setCareProgress(plot, prog);
-                } else if (channel === 'harvest') {
-                    if (!this.pacer) {
-                        this.pacer = new BreathPacer({ pace: this.pace, breaths: 1, easeIn: false });
-                        this.breathT = 0;
-                        this.breathsDone = 0;
-                    }
-                    if (breathingFresh) this.breathT += step;
-                    this.breathsDone = this.pacer.completedAt(this.breathT);
-                    if (this.breathT >= this.pacer.total) {
-                        this.pacer = null;
-                        this.breathT = 0;
-                        this.breathsDone = 0;
-                        this._completeCareHarvest();
-                    }
-                } else if (harvestStarted && this.canCareHarvest(plot)) {
-                    this.pacer = null;
-                    this.breathT = 0;
-                    this.breathsDone = 0;
                 }
             }
             if (this.step === 'care-smile' && this.selectedPlot != null && C) {
@@ -1542,9 +1585,7 @@
                 }
                 if (C.fillFraction(this.careProgressFor(plot), needs, 'fertilizer', this.plots[plot].staked) >= 1) this.go('care-hub');
             } else if (this.step === 'care-harvest' && this.selectedPlot != null && C) {
-                this.breathT += step;
-                this.breathsDone = this.pacer ? this.pacer.completedAt(this.breathT) : 0;
-                if (this.pacer && this.breathT >= this.pacer.total) this._completeCareHarvest();
+                this._completeCareHarvest();
             } else if (this.step === 'stretch' && this.stretchFlow) {
                 const snap = this.stretchFlow.update(step, input && input.stretch ? input.stretch : {});
                 this.stretchSnap = snap;

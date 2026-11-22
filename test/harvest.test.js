@@ -83,7 +83,7 @@ test('loadState v3 migrates with empty pantry', () => {
         plots: [{ plantId: 'mint', stage: 3, sunBank: 1, plantedDay: '2026-11-10' }],
         visitDays: ['2026-11-16'],
         journal: [],
-        settings: { pace: 'standard', breaths: 4, chart: true, lighting: 'auto', offsetDays: 0 },
+        settings: { pace: 'standard', breaths: 4, lighting: 'auto', offsetDays: 0 },
     };
     const s = V.loadState(JSON.stringify(legacy), now);
     assert.equal(s.version, V.STATE_VERSION);

@@ -20,13 +20,13 @@ const CHANNEL_TO_PANEL = Object.freeze({
 
 /**
  * Raw detection priority (matches auto-care routing):
- * stretch > breathe > talk > smile > idle.
+ * stretch > talk > smile > idle.
+ * Harvest is click-only; breathing no longer drives a care channel.
  * Pass only signals that are true this frame.
  */
 function rawPanelModeFromSignals(signals) {
     const s = signals || {};
     if (s.stretchEngaged) return 'stretch';
-    if (s.breathing) return 'breathe';
     if (s.talking) return 'talk';
     if (s.smiling) return 'smile';
     return 'idle';

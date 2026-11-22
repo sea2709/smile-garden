@@ -19,7 +19,7 @@
   "done": "ui/care/need-done.png at 16px on the icon's top-right shoulder"
  },
  "activeGlow": {"px": [120, 120], "display": [64, 64], "offset": [-6, -8], "note": "behind the icon while the camera sees that action. Fade in 350ms, gentle 2.4s breathe, and hold ~400ms after the signal drops"},
- "harvest": {"icon": "ui/care/harvest-prompt-64.png (day art at night too)", "display": 52, "glow": "ui/tend/tend-glow-harvest(-night).png while breathing is seen", "title": "Ready to harvest", "sub": "Breathe slowly to pick it", "gardenBadge": "ui/care/harvest-badge(-night).png in Sprout's floating badge slot"},
+ "harvest": {"icon": "ui/care/harvest-prompt-64.png (day art at night too)", "display": 52, "glow": "ui/tend/tend-glow-harvest(-night).png while harvest is ready", "title": "Ready to harvest", "sub": "Click the plant to pick it", "gardenBadge": "ui/care/harvest-badge(-night).png in Sprout's floating badge slot"},
  "stamp": {"allMet": "ui/care/bloom-stamp.png", "resting": "ui/care/resting-leaf.png", "display": 18},
  "divider": {"day": "ui/tend/tend-divider.png", "night": "ui/tend/tend-divider-night.png", "px": [10, 120], "display": [5, 64]}
 }

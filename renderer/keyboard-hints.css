@@ -7,7 +7,7 @@
    existing 18px padding, 106px slot column, 10px gap and 117px “2 more smiles”
    label, the row is 319 CSS px — the 320px strip does not need to grow.
    Harvest’s Enter cap sits on the right of the “Ready to harvest” title line,
-   because “Breathe slowly to pick it” already fills the subtitle. Sun has no
+   because “Click the plant to pick it” already fills the subtitle. Sun has no
    key (it fills by itself). Nothing here is tappable. */
 
 /* ---- visibility ---- */

@@ -1,5 +1,5 @@
 // renderer/dev-hooks.js — mock/capture automation surface (window.__smileGarden).
-// Installed only when config.mock || config.capture. Used by scripts/capture-driver.js.
+// Installed only when config.automation || config.capture. Used by scripts/capture-driver.js.
 (function (global) {
     'use strict';
 
@@ -12,6 +12,7 @@
             getStretchDemoSnap, setStretchDemoSnap,
             getForcePickedPlots, setForcePickedPlots,
             getSignalPanelDemoLock, setSignalPanelDemoLock,
+            getHideChartForCapture, setHideChartForCapture,
             getBreathHudDemoLock, setBreathHudDemoLock,
             getStretchHudDemoLock, setStretchHudDemoLock,
             getHudSeasonOverride, setHudSeasonOverride,
@@ -210,16 +211,15 @@
             return document.body.dataset.planted;
         },
         setChartForCapture(on) {
-            state.settings.chart = !!on;
+            setHideChartForCapture(!on);
             if (els.chartPanel) els.chartPanel.hidden = !on;
-            save();
-            return state.settings.chart;
+            return !!on;
         },
         setSignalPanelDemoForCapture(mode) {
             const m = ['idle', 'smile', 'talk', 'breathe', 'stretch'].includes(mode) ? mode : 'idle';
             const t = performance.now() / 1000;
             signalPanelDemoLock = m;
-            state.settings.chart = true;
+            setHideChartForCapture(false);
             if (els.breathGuide) els.breathGuide.hidden = true;
             if (els.chartPanel) {
                 els.chartPanel.hidden = false;
@@ -559,7 +559,7 @@
             syncToApp();
             signalPanelDemoLock = null;
             if (signalSwitcher && signalSwitcher.reset) signalSwitcher.reset();
-            state.settings.chart = false;
+            setHideChartForCapture(true);
             if (els.chartPanel) els.chartPanel.hidden = true;
             const ok = hooks.primeCareHarvestForCapture(i);
             syncFromApp();
@@ -822,7 +822,7 @@
         async setKeyboardModeForCapture(on = true) {
             config.keyboard = !!on;
             if (on && source && source.setAuto) source.setAuto(false);
-            if (els.mockBadge) els.mockBadge.hidden = !on && !config.mock;
+            if (els.mockBadge) els.mockBadge.hidden = !on;
             if (on) els.mockMode.textContent = 'Keyboard player';
             syncKeyboardStripMode();
             if (on) {

@@ -8,7 +8,7 @@
 
     const MAX_STAGE = 5;
     const HARVEST_HOLD_SECONDS = 2;
-    /** After breathe-harvest in care: `empty` clears the bed; swap to `replant` later if Dang wants auto-reseed. */
+    /** After click-harvest in care: `empty` clears the bed; swap to `replant` later if Dang wants auto-reseed. */
     const CARE_HARVEST_BED_RESET = 'empty';
     const WATER_FULL = 1 - 1e-6;
 

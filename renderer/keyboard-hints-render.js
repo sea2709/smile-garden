@@ -8,8 +8,7 @@
 //       strip.classList.toggle('is-keyboard', SmileKeyboardHints.isKeyboardMode(config, source));
 //
 //     Call this when config.keyboard is set (camera fallback or the
-//     “Play with keyboard instead” banner), when a demo-mode key is held
-//     (source.setKeys turns auto off), and when A returns the demo to auto.
+//     “Play with keyboard instead” banner).
 //
 //  2. Inside SmileTendStrip.render, after each .tend-care row is built and
 //     after the harvest block is updated:
@@ -46,7 +45,6 @@
         space: 'Space',
         esc: 'Esc',
         f: 'F, look away',
-        a: 'A, back to the demo player',
         'arrow-left': 'Left arrow, previous bed',
         'arrow-right': 'Right arrow, next bed',
         'arrow-up': 'Up arrow, previous bed',
@@ -55,12 +53,8 @@
 
     const WIDE = { esc: true, enter: true, space: true, 'bracket-left': true, 'bracket-right': true };
 
-    function isKeyboardMode(config, source) {
-        if (config && config.keyboard) return true;
-        // Demo starts on the auto player; a care key turns auto off and the
-        // badge switches to “Keyboard player”. A (config.mock only) turns it back.
-        if (config && config.mock && source && source.setKeys && source.auto === false) return true;
-        return false;
+    function isKeyboardMode(config) {
+        return !!(config && config.keyboard);
     }
 
     function keySrc(id, lighting, pressed) {

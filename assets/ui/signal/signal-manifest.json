@@ -61,7 +61,7 @@
    "rightCss": 246,
    "baselineCss": 27,
    "font": "Nunito 800 12px",
-   "note": "right-aligned; keep the existing G kbd chip at right:14px"
+   "note": "right-aligned in the signal-head"
   },
   "canvas": {
    "leftCss": 16,

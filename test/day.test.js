@@ -6,6 +6,13 @@ const D = require('../game/day.js');
 const V = require('../game/visit.js');
 const C = require('../game/clock-arc.js');
 
+test('formatGardenDayLabel maps garden keys to Day N · Season', () => {
+    assert.equal(D.formatGardenDayLabel('garden-1'), 'Day 1 · Spring');
+    assert.equal(D.formatGardenDayLabel('garden-8'), 'Day 8 · Summer');
+    assert.equal(D.formatGardenDayLabel('2026-11-16'), null);
+    assert.equal(D.parseGardenDayKey('garden-3'), 3);
+});
+
 test('garden clock pauses at late night and advances with real time', () => {
     const s = V.createState(new Date());
     const clock = new D.GardenDayClock(s, { realMsPerGardenMinute: 100 });

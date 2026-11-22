@@ -34,13 +34,11 @@ test('talk check passes after ~2s talking', () => {
     assert.equal(snap.passed.talk, true);
 });
 
-test('breath check passes when stable rate arrives', () => {
+test('camera check no longer includes breath (harvest is click)', () => {
+    assert.deepEqual(CC.CHECKS, ['smile', 'talk', 'stretch']);
     const session = CC.createCameraCheckSession({});
     session.select('breath');
-    let snap = session.update(0.1, { faceVisible: true, breathing: { stable: false, fresh: true } });
-    assert.equal(snap.passed.breath, false);
-    snap = session.update(0.1, { faceVisible: true, breathing: { stable: true, fresh: true, rate: 6 } });
-    assert.equal(snap.passed.breath, true);
+    assert.equal(session.active, null);
 });
 
 test('stretch check uses stretch flow both sides', () => {
@@ -71,7 +69,6 @@ test('stretch check uses stretch flow both sides', () => {
 
 test('checks are skippable in any order', () => {
     const session = CC.createCameraCheckSession({});
-    session.skip('breath');
     session.select('talk');
     session.skip('talk');
     assert.equal(session.snapshot().allMarked, false);

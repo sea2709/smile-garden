@@ -2,12 +2,11 @@
 (function () {
     'use strict';
 
-    const CHECKS = Object.freeze(['smile', 'talk', 'breath', 'stretch']);
+    const CHECKS = Object.freeze(['smile', 'talk', 'stretch']);
 
     const PACKET_TITLES = Object.freeze({
         smile: 'Smile',
         talk: 'Talk',
-        breath: 'Breathe',
         stretch: 'Neck stretch',
     });
 
@@ -15,29 +14,26 @@
     const PACKET_CARE = Object.freeze({
         smile: 'Water',
         talk: 'Fertilize',
-        breath: 'Harvest',
         stretch: 'Stake',
     });
 
     const ACTIVE_PROMPTS = Object.freeze({
         smile: 'Hold a natural smile — in the garden this waters your plant.',
         talk: 'Say a few words aloud — talking fertilizes the bed.',
-        breath: 'Breathe slowly and steadily — calm breath harvests a fully grown crop.',
         stretch: 'Tip each ear toward a shoulder — this stakes plants that need support.',
     });
 
     const KEYBOARD_ACTIVE_PROMPTS = Object.freeze({
         smile: 'Hold S for a smile — in the garden this waters your plant.',
         talk: 'Hold T to talk — talking fertilizes the bed.',
-        breath: 'Breathe packet listens on its own — calm breath harvests a fully grown crop.',
         stretch: 'Hold [ or ] to tip each ear — this stakes plants that need support.',
     });
 
-    const IDLE_PROMPT = 'Tap a seed packet and hold the gesture so the camera learns you. Daylight fills sun needs by itself; when you tend, the camera applies smile, talk, breath, and stretch for you. Press Esc or go idle to stop.';
+    const IDLE_PROMPT = 'Tap a seed packet and hold the gesture so the camera learns you. Daylight fills sun needs by itself; when you tend, the camera applies smile, talk, and stretch for you. Click a mature crop to harvest. Press Esc or go idle to stop.';
 
-    const KEYBOARD_IDLE_PROMPT = 'Tap a seed packet, then hold S to smile, T to talk, or [ / ] to tilt. Breathe runs on its own. Daylight fills sun needs by itself. Press Esc or go idle to stop.';
+    const KEYBOARD_IDLE_PROMPT = 'Tap a seed packet, then hold S to smile, T to talk, or [ / ] to tilt. Daylight fills sun needs by itself. Click a mature crop to harvest. Press Esc or go idle to stop.';
 
-    const FALLBACK_ICON = Object.freeze({ smile: '☀', talk: '💬', breath: '🍃', stretch: '🌻' });
+    const FALLBACK_ICON = Object.freeze({ smile: '☀', talk: '💬', stretch: '🌻' });
 
     function firstOpenCheck(snap) {
         for (const k of CHECKS) {

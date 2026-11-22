@@ -36,7 +36,8 @@ test('SmileFarmer state priority', () => {
     assert.equal(farmer.pickName({ face: true, tilt: 'right', smile: true }, t), 'tilt-right');
     assert.equal(farmer.pickName({ face: true, smile: true, talk: true }, t), 'smile');
     assert.equal(farmer.pickName({ face: true, talk: true }, t), 'talk-1');
-    assert.equal(farmer.pickName({ face: true, phase: 'care-harvest' }, t), 'breathe-1');
+    assert.equal(farmer.pickName({ face: true, phase: 'breathe' }, t), 'breathe-1');
+    assert.equal(farmer.pickName({ face: true, phase: 'care-harvest' }, t), 'rest');
     assert.equal(farmer.pickName({ face: true }, t), 'rest');
 });
 

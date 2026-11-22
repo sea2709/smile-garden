@@ -1,7 +1,8 @@
-// scripts/capture-screenshots.js — run the game in mock mode and save fresh
-// screenshots to docs/ (all four lightings, a smile / talk / breathing step,
-// the summary, the journal tabs, the night "turn on a light" hint and a
-// fuller garden). Uses a throwaway profile, so your saved garden is untouched.
+// scripts/capture-screenshots.js — run the game under capture automation and
+// save fresh screenshots to docs/ (all four lightings, a smile / talk /
+// breathing step, the summary, the journal tabs, the night "turn on a light"
+// hint and a fuller garden). Uses a throwaway profile, so your saved garden
+// is untouched.
 //
 //   npm run screenshots          (on Linux without a display: xvfb-run -a npm run screenshots)
 
@@ -44,7 +45,6 @@ if (!timeOnly && !cameraOnly && !stakeOnly && !tagsOnly && !stripGlowOnly && !ke
 }
 const electron = require('electron'); // path to the binary when required from Node
 const env = Object.assign({}, process.env, {
-    SMILE_GARDEN_MOCK: '1',
     SMILE_GARDEN_FAST: '1',
     SMILE_GARDEN_CAPTURE_DIR: outDir,
     SMILE_GARDEN_CAPTURE_CAMERA_ONLY: cameraOnly ? '1' : (process.env.SMILE_GARDEN_CAPTURE_CAMERA_ONLY || ''),
@@ -54,5 +54,5 @@ const env = Object.assign({}, process.env, {
     SMILE_GARDEN_STRIP_GLOW_ONLY: stripGlowOnly ? '1' : (process.env.SMILE_GARDEN_STRIP_GLOW_ONLY || ''),
     SMILE_GARDEN_KEYBOARD_FARMER_SHOTS: keyboardFarmerOnly ? '1' : (process.env.SMILE_GARDEN_KEYBOARD_FARMER_SHOTS || ''),
 });
-const child = spawn(electron, ['.', '--mock', '--fast', '--no-sandbox'], { cwd: root, env, stdio: 'inherit' });
+const child = spawn(electron, ['.', '--fast', '--no-sandbox'], { cwd: root, env, stdio: 'inherit' });
 child.on('exit', (code) => process.exit(code || 0));

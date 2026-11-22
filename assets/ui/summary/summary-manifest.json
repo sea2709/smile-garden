@@ -172,12 +172,10 @@
  "copy": {
   "resting": "'resting', 'resting, wants water', 'resting, saving up sunshine', 'resting until tended'; never failed/missed/wilted",
   "notDone": "show a soft en dash in the value; never 'skipped'",
-  "sunSource": "'from daylight, all by itself'",
   "sources": {
    "water": "from smiles",
    "fertilizer": "from talking",
-   "stakes": "from stretching",
-   "harvests": "from breathing"
+   "stakes": "from stretching"
   },
   "titles": {
    "grew": "Your garden grew today",

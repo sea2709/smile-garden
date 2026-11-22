@@ -13,7 +13,7 @@ const CARE_PLAYER = Object.freeze({
     sun: { auto: true, label: 'Sunlight' },
     water: { step: 'care-smile', input: 'smile', label: 'Water' },
     fertilizer: { step: 'care-talk', input: 'talk', label: 'Fertilize' },
-    harvest: { step: 'care-harvest', input: 'breathe', label: 'Harvest' },
+    harvest: { step: 'care-hub', input: 'click', label: 'Harvest' },
     stake: { step: 'stretch', input: 'stretch', label: 'Stake' },
 });
 
@@ -127,8 +127,8 @@ function needStillOpen(progress, needs, plotStaked, key) {
 
 /**
  * Which care channel auto-detection should apply this frame (null = none).
- * Priority: stake > harvest breath > talk > smile.
- * Overlap: talk beats smile; harvest blocks water/fert until breath finishes or is abandoned.
+ * Priority: stake > talk > smile. Harvest is click-only (not a camera channel).
+ * Overlap: talk beats smile.
  */
 function pickAutoCareChannel(ctx) {
     const c = ctx || {};
@@ -138,8 +138,6 @@ function pickAutoCareChannel(ctx) {
     const plotStaked = !!c.plotStaked;
 
     if (needs.stake && !stakeNeedMet(progress, plotStaked) && c.stretchEngaged) return 'stake';
-
-    if (c.canHarvest && (c.harvestBreathStarted || c.breathingFresh)) return 'harvest';
 
     if (needs.fertilizer > 0 && needStillOpen(progress, needs, plotStaked, 'fertilizer') && c.talking) {
         return 'fertilizer';

@@ -55,7 +55,9 @@ test('buildSummaryData: growth day hero and care labels', () => {
     assert.equal(data.care[0].value, '2');
     assert.equal(data.care[1].quiet, true);
     assert.equal(data.care[1].value, SD.QUIET);
-    assert.equal(data.sun.src, 'from daylight, all by itself');
+    assert.equal(data.care.length, 3);
+    assert.equal(data.care[2].label, 'Stakes');
+    assert.equal(data.sun, null);
 });
 
 test('buildSummaryData: quiet night card with note', () => {
@@ -74,7 +76,8 @@ test('buildSummaryData: quiet night card with note', () => {
     });
     assert.equal(data.title, 'A quiet night in the garden');
     assert.equal(data.hero.art, 'morning-hero.png');
-    assert.equal(data.sun.quiet, true);
+    assert.equal(data.sun, null);
+    assert.ok(!data.care.some((c) => c.key === 'harvest'));
     assert.match(data.note, /Season day 3 of 7/);
     assert.ok(!data.note.includes('Breathing'));
 });

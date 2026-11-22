@@ -13,8 +13,8 @@
 .cc-frame { position: absolute; left: 300px; top: 0; width: 680px; height: 520px; background: url('../assets/ui/camera-check/window-frame.png') 0 0 / 680px 520px no-repeat; pointer-events: none; }
 .cc-sill  { position: absolute; left: 280px; top: 520px; width: 720px; height: 80px; background: url('../assets/ui/camera-check/sill.png') 0 0 / 720px 80px no-repeat; }
 .cc-packet { position: absolute; top: 450px; width: 110px; height: 150px; margin-left: -55px; background: center bottom / 110px 150px no-repeat; transition: transform .3s ease; }
-.cc-packet[data-kind="smile"]   { left: 400px; } .cc-packet[data-kind="talk"]    { left: 560px; }
-.cc-packet[data-kind="breathe"] { left: 720px; } .cc-packet[data-kind="stretch"] { left: 880px; }
+.cc-packet[data-kind="smile"]   { left: 440px; } .cc-packet[data-kind="talk"]    { left: 640px; }
+.cc-packet[data-kind="stretch"] { left: 840px; }
 /* state image: packet-{kind}-{closed|listening|sprouted}.png, e.g. */
 .cc-packet[data-kind="smile"][data-state="closed"]    { background-image: url('../assets/ui/camera-check/packet-smile-closed.png'); }
 .cc-packet[data-kind="smile"][data-state="listening"] { background-image: url('../assets/ui/camera-check/packet-smile-listening.png'); }

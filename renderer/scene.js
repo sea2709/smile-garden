@@ -553,7 +553,9 @@
         }
         function plotAt(clientX, clientY) {
             const { x, y } = toArt(clientX, clientY);
-            for (let i = 0; i < ART.plots.length; i++) {
+            // Front row last in ART.plots — prefer it so overlapping hit boxes
+            // do not steal clicks meant for beds closer to the player.
+            for (let i = ART.plots.length - 1; i >= 0; i--) {
                 const b = ART.plots[i].box;
                 if (x >= b[0] - 12 && x <= b[2] + 12 && y >= b[1] - 50 && y <= b[3] + 14) return i;
             }
@@ -1691,19 +1693,6 @@
             ctx.restore();
         }
 
-        function drawLeftHudBrandWash() {
-            const k = clockRibbonKeepOut();
-            const washRight = Math.min(k.left - 16, 468);
-            if (washRight < 96) return;
-            ctx.save();
-            const g = ctx.createLinearGradient(0, 0, 0, 96);
-            g.addColorStop(0, 'rgba(251, 245, 230, 0.82)');
-            g.addColorStop(1, 'rgba(251, 245, 230, 0)');
-            ctx.fillStyle = g;
-            ctx.fillRect(0, 0, washRight, 96);
-            ctx.restore();
-        }
-
         function drawLogoHud() {
             const hud = ART.logoHud;
             if (!hud) return;
@@ -1717,7 +1706,6 @@
             const nightReady = ready(logoNightImg);
             refreshLogoOnCanvas();
             if (!logoOnCanvas) return;
-            drawLeftHudBrandWash();
             const { x, y, w, h } = hud;
             const [sw, sh] = hud.srcPixels || [w * 2, h * 2];
             if (dayReady && layers.day > 0.02) {

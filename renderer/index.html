@@ -67,7 +67,6 @@
                 <span class="signal-label" data-for="idle"><span class="day-only">Waiting for you</span><span class="night-only">Resting</span></span>
             </span>
             <span id="chart-live" class="signal-live"></span>
-            <span class="kbd">G</span>
         </div>
         <div class="signal-chart">
             <i class="signal-bg" data-for="smile" aria-hidden="true"></i>
@@ -79,7 +78,7 @@
         </div>
     </section>
 
-    <!-- Camera preview (real mode) / demo badge (mock) -->
+    <!-- Camera preview / keyboard-player badge -->
     <div id="pip-dock" class="pip-dock" hidden>
         <div id="pip" class="pip">
             <video id="preview" class="mirror-video" autoplay playsinline muted></video>
@@ -88,8 +87,8 @@
         <button id="btn-pip-mode" class="btn btn-soft btn-small pip-mode-btn" type="button" title="Switch to Keyboard mode">Switch to Keyboard mode</button>
     </div>
     <div id="mock-badge" class="mock-badge" hidden>
-        <b id="mock-mode">Demo player</b>
-        <span>Hold <span class="kbd">S</span> smile · <span class="kbd">T</span> talk · <span class="kbd">F</span> look away · <span class="kbd">[</span>/<span class="kbd">]</span> neck tilt · <span class="kbd">A</span> auto</span>
+        <b id="mock-mode">Keyboard player</b>
+        <span>Hold <span class="kbd">S</span> smile · <span class="kbd">T</span> talk · <span class="kbd">F</span> look away · <span class="kbd">[</span>/<span class="kbd">]</span> neck tilt</span>
     </div>
 
     <!-- Reading hint (validation / no face / night light) -->
@@ -149,7 +148,7 @@
                 <div class="tend-harvest-title">
                     <b>Ready to harvest</b>
                 </div>
-                <span>Breathe slowly to pick it</span>
+                <span>Click the plant to pick it</span>
             </div>
         </div>
     </section>
@@ -196,6 +195,9 @@
         </button>
     </div>
 
+    <!-- Care-hub finish (step panel is hidden while the tend strip is up) -->
+    <button id="btn-tend-finish" class="btn btn-soft btn-tend-finish" type="button" hidden>Finish visit</button>
+
     <div id="plot-tip" class="plot-tip" hidden></div>
     <div id="float-layer" class="float-layer"></div>
     <div id="toast" class="toast" hidden></div>
@@ -220,11 +222,10 @@
                 <img id="cc-sill" class="cc-sill" alt="">
                 <aside id="cc-howto" class="cc-howto" aria-label="Warm-up instructions">
                     <h2 class="cc-howto-title">Camera warm-up</h2>
-                    <p class="cc-howto-lead">Tap each seed packet and hold the action for a couple of seconds so the camera can see it. In the garden, <em>daylight fills sun needs by itself</em> while you pick one plant and the camera tends it from your smile, voice, breath, and stretch.</p>
+                    <p class="cc-howto-lead">Tap each seed packet and hold the action for a couple of seconds so the camera can see it. In the garden, <em>daylight fills sun needs by itself</em> while you pick one plant and the camera tends it from your smile, voice, and stretch. Click a mature crop to harvest.</p>
                     <ul class="cc-howto-list">
                         <li><strong>Smile</strong> — <em>waters</em> the bed<span class="cc-howto-key" data-for="smile" hidden> · hold <span class="kbd">S</span></span></li>
                         <li><strong>Talk</strong> — <em>fertilizes</em><span class="cc-howto-key" data-for="talk" hidden> · hold <span class="kbd">T</span></span></li>
-                        <li><strong>Breathe</strong> — slow breath <em>harvests</em> a fully grown crop<span class="cc-howto-key" data-for="breath" hidden> · runs on its own</span></li>
                         <li><strong>Neck stretch</strong> — <em>stakes</em> tall plants<span class="cc-howto-key" data-for="stretch" hidden> · hold <span class="kbd">[</span> / <span class="kbd">]</span></span></li>
                     </ul>
                     <p id="cc-howto-keys" class="cc-howto-keys" hidden>Keyboard mode: tap a packet, then hold the key. <span class="kbd">F</span> looks away.</p>
@@ -246,9 +247,6 @@
             <h1>Before you begin</h1>
             <p>Smile Garden is a relaxing game for <b>general wellness</b>. It is <b>not a medical device</b> and does not
                diagnose, treat or monitor any health condition. Camera readings are estimates and can be wrong.</p>
-            <p>The breathing step is always <b>optional</b>. If you have a <b>heart or lung condition</b>, are
-               <b>pregnant</b>, or have felt faint while breathing slowly before, please check with your doctor first,
-               or simply skip it. Breathe gently, never hold your breath, and stop if you feel dizzy or uncomfortable.</p>
             <p>Smile Garden is for adults <b>18 and older</b>.</p>
             <label class="check"><input type="checkbox" id="chk-adult"> I'm 18 or older and I've read this note.</label>
             <div class="actions"><button id="btn-wellness-ok" class="btn btn-primary" type="button" disabled>Enter the garden</button></div>
@@ -265,7 +263,7 @@
                 <li><span class="dot dot-sun"></span><b>Sun</b> — fills by itself in daylight (pauses at night)</li>
                 <li><span class="dot dot-water"></span><b>Water</b> — smile at your plant</li>
                 <li><span class="dot dot-fert"></span><b>Fertilizer</b> — talk to your plant</li>
-                <li><span class="dot dot-harvest"></span><b>Harvest</b> — breathe when the plant is fully grown</li>
+                <li><span class="dot dot-harvest"></span><b>Harvest</b> — click when the plant is fully grown</li>
                 <li><span class="dot dot-stretch"></span><b>Stake</b> — neck stretch on tall climbers (once until harvest)</li>
             </ol>
             <p id="greet-note" class="note"></p>
@@ -337,7 +335,7 @@
         <div class="dev-row">
             <button id="dev-input-mode" class="btn btn-soft btn-small" type="button">Switch to keyboard mode</button>
         </div>
-        <p id="dev-input-note" class="note">Input: demo auto (S / T still take over).</p>
+        <p id="dev-input-note" class="note">Input: camera (SmartSpectra).</p>
         <div class="dev-row"><button id="dev-sim" class="btn btn-soft btn-small" type="button">Simulate 5 good days</button></div>
         <div class="dev-row"><button id="dev-ready" class="btn btn-soft btn-small" type="button">Make all planted beds ready</button></div>
         <div class="dev-row"><button id="dev-fill" class="btn btn-soft btn-small" type="button">Fill empty beds</button></div>

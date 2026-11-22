@@ -1,4 +1,4 @@
-// scripts/probe-startup.js — one-shot Electron startup probe (mock only).
+// scripts/probe-startup.js — one-shot Electron startup probe (automation only).
 'use strict';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

@@ -123,7 +123,15 @@ body[data-lighting='night'] .tend-strip {
     .tend-harvest-icon.is-active .tend-harvest-glow { animation: none; }
 }
 
-.tend-harvest { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 2px 0 4px; }
+.tend-harvest {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 2px 0 4px;
+    pointer-events: auto;
+    cursor: pointer;
+}
 .tend-harvest-icon { position: relative; width: 52px; height: 52px; flex: 0 0 auto; overflow: visible; }
 .tend-harvest-icon .tend-harvest-glow { z-index: 0; }
 .tend-harvest-icon #tend-harvest-img {

@@ -169,7 +169,7 @@
       ],
       "fps": 4,
       "keys": null,
-      "when": "phase is breathe, care-harvest, care-hub-breathe, or camera-check-breath. Keyboard mode has no breathe key; fertilizer is guided.",
+      "when": "phase is breathe or camera-check-breath (legacy / capture). Harvest is click-only and no longer uses the breathe strip.",
       "optional": true
     },
     "harvest": {

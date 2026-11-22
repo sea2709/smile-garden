@@ -1,6 +1,6 @@
 // renderer/app.js — Smile Garden: calm in-garden tending on a Stardew-style day clock.
 //
-// Flow: wellness -> garden idle -> tend beds (smile / talk / breathe per plant)
+// Flow: wellness -> garden idle -> tend beds (smile / talk / click-harvest / stretch)
 // -> optional Go to bed -> overnight growth reveal. Clock runs only while open.
 
 (function () {
@@ -21,7 +21,7 @@
         'smile-chart', 'pip-dock', 'pip', 'preview', 'btn-pip-mode', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
         'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
-        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'tend-strip', 'tend-name', 'tend-stamp', 'tend-row', 'tend-harvest', 'tend-harvest-icon', 'tend-harvest-img', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
+        'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'tend-strip', 'tend-name', 'tend-stamp', 'tend-row', 'tend-harvest', 'tend-harvest-icon', 'tend-harvest-img', 'btn-tend-finish', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-prompt', 'cc-howto', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
         'screen-greeting', 'greet-date', 'greet-title', 'greet-status', 'plan-smile', 'plan-talk',
         'greet-note', 'btn-greet-plant', 'btn-begin', 'greet-fine', 'screen-picker', 'picker-target', 'seed-cards', 'btn-picker-close',
@@ -35,7 +35,8 @@
     // ------------------------------------------------------------------
     // State + persistence
     // ------------------------------------------------------------------
-    let config = { mock: true, fast: false };
+    let config = { automation: false, fast: false };
+    function usesSimSource() { return !!(config.automation || config.keyboard); }
     let state = V.loadState(safeGet(), new Date());
     const clock = new V.GameClock({ offsetDays: state.settings.offsetDays });
     // Prefer the current default so older saves (1000 ms) pick up the faster clock.
@@ -79,6 +80,8 @@
         blendSec: reduceMotion ? 0 : 0.3,
     }) : null;
     let signalPanelDemoLock = null;
+    /** Capture-only: hide the signal panel without a user-facing toggle. */
+    let hideChartForCapture = false;
     let screen = 'loading';
     let session = null;
     let source = null;
@@ -168,6 +171,7 @@
         if (name !== 'visit') {
             if (els.tendStrip) els.tendStrip.hidden = true;
             document.body.dataset.tendStrip = '0';
+            if (els.btnTendFinish) els.btnTendFinish.hidden = true;
             if (els.stretchCarePanel) els.stretchCarePanel.hidden = true;
             document.body.dataset.stretchCare = '0';
             document.body.dataset.step = '';
@@ -357,7 +361,7 @@
         if (els.pipDock) els.pipDock.hidden = true;
         if (els.btnPipMode) els.btnPipMode.hidden = true;
         if (els.preview) els.preview.style.removeProperty('visibility');
-        if (els.ccMockSlot) els.ccMockSlot.hidden = !(config.mock || config.keyboard);
+        if (els.ccMockSlot) els.ccMockSlot.hidden = !usesSimSource();
     }
 
     function restorePipHome() {
@@ -472,6 +476,14 @@
     // ------------------------------------------------------------------
     function fmtDate(d) {
         return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+    }
+    /** Journal day header: garden keys ("garden-3") or calendar "YYYY-MM-DD". */
+    function formatJournalDay(day) {
+        const garden = D.formatGardenDayLabel(day);
+        if (garden) return garden;
+        const d = V.dayStart(day);
+        if (Number.isNaN(d.getTime())) return String(day || 'Unknown day');
+        return d.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     }
     function refreshLighting() {
         const auto = state.settings.lighting === 'auto';
@@ -752,9 +764,7 @@
         else if (lighting === 'night') note = 'Night visits are extra calm. A soft light in front of you helps the camera see your smile.';
         else note = `Plants grow one stage on a day they get enough sun and water. ${V.weeklyVisits(state, now)} visits so far this week, and every one counts.`;
         els.greetNote.textContent = note;
-        els.greetFine.textContent = config.mock
-            ? 'Demo mode: a simulated player smiles and chats. Hold S to smile (water), T to talk (fertilize), [ / ] to stretch, F to hide, Enter to pick. Space also smiles but confirms harvest when a crop is ready.'
-            : (config.enableTelemetry ? 'SmartSpectra SDK telemetry is on (SMARTSPECTRA_TELEMETRY=0 to opt out). ' : '') + 'For fun and general wellness only.';
+        els.greetFine.textContent = (config.enableTelemetry ? 'SmartSpectra SDK telemetry is on (SMARTSPECTRA_TELEMETRY=0 to opt out). ' : '') + 'For fun and general wellness only.';
     }
     function renderIdle() {
         const tendable = V.tendableForState(state, clock.now());
@@ -859,10 +869,10 @@
         breathe: { title: 'Breathe with the light', text: 'Follow the glow: in as it grows, out as it fades. No holding, no straining.' },
         'stretch-offer': { title: 'Stake this plant', text: 'Optional neck stretch — tip each ear toward a shoulder and hold briefly, like setting a gentle stake. Skip anytime.' },
         stretch: { title: 'Neck stretch', text: 'Tilt toward one shoulder (~15°) and hold about 3 seconds, then the other. Order does not matter.' },
-        'care-hub': { title: 'Tend with your camera', text: 'Pick any bed anytime (click, arrows, or Enter). Sunlight fills by day; smile to water, talk to fertilize, breathe to harvest when mature, and stretch to stake climbers. Partial care is kept per bed.' },
+        'care-hub': { title: 'Tend with your camera', text: 'Pick any bed anytime (click, arrows, or Enter). Sunlight fills by day; smile to water, talk to fertilize, click to harvest when mature, and stretch to stake climbers. Partial care is kept per bed.' },
         'care-smile': { title: 'Water', text: 'Smile at your plant while the water dot fills (~10 s per dot).' },
         'care-talk': { title: 'Fertilize', text: 'Talk to your plant while the fertilizer dot fills (~10 s per dot).' },
-        'care-harvest': { title: 'Harvest', text: 'Breathe with the guide to harvest this mature crop. Gentle nose breathing only.' },
+        'care-harvest': { title: 'Harvest', text: 'Click a mature crop to harvest it into your basket.' },
     };
     const NEED_LABELS = { sun: 'Sunlight', water: 'Water', fertilizer: 'Fertilizer', harvest: 'Harvest', stake: 'Stake' };
     const NEED_EMOJI = { sun: '☀', water: '💧', fertilizer: '🍃', harvest: '🧺', stake: '🌻' };
@@ -885,12 +895,12 @@
             window.SmileKeyboardHints.isKeyboardMode(config, source),
         );
         if (els.pip) {
-            els.pip.classList.toggle('pip-farmer', !!(config.mock || config.keyboard));
+            els.pip.classList.toggle('pip-farmer', usesSimSource());
         }
     }
 
     async function ensureFarmerPipLive() {
-        if (!config.mock && !config.keyboard) return false;
+        if (!usesSimSource()) return false;
         syncKeyboardStripMode();
         if (!(await ensureSource())) return false;
         if (source && source.setNight) source.setNight(lighting === 'night');
@@ -971,7 +981,7 @@
     }
 
     function redrawSignalPanel(t, extraOpts) {
-        const chartOn = state.settings.chart && (screen === 'visit' || !!signalPanelDemoLock);
+        const chartOn = !hideChartForCapture && (screen === 'visit' || !!signalPanelDemoLock);
         if (!chartOn || !els.chartPanel || !window.SmileChart.drawSignalPanel) return;
         const mode = signalPanelDemoLock || (signalSwitcher ? signalSwitcher.mode : 'idle');
         els.chartPanel.hidden = false;
@@ -1001,8 +1011,9 @@
     async function ensureSource() {
         if (source) return true;
         try {
-            if (config.mock || config.keyboard) {
-                source = window.SmileSources.createMockSource({ auto: !config.keyboard });
+            if (usesSimSource()) {
+                // Automation may auto-drive; keyboard mode is always manual keys.
+                source = window.SmileSources.createMockSource({ auto: !!config.automation && !config.keyboard });
             } else {
                 const apiKey = window.smileGarden.takeApiKey
                     ? await window.smileGarden.takeApiKey()
@@ -1100,10 +1111,10 @@
         return screen === 'idle' || screen === 'greeting' || screen === 'summary';
     }
 
-    /** Prefer real camera; if it cannot start, fall back to keyboard/mock so tending still works. */
+    /** Prefer real camera; if it cannot start, fall back to keyboard so tending still works. */
     async function ensurePlayableSource() {
         if (await ensureSource()) return true;
-        if (config.mock || config.keyboard) return false;
+        if (usesSimSource()) return false;
         config.keyboard = true;
         source = null;
         sourceReady = false;
@@ -1139,7 +1150,12 @@
         talkPromptIdx = Math.floor(Math.random() * TALK_PROMPTS.length);
         let step = session.begin();
         if (step === 'summary') {
-            session.plantedBeds = [plotIndex];
+            // Keep every planted bed selectable — never lock the visit to one plot.
+            session.plantedBeds = careBedsForState();
+            if (!session.plantedBeds.includes(plotIndex)) {
+                session.plantedBeds = session.plantedBeds.concat([plotIndex]).sort((a, b) => a - b);
+            }
+            for (const i of session.plantedBeds) session._loadCareProgress(i);
             session.selectedPlot = plotIndex;
             session.phase = 'tend';
             session.plantRound = 0;
@@ -1159,7 +1175,7 @@
             syncPipVisibility();
             syncKeyboardStripMode();
         } catch (e) {
-            showError('Camera could not start', String(e && e.message || e), !config.mock);
+            showError('Camera could not start', String(e && e.message || e), !usesSimSource());
         }
     }
 
@@ -1195,7 +1211,7 @@
             syncPipVisibility();
             syncKeyboardStripMode();
         } catch (e) {
-            showError('Camera could not start', String(e && e.message || e), !config.mock);
+            showError('Camera could not start', String(e && e.message || e), !usesSimSource());
             CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
             save();
         }
@@ -1206,12 +1222,9 @@
     let lastSourcePhase = '';
     function careHubMockPhase() {
         if (!session || session.step !== 'care-hub') return 'care-hub';
-        if (session.activeCareChannel === 'harvest' || session.canCareHarvest(session.selectedPlot)) {
-            return 'care-hub-breathe';
-        }
         if (session.activeCareChannel === 'stake') return 'care-hub-stretch';
-        // Point the mock auto-player at an open need. Keyboard mode ignores phase
-        // and follows held S / T / [ ] keys instead.
+        // Point the simulated auto-player at an open need (automation). Keyboard
+        // mode ignores phase and follows held S / T / [ ] keys instead.
         if (session.selectedPlot != null && C) {
             const p = state.plots[session.selectedPlot];
             if (p && p.plantId) {
@@ -1266,14 +1279,17 @@
         const careMode = step === 'care-hub' || step === 'care-smile' || step === 'care-talk' || step === 'care-harvest';
         if (els.tendStrip) els.tendStrip.hidden = !(careMode || step === 'stretch-offer' || step === 'stretch');
         if (careMode || step === 'stretch-offer' || step === 'stretch') renderNeedsCard();
+        // Step panel (and its Finish visit button) is hidden in care mode; keep a
+        // reachable finish control docked bottom-right while the tend strip is up.
+        if (els.btnTendFinish) {
+            els.btnTendFinish.hidden = !(careMode || step === 'stretch-offer' || step === 'stretch');
+        }
         const copy = STEP_COPY[step] || STEP_COPY.smile;
         const who = selectedPlantLabel();
         els.stepTitle.textContent = step === 'pick' ? copy.title : (who ? `${copy.title} · ${who}` : copy.title);
         els.stepText.textContent = copy.text;
-        const harvestReady = step === 'care-hub' && session && session.canCareHarvest(session.selectedPlot);
-        const harvestBreath = step === 'care-hub' && session && (session.activeCareChannel === 'harvest' || harvestReady);
         const stakeStretch = step === 'care-hub' && session && session.activeCareChannel === 'stake';
-        els.breathGuide.hidden = step !== 'breathe' && step !== 'care-harvest' && !harvestBreath;
+        els.breathGuide.hidden = step !== 'breathe';
         els.stretchGuide.hidden = step !== 'stretch' && !stakeStretch;
         if (stakeStretch) renderStretchHud();
         els.stepPanel.hidden = careMode || step === 'stretch-offer' || step === 'stretch';
@@ -1318,10 +1334,7 @@
         } else if (step === 'care-smile' || step === 'care-talk' || step === 'care-harvest') {
             const back = mkBtn('Back to needs', 'btn btn-ghost', () => { onStep(session.go('care-hub')); });
             back.id = 'btn-skip';
-            if (step === 'care-harvest') {
-                const skip = mkBtn('Skip breathing', 'btn btn-soft', () => { onStep(session.go('care-hub')); });
-                box.append(back, skip);
-            } else box.append(back);
+            box.append(back);
         } else if (step === 'stretch-offer' || step === 'stretch') {
             /* actions rendered in stretch-care-panel */
         } else if (step === 'breathe-offer') {
@@ -1641,14 +1654,10 @@
                 session.activeCareChannel = 'fertilizer';
             } else if (signalPanelDemoLock === 'stretch') {
                 session.activeCareChannel = 'stake';
-            } else if (signalPanelDemoLock === 'breathe') {
-                session.activeCareChannel = 'harvest';
             }
         }
         let breathPhase = null;
-        if (session.activeCareChannel === 'harvest' && session.pacer && session.pacer.total > 0) {
-            breathPhase = Math.sin((session.breathT / session.pacer.total) * Math.PI * 2);
-        } else if (input.breathing && Number.isFinite(input.breathing.rate)) {
+        if (input.breathing && Number.isFinite(input.breathing.rate)) {
             breathPhase = Math.sin(t * (input.breathing.rate / 60) * Math.PI * 2);
         }
         let panelMode = 'idle';
@@ -1659,7 +1668,6 @@
             panelMode = SP.rawPanelModeFromSignals({
                 smiling: input.faceVisible && session.smiling,
                 talking: input.faceVisible && session.talking,
-                breathing: !!(input.breathing && input.breathing.fresh) || session.activeCareChannel === 'harvest',
                 stretchEngaged: stretchEngagedForHub(),
             });
             panelMode = signalSwitcher.step(t, panelMode);
@@ -1716,15 +1724,15 @@
             const pl = state.plots[session.selectedPlot];
             if (pl && session.canCareHarvest(session.selectedPlot)) {
                 els.stepLive.textContent = config.keyboard
-                    ? 'Fully grown — breathe with the guide, or press Enter (Space also confirms).'
-                    : 'Fully grown — breathe calmly to pick, or press Enter (Space also confirms).';
+                    ? 'Fully grown — click the bed to harvest, or press Enter (Space also confirms).'
+                    : 'Fully grown — click the bed to harvest (Enter or Space also works).';
             } else {
                 const all = pl && C.allNeedsMet(session.careProgressFor(session.selectedPlot), L.plantNeeds(pl.plantId), pl.staked);
                 const moreBeds = session.selectablePlots && session.selectablePlots().length > 1;
                 els.stepLive.textContent = all
                     ? (moreBeds
-                        ? 'All needs met — arrow keys or Enter for another bed. Finish when you like.'
-                        : 'All needs met — bloom stamp on the tag. Finish when you like.')
+                        ? 'All needs met — arrow keys or Enter for another bed. Finish visit when you like.'
+                        : 'All needs met — bloom stamp on the tag. Press Enter or Finish visit.')
                     : 'Smile to water, talk to fertilize, stretch to stake. Switch beds with arrow keys, Enter, or a click.';
             }
         } else if (step === 'care-smile') {
@@ -1734,17 +1742,7 @@
             els.stepLive.textContent = session.poorReading ? 'Paused: waiting to see your face'
                 : session.talking ? '🍃 Fertilizing…' : 'Talk to your plant to fill the fertilizer dot';
         } else if (step === 'care-harvest') {
-            if (session.pacer) {
-                const b = session.pacer.at(session.breathT);
-                els.breathGuide.hidden = false;
-                const scale = 0.45 + 0.55 * b.size;
-                els.breathOrb.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
-                els.breathWord.textContent = b.phase === 'in' ? 'Breathe in' : 'And slowly out';
-                renderBreathCount(session.breathsDone);
-                renderBreathRate();
-                scene.setEffects({ breath: b.size });
-            }
-            els.stepLive.textContent = '🧺 Breathe with the guide to harvest this crop';
+            els.stepLive.textContent = '🧺 Click a mature crop to harvest it';
         } else if (step === 'smile') {
             els.stepLive.textContent = session.poorReading ? pausedFaceLive()
                 : session.smiling ? `☀ Sunlight pouring: ${session.sunHours.toFixed(1)} h` : `${session.sunHours.toFixed(1)} h of sun so far. Smile when you're ready`;
@@ -1788,7 +1786,7 @@
             const waterFx = ((step === 'care-smile' || step === 'smile') && session.smiling)
                 || (step === 'talk' && session.talking) ? 1 : 0;
             const fertFx = (step === 'care-talk' && session.talking) ? 1
-                : (step === 'breathe' || step === 'care-harvest') ? 0.9 : 0;
+                : step === 'breathe' ? 0.9 : 0;
             scene.setEffects({
                 plot: session.selectedPlot,
                 sun: smileAmt,
@@ -2039,7 +2037,7 @@
                     day = e.day;
                     const h = document.createElement('div');
                     h.className = 'j-day';
-                    h.textContent = V.dayStart(day).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+                    h.textContent = formatJournalDay(day);
                     body.appendChild(h);
                 }
                 const row = document.createElement('div');
@@ -2056,7 +2054,7 @@
                     row.appendChild(ic);
                 }
                 const span = document.createElement('span');
-                span.textContent = e.text || e.kind;
+                span.textContent = String(e.text || e.kind).replace(/\bNaN\b/g, '—');
                 row.appendChild(span);
                 body.appendChild(row);
             }
@@ -2227,7 +2225,7 @@
         // Pipeline already stopped; keep startCamera() from early-returning.
         sourceReady = false;
         const name = (e && e.name) || '';
-        const live = !config.mock && !config.keyboard;
+        const live = !usesSimSource();
         if (name === 'SustainedLowFrameRate') {
             showError(
                 'Camera too slow',
@@ -2280,7 +2278,7 @@
             showError(
                 'Camera could not restart',
                 String(err && err.message || err),
-                !config.mock && !config.keyboard,
+                !usesSimSource(),
                 true,
             );
         } finally {
@@ -2300,8 +2298,11 @@
                 const kind = L.plantById(state.plots[i].plantId);
                 els.plotTip.textContent = '';
                 const b = document.createElement('b'); b.textContent = kind.name;
+                const careClickSteps = ['care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
+                const readyHere = careClickSteps.includes(session.step) && session.canCareHarvest(i);
                 const action = session.step === 'pick-harvest' ? 'pick'
-                    : (session.selectedPlot === i ? 'selected' : 'switch');
+                    : (readyHere && session.selectedPlot === i) ? 'harvest'
+                        : (session.selectedPlot === i ? 'selected' : 'switch');
                 els.plotTip.append(b, document.createTextNode(` · bed ${i + 1} — click to ${action}`));
                 const c = scene.plotClient(i);
                 els.plotTip.style.left = `${c.x}px`;
@@ -2342,25 +2343,44 @@
         return !!el.closest([
             'button', 'a', 'input', 'select', 'textarea', 'label',
             '.top-actions', '.dev-drawer', '.error-banner', '.signal-panel',
-            '.step-panel', '.stretch-care-panel', '.idle-bar', '.picker',
+            '.step-panel', '.stretch-care-panel', '.tend-strip', '.idle-bar', '.picker',
             '.journal', '.card', '.sg-summary', '#sum-card', '.wellness',
             '.camera-check', '.cc-howto', '.cc-packets',
             '#btn-cc-start', '#btn-cc-skip-now', '#btn-cc-retry',
         ].join(','));
     }
 
+    /** Real controls keep priority; soft chrome (panels) must not block bed hits underneath. */
+    function isBlockingChromeTarget(el) {
+        if (!el || !el.closest) return false;
+        return !!el.closest('button, a, input, select, textarea, label, .dev-drawer, .error-banner, .picker, .journal, .sg-summary, #sum-card, .wellness, .camera-check, .cc-packets');
+    }
+
     let lastGardenPickAt = 0;
     function onGardenPointer(e) {
         if (e.button != null && e.button !== 0) return;
         // Capture-phase on #app: beds stay clickable even if a translucent overlay sits above the canvas.
-        if (isUiChromeTarget(e.target)) return;
         const now = performance.now();
         if (now - lastGardenPickAt < 350) return;
         const i = scene.plotAt(e.clientX, e.clientY);
+        const visitSelectSteps = ['pick', 'pick-harvest', 'care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
+        const visitSelecting = screen === 'visit' && session && visitSelectSteps.includes(session.step);
+        // During a visit, bed hits win over soft overlays so mid-tend switching works.
+        if (visitSelecting && i !== null) {
+            if (isBlockingChromeTarget(e.target)) return;
+        } else if (isUiChromeTarget(e.target)) {
+            return;
+        }
         if (i === null) return;
         lastGardenPickAt = now;
-        const visitSelectSteps = ['pick', 'pick-harvest', 'care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
-        if (screen === 'visit' && session && visitSelectSteps.includes(session.step)) {
+        if (visitSelecting) {
+            const careClickSteps = ['care-hub', 'care-smile', 'care-talk', 'care-harvest', 'stretch-offer', 'stretch'];
+            // Ready crop: first click selects (so you can switch mid-tend); second click harvests.
+            if (careClickSteps.includes(session.step) && session.canCareHarvest(i)
+                && session.selectedPlot === i) {
+                onStep(session.confirmCareHarvest());
+                return;
+            }
             if (session.setSelectedPlot(i)) {
                 // Mid-tend / stretch: land back on care-hub for the newly chosen bed.
                 onStep(session.step);
@@ -2386,6 +2406,21 @@
     const appRoot = document.getElementById('app') || document.body;
     appRoot.addEventListener('pointerdown', onGardenPointer, true);
     appRoot.addEventListener('click', onGardenPointer, true);
+    if (els.tendHarvest) {
+        els.tendHarvest.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!session || !session.canCareHarvest(session.selectedPlot)) return;
+            onStep(session.confirmCareHarvest());
+        });
+        els.tendHarvest.style.cursor = 'pointer';
+    }
+    if (els.btnTendFinish) {
+        els.btnTendFinish.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (!session || screen !== 'visit') return;
+            onStep(session.finishCareHub());
+        });
+    }
 
     // ------------------------------------------------------------------
     // Buttons + keys
@@ -2423,7 +2458,7 @@
     }
     function syncInputModeUi() {
         const keyboard = !!config.keyboard;
-        const regularLabel = config.mock ? 'Switch to Demo auto mode' : 'Switch to Camera mode';
+        const regularLabel = 'Switch to Camera mode';
         const keyboardLabel = 'Switch to Keyboard mode';
         if (els.devInputMode) {
             els.devInputMode.textContent = keyboard ? regularLabel : keyboardLabel;
@@ -2438,21 +2473,16 @@
         if (els.devInputNote) {
             els.devInputNote.textContent = keyboard
                 ? 'Input: keyboard (hold S smile, T talk, [ / ] stretch).'
-                : (config.mock
-                    ? 'Input: demo auto (S / T still take over).'
-                    : 'Input: camera (SmartSpectra).');
+                : 'Input: camera (SmartSpectra).';
         }
         if (keyboard) {
             els.mockBadge.hidden = false;
             els.mockMode.textContent = 'Keyboard player';
-        } else if (config.mock) {
-            els.mockBadge.hidden = false;
-            els.mockMode.textContent = 'Demo player (auto)';
         } else {
             els.mockBadge.hidden = true;
         }
         if (els.ccMockSlot && screen === 'camera-check') {
-            els.ccMockSlot.hidden = !(config.mock || config.keyboard);
+            els.ccMockSlot.hidden = !usesSimSource();
         }
     }
 
@@ -2465,13 +2495,13 @@
         }
     }
 
-    /** Tear down whatever is running and start the keyboard mock player. */
+    /** Tear down whatever is running and start the keyboard player. */
     async function enterKeyboardMode(opts) {
         const quiet = !!(opts && opts.quiet);
         if (els.errorBanner) els.errorBanner.hidden = true;
         if (els.btnErrorRetry) els.btnErrorRetry.hidden = true;
         // Tear down the real SDK fully — including sourceReady — so startCamera()
-        // actually starts the mock tick loop (otherwise S/T appear dead).
+        // actually starts the keyboard tick loop (otherwise S/T appear dead).
         if (source) { try { source.destroy(); } catch { /* ignore */ } }
         source = null;
         sourceReady = false;
@@ -2490,10 +2520,10 @@
         }
     }
 
-    /** Leave keyboard fallback: demo auto when started with --mock, else camera SDK. */
+    /** Leave keyboard fallback and rebuild the camera SDK source. */
     async function enterRegularMode(opts) {
         const quiet = !!(opts && opts.quiet);
-        if (!config.keyboard && !(source && source.setAuto && source.auto === false && config.mock)) {
+        if (!config.keyboard) {
             syncInputModeUi();
             syncKeyboardStripMode();
             return;
@@ -2501,29 +2531,6 @@
         if (els.errorBanner) els.errorBanner.hidden = true;
         if (els.btnErrorRetry) els.btnErrorRetry.hidden = true;
 
-        if (config.mock) {
-            config.keyboard = false;
-            if (source && source.setAuto) source.setAuto(true);
-            else {
-                if (source) { try { source.destroy(); } catch { /* ignore */ } }
-                source = null;
-                sourceReady = false;
-            }
-            syncInputModeUi();
-            syncKeyboardStripMode();
-            if (!quiet) toast('Demo auto player resumed (press A anytime).');
-            if ((screen === 'visit' || screen === 'camera-check') && !sourceReady) {
-                try {
-                    await startCamera();
-                    applySourcePhaseAfterSwitch();
-                } catch { /* ignore */ }
-            } else {
-                applySourcePhaseAfterSwitch();
-            }
-            return;
-        }
-
-        // Real mode: drop the keyboard mock and rebuild the SDK source.
         if (source) { try { source.destroy(); } catch { /* ignore */ } }
         source = null;
         sourceReady = false;
@@ -2637,7 +2644,6 @@
     window.addEventListener('keydown', (e) => {
         if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT')) return;
         const k = e.key.toLowerCase();
-        if (k === 'g') { state.settings.chart = !state.settings.chart; save(); toast(state.settings.chart ? 'Smile chart on (shows during visits)' : 'Smile chart hidden'); return; }
         if (k === 'j') { screen === 'journal' ? closeJournal() : openJournal('diary'); return; }
         if (k === 'c' && screen !== 'camera-check' && screen !== 'wellness' && screen !== 'loading') {
             state.cameraCheckNote = null;
@@ -2663,18 +2669,26 @@
                     onStep(session.confirmCareHarvest());
                     return;
                 }
-                // Ready crop: Enter and Space both instant-pick (keyboard has no breathe key).
-                if ((session.step === 'care-hub' || session.step === 'care-smile'
-                    || session.step === 'care-talk' || session.step === 'stretch-offer' || session.step === 'stretch')
-                    && session.canCareHarvest(session.selectedPlot)) {
+                const careNavSteps = session.step === 'care-hub' || session.step === 'care-smile'
+                    || session.step === 'care-talk' || session.step === 'stretch-offer' || session.step === 'stretch';
+                // Space: instant-pick when ready. Enter may switch beds instead.
+                if (k === ' ' && careNavSteps && session.canCareHarvest(session.selectedPlot)) {
                     onStep(session.confirmCareHarvest());
                     return;
                 }
-                if (k === 'enter' && (session.step === 'care-hub' || session.step === 'care-smile'
-                    || session.step === 'care-talk' || session.step === 'stretch-offer' || session.step === 'stretch')) {
-                    // Not harvest-ready: Enter cycles beds so keyboard players can leave a finished plant.
-                    const moreBeds = session.selectablePlots && session.selectablePlots().length > 1;
-                    if (moreBeds && typeof session.selectNextPlant === 'function') {
+                if (k === 'enter' && careNavSteps) {
+                    const action = typeof session.careHubEnterAction === 'function'
+                        ? session.careHubEnterAction()
+                        : 'noop';
+                    if (action === 'harvest') {
+                        onStep(session.confirmCareHarvest());
+                        return;
+                    }
+                    if (action === 'finish') {
+                        onStep(session.finishCareHub());
+                        return;
+                    }
+                    if (action === 'switch' && typeof session.selectNextPlant === 'function') {
                         const before = session.selectedPlot;
                         session.selectNextPlant();
                         if (session.selectedPlot !== before) onStep('care-hub');
@@ -2697,28 +2711,14 @@
                 return;
             }
         }
-        if (k === 'a' && source && source.setAuto && (config.mock || config.keyboard)) {
-            if (config.mock) {
-                config.keyboard = false;
-                source.setAuto(true);
-                syncInputModeUi();
-                syncKeyboardStripMode();
-                renderNeedsCard();
-            } else {
-                // Real-mode keyboard fallback: A alone cannot restore the camera;
-                // Demo tools → regular mode (or the toggle) does that.
-                toast('Use Demo tools to switch back to camera mode.');
-            }
-            return;
-        }
-        if (tiltKeys[e.key] && source && source.setKeys && (config.mock || config.keyboard)) {
+        if (tiltKeys[e.key] && source && source.setKeys && usesSimSource()) {
             source.setKeys({ [tiltKeys[e.key]]: true });
             els.mockMode.textContent = 'Keyboard player';
             syncKeyboardStripMode();
             renderNeedsCard();
             return;
         }
-        if (manualKeys[k] && source && source.setKeys && (config.mock || config.keyboard)) {
+        if (manualKeys[k] && source && source.setKeys && usesSimSource()) {
             if (k === ' ') e.preventDefault();
             source.setKeys({ [manualKeys[k]]: true });
             els.mockMode.textContent = 'Keyboard player';
@@ -2728,11 +2728,11 @@
     });
     window.addEventListener('keyup', (e) => {
         const k = e.key.toLowerCase();
-        if (tiltKeys[e.key] && source && source.setKeys && (config.mock || config.keyboard)) {
+        if (tiltKeys[e.key] && source && source.setKeys && usesSimSource()) {
             source.setKeys({ [tiltKeys[e.key]]: false });
             return;
         }
-        if (manualKeys[k] && source && source.setKeys && (config.mock || config.keyboard)) source.setKeys({ [manualKeys[k]]: false });
+        if (manualKeys[k] && source && source.setKeys && usesSimSource()) source.setKeys({ [manualKeys[k]]: false });
     });
 
     // ------------------------------------------------------------------
@@ -2765,7 +2765,7 @@
             if (els.brandFallback) els.brandFallback.hidden = logoVisible;
         }
         renderMeters();
-        const chartOn = state.settings.chart && (screen === 'visit' || !!signalPanelDemoLock);
+        const chartOn = !hideChartForCapture && (screen === 'visit' || !!signalPanelDemoLock);
         if (els.chartPanel && els.chartPanel.hidden === chartOn) els.chartPanel.hidden = !chartOn;
         if (chartOn) redrawSignalPanel(t);
         hudAcc += dt;
@@ -2805,7 +2805,7 @@
         } catch (e) {
             showError('Startup error', 'Could not read app config: ' + (e && e.message));
         }
-        if (config.mock) {
+        if (config.automation) {
             syncInputModeUi();
         } else if (config.sdkLoadError || !config.hasApiKey) {
             els.btnBegin.disabled = true;
@@ -2839,15 +2839,15 @@
             scene.setSeason(state.season);
             refreshLighting();
         }
-        // Capture / mock automation only — never expose in real production sessions.
-        if (config.mock || config.capture) {
+        // Capture / probe automation only — never expose in real play sessions.
+        if (config.automation || config.capture) {
             window.__smileGarden = __smileGardenHooks;
         }
         document.body.dataset.ready = '1';
         window.addEventListener('resize', syncHudChipClamp);
     }
 
-    // Dev/test hooks (used by scripts/capture-driver.js). Installed only in mock/capture.
+    // Dev/test hooks (used by scripts/capture-driver.js). Installed only in automation.
     const __smileGardenHooks = window.SmileDevHooks.create({
         getState: () => state,
         setState: (v) => { state = v; },
@@ -2861,6 +2861,8 @@
         setForcePickedPlots: (v) => { forcePickedPlots = v; },
         getSignalPanelDemoLock: () => signalPanelDemoLock,
         setSignalPanelDemoLock: (v) => { signalPanelDemoLock = v; },
+        getHideChartForCapture: () => hideChartForCapture,
+        setHideChartForCapture: (v) => { hideChartForCapture = !!v; },
         getBreathHudDemoLock: () => breathHudDemoLock,
         setBreathHudDemoLock: (v) => { breathHudDemoLock = v; },
         getStretchHudDemoLock: () => stretchHudDemoLock,

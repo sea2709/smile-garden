@@ -1,17 +1,16 @@
-// renderer/mock-source.js — simulated player for demo mode (no SDK, no camera).
+// renderer/mock-source.js — simulated player for keyboard mode and capture/probe
+// automation (no SDK, no camera).
 //
 // Emits the same events as sdk-source.js (status, validation, expression,
 // talking, breathing). The renderer tells it which visit step is running with
-// setPhase(step); the simulated player then smiles in waves (smile step),
-// chats in bursts (talk step) or rests (breathing). At night it once has a
-// dim, hard-to-read moment so the "turn on a light" hint can show.
+// setPhase(step); when auto is on (automation), the simulated player smiles in
+// waves (smile step), chats in bursts (talk step) or rests (breathing). At night
+// it once has a dim, hard-to-read moment so the "turn on a light" hint can show.
 // Breathing rate warms up across the visit (like the real SDK) and becomes
 // stable during the breathe step.
 //
-// Keyboard fallback: setKeys({ smile, talk, hide, tiltLeft, tiltRight })
+// Keyboard: setKeys({ smile, talk, hide, tiltLeft, tiltRight })
 // (hold S / Space to smile, T to talk, F to hide, [ / ] to tilt for stretch).
-// setAuto(true)
-// hands control back to the simulated player.
 
 (function () {
     'use strict';

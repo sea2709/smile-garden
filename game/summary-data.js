@@ -18,15 +18,6 @@ function careStatValue(n) {
     return { value: rounded, quiet: false };
 }
 
-function sunGlowIcon(sunDots, night) {
-    const s = Number(sunDots) || 0;
-    if (s <= 1e-6) return night ? 'sun-resting' : 'sun-resting';
-    if (s < 1) return 'sun-glow-0';
-    if (s < 2) return 'sun-glow-1';
-    if (s < 3) return 'sun-glow-2';
-    return 'sun-glow-3';
-}
-
 /** Sum dot progress across planted beds (care v6). */
 function aggregateCareFromBeds(careBeds, harvestCount, state, plantNeeds) {
     let sun = 0;
@@ -73,31 +64,14 @@ function aggregateCareFromDailyTends(state, dayNumber, plantNeeds) {
     return { sunDots: sun, waterDots: water, fertilizerDots: fertilizer, stakes, harvests: 0 };
 }
 
-function legacySunHours(out) {
-    return Math.max(0, Number(out && out.sunHours) || 0);
-}
-
-function buildCareSection(stats, night) {
-    const st = stats || { sunDots: 0, waterDots: 0, fertilizerDots: 0, stakes: 0, harvests: 0 };
-    const sunVal = st.legacySunHours != null
-        ? careStatValue(st.legacySunHours)
-        : careStatValue(st.sunDots);
-    if (st.legacySunHours != null && !sunVal.quiet) {
-        sunVal.value = `${round1(st.legacySunHours)} h`;
-        sunVal.quiet = false;
-    }
-    const sun = {
-        icon: sunGlowIcon(st.legacySunHours != null ? st.legacySunHours : st.sunDots, night),
-        src: 'from daylight, all by itself',
-        ...sunVal,
-    };
+function buildCareSection(stats) {
+    const st = stats || { waterDots: 0, fertilizerDots: 0, stakes: 0 };
     const care = [
         Object.assign({ key: 'water', label: 'Water', src: 'from smiles' }, careStatValue(st.waterDots)),
         Object.assign({ key: 'fertilizer', label: 'Fertilizer', src: 'from talking' }, careStatValue(st.fertilizerDots)),
         Object.assign({ key: 'stake', label: 'Stakes', src: 'from stretching' }, careStatValue(st.stakes)),
-        Object.assign({ key: 'harvest', label: 'Harvests', src: 'from breathing' }, careStatValue(st.harvests)),
     ];
-    return { sun, care };
+    return { care };
 }
 
 /**
@@ -199,16 +173,12 @@ function buildSummaryData(ctx) {
         stats = aggregateCareFromDailyTends(state, state.dayNumber, (id) => plantById(id).needs || {});
     } else if (!stats) {
         stats = {
-            legacySunHours: legacySunHours(out),
             waterDots: Math.round((Number(out.water) || 0) * 3),
             fertilizerDots: Math.round((Number(out.fertilizer) || 0) * 3),
             stakes: 0,
-            harvests: (harvested || []).length,
         };
     }
-  if (!stats.harvests && harvested.length) stats = Object.assign({}, stats, { harvests: harvested.length });
-
-    const { sun, care } = buildCareSection(stats, night);
+    const { care } = buildCareSection(stats);
 
     let note = null;
     if (night) {
@@ -217,13 +187,12 @@ function buildSummaryData(ctx) {
         note = `Season day ${sd} of ${dps}. Growth happens when you go to bed, not on a timer.`;
     }
 
-    return { eyebrow, title, hero, garden, sun, care, note, careLabel: "Today's care" };
+    return { eyebrow, title, hero, garden, sun: null, care, note, careLabel: "Today's care" };
 }
 
 const api = {
     QUIET,
     careStatValue,
-    sunGlowIcon,
     aggregateCareFromBeds,
     aggregateCareFromDailyTends,
     buildCareSection,

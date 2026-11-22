@@ -1,8 +1,8 @@
-// scripts/capture-driver.js — dev-only screenshot automation (mock mode).
+// scripts/capture-driver.js — dev-only screenshot automation (capture mode).
 //
-// Loaded by main.js only when SMILE_GARDEN_CAPTURE_DIR is set AND the app runs
-// in mock mode (with a throwaway userData profile). Drives the daily-visit UI
-// through window.__smileGarden and saves PNGs with webContents.capturePage().
+// Loaded by main.js only when SMILE_GARDEN_CAPTURE_DIR is set (with a throwaway
+// userData profile). Drives the daily-visit UI through window.__smileGarden and
+// saves PNGs with webContents.capturePage().
 
 'use strict';
 

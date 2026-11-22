@@ -2,7 +2,7 @@
 (function () {
 'use strict';
 
-const CHECKS = Object.freeze(['smile', 'talk', 'breath', 'stretch']);
+const CHECKS = Object.freeze(['smile', 'talk', 'stretch']);
 const HOLD_SECONDS = 2;
 
 const DARK_VALIDATION = new Set(['TooDark', 'TooDarkOrBacklit', 'TooBright', 'Backlit']);
@@ -77,8 +77,8 @@ function createCameraCheckSession(options) {
     const opts = options || {};
     const smileOn = Number.isFinite(opts.smileOn) ? opts.smileOn : 0.5;
     const Stretch = opts.Stretch || null;
-    const passed = { smile: false, talk: false, breath: false, stretch: false };
-    const skipped = { smile: false, talk: false, breath: false, stretch: false };
+    const passed = { smile: false, talk: false, stretch: false };
+    const skipped = { smile: false, talk: false, stretch: false };
     let active = null;
     let smileHold = 0;
     let talkHold = 0;
@@ -126,13 +126,6 @@ function createCameraCheckSession(options) {
         }
     }
 
-    function updateBreath(input) {
-        if (passed.breath || skipped.breath) return;
-        if (active !== 'breath') return;
-        const b = input.breathing;
-        if (b && b.fresh && b.stable) passed.breath = true;
-    }
-
     function updateStretch(dt, input) {
         if (passed.stretch || skipped.stretch || !stretchFlow) return;
         if (active !== 'stretch') return;
@@ -146,7 +139,6 @@ function createCameraCheckSession(options) {
         const sample = input || {};
         updateSmile(d, sample);
         updateTalk(d, sample);
-        updateBreath(sample);
         const stretchSnap = updateStretch(d, sample);
         const lightingOk = inferLightingOk(sample);
         if (passed[active]) active = null;

@@ -3,8 +3,8 @@
 // renderSummaryCard(cardEl, data, { night, art }) where
 //   data = { eyebrow, title, hero: { icon, num, text, art? },
 //            garden: [{ kind: 'grew'|'harvest'|'resting'|'ready'|'unlock', icon, plantImg?, name, meta }],
-//            sun: { value, src } | null,
-//            care: [{ key: 'water'|'fertilizer'|'stake'|'harvest', label, value, src }] | null,
+//            sun: null (sunlight no longer shown),
+//            care: [{ key: 'water'|'fertilizer'|'stake', label, value, src }] | null,
 //            note }
 (function (root) {
     'use strict';
@@ -42,28 +42,20 @@
             scroll.append(ul);
         }
         card.append(scroll);
-        if (d.sun || d.care) {
+        if (d.care && d.care.length) {
             card.append(el('div', 'sum-divider'));
             const sec = el('section', 'sum-care');
             sec.append(el('h2', 'sum-label', d.careLabel || "Today's care"));
-            if (d.sun) {
-                const s = el('div', 'sum-sun');
-                const txt = el('div'); txt.append(el('span', 'k', 'Sunlight'), el('span', 'src', d.sun.src));
-                const v = el('span', 'v' + (d.sun.quiet ? ' quiet' : ''), d.sun.value);
-                s.append(img(CARE + (d.sun.icon || 'sun-glow-3') + sfx + '.png'), txt, v); sec.append(s);
-            }
-            if (d.care) {
-                const grid = el('div', 'sum-care-grid');
-                const ICON = { water: 'icon-water', fertilizer: 'icon-fertilizer', stake: 'icon-stake', harvest: 'harvest-prompt-64' };
-                d.care.forEach((c) => {
-                    const cell = el('div', 'sum-cell is-' + c.key);
-                    const txt = el('div'); const r1 = el('div', 'row1');
-                    r1.append(el('span', 'k', c.label), el('span', 'v' + (c.quiet ? ' quiet' : ''), c.value));
-                    txt.append(r1, el('span', 'src', c.src));
-                    cell.append(img(CARE + ICON[c.key] + sfx + '.png'), txt); grid.append(cell);
-                });
-                sec.append(grid);
-            }
+            const grid = el('div', 'sum-care-grid');
+            const ICON = { water: 'icon-water', fertilizer: 'icon-fertilizer', stake: 'icon-stake' };
+            d.care.forEach((c) => {
+                const cell = el('div', 'sum-cell is-' + c.key);
+                const txt = el('div'); const r1 = el('div', 'row1');
+                r1.append(el('span', 'k', c.label), el('span', 'v' + (c.quiet ? ' quiet' : ''), c.value));
+                txt.append(r1, el('span', 'src', c.src));
+                cell.append(img(CARE + ICON[c.key] + sfx + '.png'), txt); grid.append(cell);
+            });
+            sec.append(grid);
             card.append(sec);
         }
         if (d.note) card.append(el('p', 'sum-note', d.note));

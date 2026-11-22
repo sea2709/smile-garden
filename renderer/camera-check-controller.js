@@ -97,11 +97,10 @@
             }
             const active = session && session.active;
             const config = getConfig();
-            const keyboard = !!(config.keyboard || config.mock);
+            const keyboard = !!(config.keyboard || config.automation);
             if (CCUI) {
-                els.breathGuide.hidden = active !== 'breath';
+                els.breathGuide.hidden = true;
                 els.stretchGuide.hidden = active !== 'stretch';
-                if (active === 'breath') renderBreathRate();
                 if (active === 'stretch') renderStretchHud();
                 CCUI.renderStatus(els.ccStatusFace, els.ccStatusLight, els.ccStatusCamera, snap, {
                     denied: deniedDemo || !!snap.cameraDenied || !!snap.noCamera,
@@ -211,7 +210,7 @@
                 state.cameraCheckNote = null;
             } catch (e) {
                 if (!getSource()) {
-                    deniedDemo = !config.mock;
+                    deniedDemo = !config.automation;
                 } else {
                     CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
                     save();
@@ -242,7 +241,7 @@
                 renderUI(session.update(0, buildInput()));
             } catch (e) {
                 if (!getSource()) {
-                    deniedDemo = !config.mock;
+                    deniedDemo = !config.automation;
                 } else {
                     CC.markCameraCheckRequired(state, `Camera could not start: ${e && e.message || e}`);
                     save();

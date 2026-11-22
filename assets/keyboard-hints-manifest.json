@@ -130,20 +130,20 @@
     "flag": "config.keyboard",
     "howEnabled": [
       "Camera cannot start: startCamera() sets config.keyboard = true and swaps in the mock source with auto: false.",
-      "Error banner button #btn-error-keyboard (\u201cPlay with keyboard instead\u201d) sets config.keyboard = true, destroys the SDK source, and restarts the mock.",
-      "Demo mode (config.mock) already uses the mock source with auto: true. Holding S / T / F / [ / ] calls source.setKeys and the badge becomes \u201cKeyboard player\u201d. A (config.mock only) calls setAuto(true) and returns to the simulated player."
+      "Error banner button #btn-error-keyboard (\u201cPlay with keyboard instead\u201d) sets config.keyboard = true, destroys the SDK source, and restarts the keyboard source.",
+      "PiP / Demo tools toggle switches between keyboard and camera mode."
     ],
-    "appKnows": "Yes. Read config.keyboard, or in demo mode source.auto === false after a key is held. SmileKeyboardHints.isKeyboardMode(config, source) covers both. Toggle #tend-strip.is-keyboard from that.",
-    "note": "The camera-error copy mentions \u201cDemo tools \u2192 keyboard mode\u201d, but there is no keyboard-mode button in the demo drawer. The working entries are the error-banner button and the automatic camera fallback."
+    "appKnows": "Yes. Read config.keyboard. SmileKeyboardHints.isKeyboardMode(config) covers it. Toggle #tend-strip.is-keyboard from that.",
+    "note": "Capture/probe automation uses the same mock source with auto: true (config.automation), without exposing a playable demo mode."
   },
   "bindings": {
     "verifiedIn": [
-      "renderer/app.js  (manualKeys, tiltKeys, visit confirm, Esc, arrows, A)",
+      "renderer/app.js  (manualKeys, tiltKeys, visit confirm, Esc, arrows)",
       "renderer/mock-source.js  (setKeys: smile, talk, hide, tiltLeft, tiltRight; synthetic breathing)",
       "game/visit.js  (confirmCareHarvest \u2014 instant pick on Enter / accessibility)",
-      "game/care-needs.js  (harvest.input is still 'breathe')"
+      "game/care-needs.js  (harvest.input is 'click')"
     ],
-    "careLogic": "smile waters, talk fertilizes, stretch stakes, breathe harvests, sun is automatic.",
+    "careLogic": "smile waters, talk fertilizes, stretch stakes, click harvests, sun is automatic.",
     "stripCaps": {
       "water": {
         "keys": [
@@ -186,28 +186,23 @@
       "f": "hold \u2192 hide (look away / no face). Not on the strip.",
       "[": "hold \u2192 tiltLeft (stretch / stake)",
       "]": "hold \u2192 tiltRight (stretch / stake)",
-      "Enter": "on visit pick / pick-harvest / harvest-hold / care-hub when canCareHarvest / care-harvest: confirm. confirmCareHarvest() is an instant pick and skips waiting for the breath pacer.",
+      "Enter": "on visit pick / pick-harvest / harvest-hold / care-hub when canCareHarvest / care-harvest: confirm. confirmCareHarvest() is an instant pick (same as clicking the bed).",
       "ArrowLeft/Right/Up/Down": "move bed selection during pick, pick-harvest, and care-hub. Not on the strip.",
       "Escape": "close journal, picker, camera-check (if returning to garden), and the demo drawer. Does not end the visit, despite the live line \u201cEsc ends the visit\u201d when a crop is ready.",
-      "a": "config.mock only: source.setAuto(true), back to the simulated player.",
-      "g": "toggle smile chart (all modes)",
       "j": "toggle journal (all modes)",
       "c": "open camera check (all modes)",
       "d": "toggle demo tools (all modes)",
       "n": "next day, only with demo tools open"
     },
     "harvestHowItTriggers": {
-      "camera": "Breathe with the guide. care-harvest starts a BreathPacer; a stable breathing signal completes the pick. Copy: \u201cBreathe slowly to pick it\u201d / \u201cBreathe with the guide to harvest this crop\u201d.",
-      "keyboard": "There is no key that emits a breathe action. Enter or Space calls session.confirmCareHarvest(), which instant-completes the harvest (visit.js: \u201cInstant pick from care-hub (Enter / accessibility); breath still works too.\u201d). In addition, mock-source.js still emits a synthetic breathing signal after ~25s of visit time, or immediately during phase breathe / care-harvest / care-hub-breathe / camera-check-breath, even when auto is false. So the guided pacer can still finish in keyboard mode without a key, from the mock breath, not from the player.",
-      "liveCopy": "When harvest-ready on care-hub: \u201cFully grown \u2014 breathe calmly to pick, or press Enter. Esc ends the visit.\u201d"
+      "camera": "Click a mature bed (or the Ready to harvest strip). confirmCareHarvest() instant-completes the pick. Copy: \u201cClick the plant to pick it\u201d.",
+      "keyboard": "Enter or Space calls session.confirmCareHarvest(), which instant-completes the harvest (same as a mouse click).",
+      "liveCopy": "When harvest-ready on care-hub: \u201cFully grown \u2014 click the bed to harvest (Enter or Space also works).\u201d"
     },
     "mismatches": [
       "Older toasts and the README still say \u201cS smile, T talk\u201d without saying that smile waters and talk fertilizes. The caps follow the current care logic, not those old labels.",
-      "README says \u201chold S or Space to smile, T to talk, F to look away, A back to the simulated player\u201d and never mentions [ / ] for stretch or Enter for harvest. Those bindings are in app.js and work.",
       "Space is both an alt-smile and a harvest/pick confirm, because the confirm branch runs first during those visit steps and otherwise falls through to manualKeys[' '] = 'smile'.",
-      "The care-hub live line says \u201cEsc ends the visit\u201d, but the Escape handler never ends a visit.",
-      "Camera-error copy says \u201cUse Demo tools \u2192 keyboard mode\u201d, but the demo drawer has no such button.",
-      "There is no breathe key, even though harvest.input is 'breathe' and the harvest strip still says \u201cBreathe slowly to pick it\u201d. Keyboard harvest is Enter (instant) or the mock\u2019s synthetic breath."
+      "The care-hub live line says \u201cEsc ends the visit\u201d, but the Escape handler never ends a visit."
     ]
   },
   "placement": {
@@ -215,7 +210,7 @@
     "keyColumnCss": 44,
     "rowBudget": "18 pad + 44 key column + 6 gap + 106 slot column + 10 gap + 117 \u201c2 more smiles\u201d + 18 pad = 319 CSS px.",
     "care": "Left end of each .tend-care row, in .tend-keycol, before .tend-slots.",
-    "harvest": "Enter cap on the right of the \u201cReady to harvest\u201d title line (.tend-harvest-title). The subtitle stays \u201cBreathe slowly to pick it\u201d, wrapped to two lines (\u201cBreathe slowly to\u201d / \u201cpick it\u201d) so it does not run under the cap. The harvest strip grows from ~112 to 128 CSS px; the 9-slice paper supports this. The 320px width is unchanged.",
+    "harvest": "Enter cap on the right of the \u201cReady to harvest\u201d title line (.tend-harvest-title). The subtitle stays \u201cClick the plant to pick it\u201d. The harvest strip grows from ~112 to 128 CSS px; the 9-slice paper supports this. The 320px width is unchanged.",
     "visibility": "Only when #tend-strip has .is-keyboard. CSS hides .tend-keycol and .tend-harvest-key otherwise, so a camera-mode visit is unchanged."
   },
   "wiring": {

@@ -43,6 +43,14 @@ function parseGardenDayKey(key) {
     return m ? Number(m[1]) : null;
 }
 
+/** Diary / HUD label for a garden day key ("garden-3" → "Day 3 · Spring"). */
+function formatGardenDayLabel(key) {
+    const n = parseGardenDayKey(key);
+    if (n == null) return null;
+    const season = SEASON_LABELS[seasonForDayNumber(n)] || 'Spring';
+    return `Day ${n} · ${season}`;
+}
+
 function daysBetweenKeys(a, b) {
     const ga = parseGardenDayKey(a), gb = parseGardenDayKey(b);
     if (ga != null && gb != null) return gb - ga;
@@ -234,6 +242,7 @@ const api = {
     seasonDayNumber,
     gardenDayKey,
     parseGardenDayKey,
+    formatGardenDayLabel,
     daysBetweenKeys,
     clampMinutes,
     formatGardenTime,

@@ -14,9 +14,8 @@ test('SmileKeyboardHints.isKeyboardMode', () => {
     const { isKeyboardMode } = sandbox.window.SmileKeyboardHints;
     assert.equal(isKeyboardMode({ keyboard: true }, null), true);
     assert.equal(isKeyboardMode({}, null), false);
-    assert.equal(isKeyboardMode({ mock: true }, { auto: true }), false);
-    assert.equal(isKeyboardMode({ mock: true }, { auto: false, setKeys: () => {} }), true);
-    assert.equal(isKeyboardMode({ mock: true, keyboard: false }, { auto: false, setKeys: () => {} }), true);
+    assert.equal(isKeyboardMode({ automation: true }, { auto: true }), false);
+    assert.equal(isKeyboardMode({ automation: true, keyboard: false }, { auto: false, setKeys: () => {} }), false);
 });
 
 test('keyboard hint art ids exist on disk', () => {

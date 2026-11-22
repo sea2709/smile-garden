@@ -357,7 +357,7 @@
                 tiltLeft: Object.freeze({ x: 420, y: 120, w: 120, h: 36 }),
                 tiltRight: Object.freeze({ x: 740, y: 120, w: 120, h: 35 }),
                 packet: Object.freeze({ w: 110, h: 150, top: 450, bottom: 600 }),
-                packetCenters: Object.freeze({ smile: 400, talk: 560, breath: 720, stretch: 880 }),
+                packetCenters: Object.freeze({ smile: 440, talk: 640, stretch: 840 }),
                 label: Object.freeze({ top: 610, bottom: 650 }),
                 btnStart: Object.freeze({ x: 1000, y: 658, w: 240, h: 44 }),
                 btnSkip: Object.freeze({ x: 40, y: 658, w: 200, h: 44 }),

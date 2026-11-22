@@ -16,7 +16,7 @@
          <span class="signal-label" data-for="breathe">Harvesting</span>
          <span class="signal-label" data-for="idle"><span class="day-only">Waiting for you</span><span class="night-only">Resting</span></span>
        </span>
-       <span id="chart-live" class="signal-live"></span><span class="kbd">G</span>
+       <span id="chart-live" class="signal-live"></span>
      </div>
      <div class="signal-chart">
        <i class="signal-bg" data-for="smile"></i> ...one per state...
@@ -47,8 +47,7 @@ body[data-lighting="night"] .signal-panel { border-image-source: url('../assets/
 .signal-glow { left: -14px; top: -14px; width: 56px; height: 56px; background: center / 56px 56px no-repeat; }
 .signal-labels { position: absolute; left: 34px; top: 0; height: 28px; width: 150px; }
 .signal-label { left: 0; top: 5px; font: 800 13.5px/1.2 var(--sans); white-space: nowrap; }   /* baseline ~ y 27 in the panel */
-.signal-live { position: absolute; right: 22px; top: 7px; font: 800 12px/1.2 var(--sans); text-align: right; transition: color 300ms ease-in-out; }
-.signal-head .kbd { position: absolute; right: 0; top: 5px; }
+.signal-live { position: absolute; right: 0; top: 7px; font: 800 12px/1.2 var(--sans); text-align: right; transition: color 300ms ease-in-out; }
 
 .signal-chart { position: absolute; left: 16px; top: 40px; width: 250px; height: 84px; }
 .signal-bg { inset: 0; background: center / 250px 84px no-repeat; }

@@ -102,26 +102,6 @@ body[data-painted-clock="1"] .topbar {
     pointer-events: none;
     /* Clock ribbon + label are on canvas; keep the bar clear over CLOCK_KEEP_OUT (left ≥ ~486). */
     background: transparent;
-    isolation: isolate;
-}
-/* Soft cream over logo + stat chips only (left of the painted clock keep-out). */
-body[data-painted-clock="1"] .topbar::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: min(
-        468px,
-        calc(var(--hud-logo-width) + var(--hud-logo-gap) + var(--hud-chips-max, 300px) + 36px)
-    );
-    background: linear-gradient(to bottom, rgba(251, 245, 230, 0.82), rgba(251, 245, 230, 0));
-    pointer-events: none;
-    z-index: 0;
-}
-body[data-painted-clock="1"] .topbar > * {
-    position: relative;
-    z-index: 1;
 }
 body[data-painted-clock="1"] .topbar .chip,
 body[data-painted-clock="1"] .topbar .btn { pointer-events: auto; }
@@ -306,6 +286,20 @@ body[data-step="breathe"] .ring-fg, body[data-step="breathe-offer"] .ring-fg { s
 /* ---------- idle bar, tips, floats ---------- */
 .idle-bar { position: absolute; right: 22px; bottom: 22px; z-index: 30; display: flex; gap: 12px; align-items: center; padding: 12px 14px 12px 20px; animation: rise 0.5s ease; pointer-events: none; }
 .idle-bar .btn { pointer-events: auto; }
+.btn-tend-finish {
+    position: absolute; right: 22px; bottom: 22px; z-index: 30;
+    animation: rise 0.35s ease;
+    /* Floats alone over the painted garden — ghost/dashed is unreadable there. */
+    color: var(--ink);
+    background: rgba(251, 245, 230, 0.96);
+    border: 1px solid rgba(190, 160, 110, 0.5);
+    box-shadow: 0 2px 0 rgba(120, 90, 50, 0.18), 0 6px 16px rgba(70, 48, 20, 0.2);
+    backdrop-filter: blur(4px);
+}
+.btn-tend-finish:hover {
+    background: #fffaf0;
+    border-color: rgba(150, 120, 80, 0.55);
+}
 #idle-text { font-size: 14.5px; font-weight: 700; color: var(--ink-soft); max-width: 300px; }
 .plot-tip { position: absolute; z-index: 35; pointer-events: none; transform: translate(-50%, -100%); background: rgba(251, 245, 230, 0.95); border-radius: 12px; padding: 8px 12px; font-size: 13px; box-shadow: var(--shadow); white-space: nowrap; }
 .plot-tip b { font-family: var(--serif); font-size: 14.5px; }

@@ -11,9 +11,8 @@
 //   * contextIsolation + sandbox stay ON. Our own preload exposes only a tiny
 //     `window.smileGarden` API via contextBridge.
 //
-// Mock mode (`--mock` or SMILE_GARDEN_MOCK=1) never loads the SDK, so the game
-// runs with no SDK, no API key and no camera. `--fast` or SMILE_GARDEN_FAST=1 shortens
-// the smile and talk steps of the daily visit, mock mode only.
+// Capture / probe automation never loads the SDK (no API key, no camera).
+// `--fast` or SMILE_GARDEN_FAST=1 shortens smile/talk steps during automation only.
 
 'use strict';
 
@@ -28,22 +27,22 @@ require('dotenv').config({ path: path.join(__dirname, '.env') });
 
 const { app, BrowserWindow, ipcMain, session } = require('electron');
 
-const MOCK = process.argv.includes('--mock') || process.env.SMILE_GARDEN_MOCK === '1';
-const FAST = MOCK && (process.argv.includes('--fast') || process.env.SMILE_GARDEN_FAST === '1');
 const DIAGNOSTICS = process.env.SMARTSPECTRA_DIAGNOSTICS === '1';
 const SESSION_SECONDS = (() => {
     const v = Number(process.env.SMILE_GARDEN_SESSION_SECONDS);
     return Number.isFinite(v) && v >= 15 && v <= 900 ? v : null;
 })();
 
-// Dev-only: scripted screenshot capture (mock mode only). See
-// scripts/capture-screenshots.js. Never active in real mode.
-const CAPTURE_DIR = MOCK && process.env.SMILE_GARDEN_CAPTURE_DIR
+// Dev-only: scripted screenshot capture. See scripts/capture-screenshots.js.
+const CAPTURE_DIR = process.env.SMILE_GARDEN_CAPTURE_DIR
     ? path.resolve(process.env.SMILE_GARDEN_CAPTURE_DIR) : null;
+const PROBE = process.env.SMILE_GARDEN_PROBE === '1';
+const AUTOMATION = !!(CAPTURE_DIR || PROBE);
+const FAST = AUTOMATION && (process.argv.includes('--fast') || process.env.SMILE_GARDEN_FAST === '1');
 
 // Scripted capture / probe use a throwaway profile so they never touch (or are
 // affected by) your real saved garden in localStorage.
-if (CAPTURE_DIR || (MOCK && process.env.SMILE_GARDEN_PROBE === '1')) {
+if (AUTOMATION) {
     app.setPath('userData', fs.mkdtempSync(path.join(os.tmpdir(), 'smile-garden-probe-')));
 }
 
@@ -60,7 +59,7 @@ let apiKeyConsumed = false;
 let bindSmartSpectraIpc = null;
 let sdkLoadError = null;
 
-if (!MOCK) {
+if (!AUTOMATION) {
     // Packaged builds ship the native runtime outside app.asar. Point the
     // SDK's resolver at it BEFORE requiring the binding (from the official
     // electron-quickstart main.js).
@@ -86,7 +85,7 @@ const OWN_PAGE_PATH = path.normalize(path.join(__dirname, 'renderer', 'index.htm
 const OWN_PAGE_URL = pathToFileURL(OWN_PAGE_PATH).href;
 
 function resolvePreload() {
-    if (MOCK) return path.join(__dirname, 'preload.js');
+    if (AUTOMATION) return path.join(__dirname, 'preload.js');
     // A sandboxed preload can only require('electron'), so `npm run build`
     // bundles preload.js + `@smartspectra/node-sdk/preload` with esbuild.
     const bundled = path.join(__dirname, 'dist', 'preload-sdk.bundle.js');
@@ -130,7 +129,7 @@ function createWindow() {
         minWidth: 1024,
         minHeight: 640,
         backgroundColor: '#e9dfc6',
-        title: MOCK ? 'Smile Garden (demo mode)' : 'Smile Garden',
+        title: 'Smile Garden',
         webPreferences: {
             preload: resolvePreload(),
             contextIsolation: true,
@@ -141,7 +140,7 @@ function createWindow() {
     });
     mainWindow = win;
 
-    if (!MOCK && bindSmartSpectraIpc && !sdkLoadError) {
+    if (!AUTOMATION && bindSmartSpectraIpc && !sdkLoadError) {
         // One SDK per renderer connection; torn down automatically on close.
         bindSmartSpectraIpc(win);
     }
@@ -159,7 +158,7 @@ function createWindow() {
                 app.exit(1);
             });
         });
-    } else if (MOCK && process.env.SMILE_GARDEN_PROBE === '1') {
+    } else if (PROBE) {
         win.webContents.once('did-finish-load', () => {
             require('./scripts/probe-startup').run(win).catch((e) => {
                 console.error('[probe] failed:', e && e.stack || e);
@@ -177,7 +176,7 @@ ipcMain.handle('smile-garden:get-config', (event) => {
     const frameUrl = event.senderFrame ? event.senderFrame.url : '';
     if (!isOwnPage(frameUrl)) throw new Error('config requested from unexpected origin');
     return {
-        mock: MOCK,
+        automation: AUTOMATION,
         fast: FAST,
         sessionSeconds: SESSION_SECONDS,
         capture: !!CAPTURE_DIR,
@@ -190,11 +189,11 @@ ipcMain.handle('smile-garden:get-config', (event) => {
 });
 
 // One-shot API key handoff for SmartSpectraSDK. Empty after first successful take
-// (and always empty in mock mode) so the key does not linger on the config object.
+// (and always empty during automation) so the key does not linger on the config object.
 ipcMain.handle('smile-garden:take-api-key', (event) => {
     const frameUrl = event.senderFrame ? event.senderFrame.url : '';
     if (!isOwnPage(frameUrl)) throw new Error('api key requested from unexpected origin');
-    if (MOCK || !API_KEY) return '';
+    if (AUTOMATION || !API_KEY) return '';
     if (apiKeyConsumed) return '';
     apiKeyConsumed = true;
     return API_KEY;

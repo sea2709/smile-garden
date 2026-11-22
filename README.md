@@ -92,9 +92,7 @@ Art fixes done in code or scripts:
 
 ```bash
 npm install
-npm run start:mock        # demo mode: simulated player, no SDK / key / camera (45 s smile, 30 s talk)
-npm run start:mock:fast   # demo mode with short 14 s / 10 s steps (breathing keeps its real pace)
-npm start                 # real SmartSpectra mode (builds the bundles first; needs SMARTSPECTRA_API_KEY)
+npm start                 # SmartSpectra mode (builds the bundles first; needs SMARTSPECTRA_API_KEY)
 npm run pack              # unpackaged electron-builder output under release/ (host platform)
 npm run dist              # installers / archives under release/ (host platform)
 npm test                  # node:test: game logic, daily visit, persistence, time of day, breathing, art manifest
@@ -102,26 +100,24 @@ npm run check             # node --check on every first-party .js file
 xvfb-run -a npm run screenshots   # regenerate docs/*.png (headless Linux; plain `npm run screenshots` with a display)
 ```
 
-**Keys:** `G` smile chart (during visits) · `J` journal · `D` demo tools · `N` next day (with demo tools open) ·
-`Esc` closes panels (journal, picker, demo tools, camera check). In demo/keyboard mode: hold `S` to smile (water),
+**Keys:** `J` journal · `D` demo tools · `N` next day (with demo tools open) ·
+`Esc` closes panels (journal, picker, demo tools, camera check). In keyboard mode: hold `S` to smile (water),
 `T` to talk (fertilize), `[` / `]` to stretch (stake), `F` to look away, `Enter` to pick (and `Space` also confirms
-harvest when a crop is ready — otherwise it smiles like `S`), `A` back to the simulated player.
+harvest when a crop is ready — otherwise it smiles like `S`).
 
-**No key or camera?** Real mode shows a banner with **Play with keyboard instead**, which swaps in the
-keyboard player. During a visit (or warm-up), a **Switch to Keyboard mode** / **Switch to Camera mode**
-(or **Switch to Demo auto mode**) button under the PiP toggles the same modes; Demo tools has the same switch.
+**No key or camera?** A banner offers **Play with keyboard instead**, which swaps in the keyboard player.
+During a visit (or warm-up), a **Switch to Keyboard mode** / **Switch to Camera mode** button under the PiP
+toggles the same modes; Demo tools has the same switch.
 
 **Demo tools (⚙︎ Demo):** ⏭ Next day (moves the game clock one day; real growth rules still apply),
-lighting override, keyboard ↔ regular input toggle, simulate 5 good days, fill empty beds, reset garden.
+lighting override, keyboard ↔ camera input toggle, simulate 5 good days, fill empty beds, reset garden.
 
 **Saved state:** `localStorage` key `smile-garden.v3` (versioned JSON: beds, visit days, journal,
 settings, demo day offset). The screenshot run uses a throwaway profile and never touches your garden.
 
 | Variable | Effect |
 |---|---|
-| `SMARTSPECTRA_API_KEY` | Your API key (real mode). From `.env` or the environment |
-| `SMILE_GARDEN_MOCK=1` | Demo mode (same as `--mock`) |
-| `SMILE_GARDEN_FAST=1` | Demo mode only: short smile/talk steps (same as `--fast`) |
+| `SMARTSPECTRA_API_KEY` | Your API key. From `.env` or the environment |
 | `SMARTSPECTRA_TELEMETRY=0` | Opt out of SDK telemetry |
 | `SMARTSPECTRA_DIAGNOSTICS=1` | Opens DevTools |
 
@@ -222,10 +218,10 @@ game/visit.js              daily visit loop, persistence, time of day, breathing
 renderer/index.html        screens + HUD (strict CSP)
 renderer/app.js            flow, HUD, picker, summary, journal, keyboard (orchestration)
 renderer/camera-check-controller.js  camera warm-up flow (with camera-check-ui.js)
-renderer/dev-hooks.js      mock/capture automation (`window.__smileGarden`)
+renderer/dev-hooks.js      capture/probe automation (`window.__smileGarden`)
 renderer/scene.js          painted garden + code-driven motion (canvas)
 renderer/art.js            art manifest: backdrops, plot geometry, sprite baselines, meter dots
-renderer/smile-chart.js    live smile chart (G)
+renderer/smile-chart.js    live smile chart
 renderer/sdk-source.js     SmartSpectra renderer adapter (bundled to dist/)
 renderer/mock-source.js    simulated / keyboard player
 renderer/styles.css

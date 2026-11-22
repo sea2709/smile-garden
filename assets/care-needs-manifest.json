@@ -38,7 +38,7 @@
     },
     "harvest": {
       "title": "Ready to harvest",
-      "sub": "Breathe slowly to pick it"
+      "sub": "Click the plant to pick it"
     }
   },
   "strip": {
@@ -165,7 +165,7 @@
     "icon": "ui/care/harvest-prompt-64.png (day art at night too)",
     "display": 52,
     "title": "Ready to harvest",
-    "sub": "Breathe slowly to pick it"
+    "sub": "Click the plant to pick it"
   },
   "stamp": {
     "allMet": "ui/care/bloom-stamp.png",

@@ -58,8 +58,6 @@
     const BLINK_EVERY_MAX = 6.5;
     const BREATHE_PHASES = {
         'breathe': true,
-        'care-harvest': true,
-        'care-hub-breathe': true,
         'camera-check-breath': true,
     };
 
