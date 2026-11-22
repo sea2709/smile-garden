@@ -22,7 +22,8 @@
         card.append(head);
         const scroll = el('div', 'sum-scroll');
         if (d.hero && d.hero.art) scroll.append(img(SUM + d.hero.art, 'sum-hero-art'));
-        if (d.hero) {
+        // art-only heroes (quiet night morning-hero) skip the icon row
+        if (d.hero && d.hero.icon) {
             const hero = el('div', 'sum-hero');
             const ic = el('div', 'sum-hero-icon'); ic.append(img(CARE + d.hero.icon + sfx + '.png'));
             const line = el('div', 'sum-hero-line');

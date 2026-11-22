@@ -59,12 +59,17 @@ test('plant-meta.json matches ART.plants and on-disk PNG dimensions', () => {
     }
 });
 
-test('plot soil anchors sit near measured bed centroids (backdrop px)', () => {
-    const expectY = [369, 369, 369, 369, 494, 504, 504, 506];
-    const expectX = [347, 554, 761, 968, 283, 528, 771, 1027];
+test('plot soil anchors sit low in each bed so stage-1 mounds centre (backdrop px)', () => {
+    // Soil line is near the front of the bed; stage-1 art draws the dirt mound
+    // above meta.base, so the visual mass lands near the box centre.
+    const expectY = [392, 394, 395, 393, 530, 539, 539, 538];
+    const expectX = [350, 554, 761, 968, 281, 523, 781, 1034];
     for (let i = 0; i < 8; i++) {
         const p = ART.plots[i];
+        const [x0, y0, x1, y1] = p.box;
         assert.ok(Math.abs(p.y - expectY[i]) <= 4, `bed ${i + 1} y ~${expectY[i]} (got ${p.y})`);
         assert.ok(Math.abs(p.x - expectX[i]) <= 8, `bed ${i + 1} x ~${expectX[i]} (got ${p.x})`);
+        assert.ok(p.y > (y0 + y1) / 2, `bed ${i + 1} soil line below box mid`);
+        assert.ok(Math.abs(p.x - (x0 + x1) / 2) <= 6, `bed ${i + 1} x near box centre`);
     }
 });

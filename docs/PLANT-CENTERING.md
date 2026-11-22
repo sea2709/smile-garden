@@ -10,7 +10,7 @@ Heily repainted plant stages **2–5** and **picked** without the painted soil m
 
 ## Plot anchors
 
-`ART.plots[].x/y` are soil centroids on the 1280×720 backdrop (day midday measure): back row **y ≈ 369**, front row **y ≈ 494–506**. Selection rings stay on painted bed offsets; plants use plot anchors.
+`ART.plots[].x/y` are soil-line anchors on the 1280×720 backdrop. Stage-1 art draws the dirt mound **above** `meta.base`, so anchors sit **low in each bed** (near the front edge) so the mound centres in the soil: back row **y ≈ 392–395**, front row **y ≈ 530–539**. X tracks each bed’s box centre. Selection rings stay on painted bed offsets; plants use plot anchors.
 
 ## Before / after
 

@@ -18,8 +18,8 @@
     const $ = (id) => document.getElementById(id);
     const els = {};
     for (const id of ['garden', 'clock-chip', 'week-dots', 'week-text', 'score-chip', 'btn-camera-check', 'btn-journal', 'btn-dev', 'chart-panel', 'chart-live',
-        'smile-chart', 'pip-dock', 'pip', 'preview', 'btn-pip-mode', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub',         'meter-sun', 'meter-water', 'meter-fert', 'meter-stake',
-        'meter-sun-val', 'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-sun-wrap', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
+        'smile-chart', 'pip-dock', 'pip', 'preview', 'btn-pip-mode', 'mock-badge', 'mock-mode', 'hint', 'hint-title', 'hint-sub', 'meter-water', 'meter-fert', 'meter-stake',
+        'meter-water-val', 'meter-fert-val', 'meter-stake-val', 'meter-water-wrap', 'meter-fert-wrap', 'meter-stake-wrap', 'step-panel', 'step-track',
         'ring-fg', 'ring-text', 'step-title', 'step-text', 'step-live', 'btn-skip', 'breath-guide', 'breath-orb', 'breath-halo', 'breath-word',
         'breath-sub', 'breath-rate', 'breath-count', 'stretch-guide', 'stretch-guide-box', 'stretch-sunflower', 'stretch-sunflower-stem', 'stretch-hint-left', 'stretch-hint-right', 'stretch-guide-full', 'stretch-ring', 'stretch-care-panel', 'stretch-care-title', 'stretch-care-text', 'stretch-care-live', 'stretch-care-actions', 'tend-strip', 'tend-name', 'tend-stamp', 'tend-row', 'tend-harvest', 'tend-harvest-icon', 'tend-harvest-img', 'btn-tend-finish', 'idle-bar', 'idle-text', 'btn-plant-idle', 'btn-visit', 'btn-bed', 'day-chip-text', 'garden-clock', 'brand-logo-day', 'brand-logo-night', 'brand-fallback', 'plot-tip', 'float-layer', 'toast',
         'screen-wellness', 'chk-adult', 'btn-wellness-ok', 'screen-camera-check', 'cc-stage', 'cc-backdrop', 'cc-window-frame', 'cc-sill', 'cc-face-outline', 'cc-tilt-left', 'cc-tilt-right', 'cc-note', 'cc-prompt', 'cc-howto', 'cc-packets', 'cc-status-face', 'cc-status-light', 'cc-status-camera', 'cc-preview-wrap', 'cc-mock-slot', 'btn-cc-start', 'btn-cc-skip-now', 'btn-cc-retry',
@@ -594,11 +594,11 @@
     }
 
     const meterImgs = {};
-    for (const k of ['sun', 'water', 'fertilizer', 'stake']) {
+    for (const k of ['water', 'fertilizer', 'stake']) {
         meterImgs[k] = new Image();
         meterImgs[k].src = k === 'stake' ? '../assets/ui/meter-stake.png' : `../assets/ui/meter-${k}.png`;
     }
-    const METER_COLORS = { sun: ['#fbe29a', '#e3a22a'], water: ['#d2e5f4', '#5b92c6'], fertilizer: ['#dfe8b8', '#7b9646'], stake: ['#ece2b8', '#9c8c4c'] };
+    const METER_COLORS = { water: ['#d2e5f4', '#5b92c6'], fertilizer: ['#dfe8b8', '#7b9646'], stake: ['#ece2b8', '#9c8c4c'] };
     const stretchRingArt = { framesDay: null, framesNight: null, loadPromise: null };
     const STRETCH_RING_FRAMES = 12;
     function loadStretchImg(src) {
@@ -677,17 +677,16 @@
                 const needs = L.plantNeeds(pl.plantId);
                 const prog = session.careProgressFor(plot);
                 return {
-                    sun: C.fillFraction(prog, needs, 'sun', pl.staked),
                     water: C.fillFraction(prog, needs, 'water', pl.staked),
                     fert: C.fillFraction(prog, needs, 'fertilizer', pl.staked),
                     fertUsed: session.step === 'care-harvest',
                 };
             }
         }
-        if (session) return { sun: session.sunHours, water: session.water, fert: session.fertilizer, fertUsed: session.breathTaken };
+        if (session) return { water: session.water, fert: session.fertilizer, fertUsed: session.breathTaken };
         const dayKey = state.version >= 5 ? D.gardenDayKey(state.dayNumber) : clock.today();
-        if (lastResult && lastResult.day === dayKey) return { sun: lastResult.sunHours, water: lastResult.water, fert: lastResult.fertilizer, fertUsed: lastResult.fertilizer > 0 };
-        return { sun: 0, water: 0, fert: 0, fertUsed: false };
+        if (lastResult && lastResult.day === dayKey) return { water: lastResult.water, fert: lastResult.fertilizer, fertUsed: lastResult.fertilizer > 0 };
+        return { water: 0, fert: 0, fertUsed: false };
     }
     function stakeMeterFrac() {
         if (!session) return 0;
@@ -696,7 +695,6 @@
     }
     function renderMeters() {
         const m = meterValues();
-        drawMeter(els.meterSun, 'sun', m.sun / V.TUNING.maxSunHours);
         drawMeter(els.meterWater, 'water', m.water);
         drawMeter(els.meterFert, 'fertilizer', m.fert);
         if (els.meterStake) drawMeter(els.meterStake, 'stake', stakeMeterFrac());
@@ -704,21 +702,17 @@
         const care = step.startsWith('care-');
         if (care && session && session.selectedPlot != null) {
             const needs = L.plantNeeds(state.plots[session.selectedPlot].plantId);
-            const fmt = (key) => {
-                const got = Math.round((key === 'sun' ? m.sun : key === 'water' ? m.water : m.fert) * C.dotsForNeed(needs, key));
+            const fmt = (key, frac) => {
                 const req = C.dotsForNeed(needs, key);
+                const got = Math.round(frac * req);
                 return req ? `${got} / ${req} dots` : '—';
             };
-            els.meterSunVal.textContent = fmt('sun');
-            els.meterWaterVal.textContent = fmt('water');
-            els.meterFertVal.textContent = fmt('fertilizer');
+            els.meterWaterVal.textContent = fmt('water', m.water);
+            els.meterFertVal.textContent = fmt('fertilizer', m.fert);
         } else {
-            const goal = session && session.selectedPlot != null ? session.sunGoal(session.selectedPlot) : 12;
-            els.meterSunVal.textContent = session ? `${m.sun.toFixed(1)} / ${goal} h` : `${m.sun.toFixed(1)} / 12 h`;
             els.meterWaterVal.textContent = `${Math.round(m.water * 100)}%`;
             els.meterFertVal.textContent = m.fertUsed ? `${Math.round(m.fert * 100)}%` : 'optional';
         }
-        els.meterSunWrap.classList.toggle('active', (step === 'care-hub' || step === 'care-smile') && lighting !== 'night');
         const ch = session ? session.activeCareChannel : null;
         els.meterWaterWrap.classList.toggle('active', step === 'smile' || step === 'care-smile' || ch === 'water');
         els.meterFertWrap.classList.toggle('active', step === 'talk' || step === 'care-talk' || step === 'breathe' || step === 'breathe-offer' || step === 'care-harvest' || ch === 'fertilizer');
