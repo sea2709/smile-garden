@@ -1,6 +1,7 @@
 node_modules/
 dist/
 release/
+tools/ffmpeg
 *.log
 .DS_Store
 .env

@@ -1766,10 +1766,9 @@
             scene.setEffects({ breath: b.size });
         }
 
-        // scene effects
-        const on = L.DEFAULTS.smileOn;
-        const smileAmt = (step === 'smile' || step === 'care-smile' || step === 'harvest-hold') && session.smiling
-            ? 0.45 + 0.55 * L.clamp01((session.h - on) / (1 - on)) : 0;
+        // scene effects — smile waters, talk fertilizes; sun dots fill from daylight
+        // (do NOT drive sun FX from smiling: the sun strip uses additive blend and
+        // blows the bed clip out to solid white over the water drops).
         const stretchSnap = session.stretchSnap || {};
         const stakeAmt = step === 'stretch'
             ? Math.max(stretchSnap.leftProgress || 0, stretchSnap.rightProgress || 0)
@@ -1783,7 +1782,7 @@
                 : step === 'breathe' ? 0.9 : 0;
             scene.setEffects({
                 plot: session.selectedPlot,
-                sun: smileAmt,
+                sun: 0,
                 water: waterFx,
                 fert: fertFx,
                 stake: stakeAmt,

@@ -36,8 +36,11 @@ const SESSION_SECONDS = (() => {
 // Dev-only: scripted screenshot capture. See scripts/capture-screenshots.js.
 const CAPTURE_DIR = process.env.SMILE_GARDEN_CAPTURE_DIR
     ? path.resolve(process.env.SMILE_GARDEN_CAPTURE_DIR) : null;
+// Dev-only: short demo MP4 of smile/talk care. See scripts/record-demo.js.
+const DEMO_DIR = process.env.SMILE_GARDEN_DEMO_DIR
+    ? path.resolve(process.env.SMILE_GARDEN_DEMO_DIR) : null;
 const PROBE = process.env.SMILE_GARDEN_PROBE === '1';
-const AUTOMATION = !!(CAPTURE_DIR || PROBE);
+const AUTOMATION = !!(CAPTURE_DIR || DEMO_DIR || PROBE);
 const FAST = AUTOMATION && (process.argv.includes('--fast') || process.env.SMILE_GARDEN_FAST === '1');
 
 // Scripted capture / probe use a throwaway profile so they never touch (or are
@@ -151,7 +154,14 @@ function createWindow() {
 
     win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
     if (DIAGNOSTICS) win.webContents.openDevTools({ mode: 'detach' });
-    if (CAPTURE_DIR) {
+    if (DEMO_DIR) {
+        win.webContents.once('did-finish-load', () => {
+            require('./scripts/demo-driver').run(win, DEMO_DIR).catch((e) => {
+                console.error('[demo] failed:', e);
+                app.exit(1);
+            });
+        });
+    } else if (CAPTURE_DIR) {
         win.webContents.once('did-finish-load', () => {
             require('./scripts/capture-driver').run(win, CAPTURE_DIR).catch((e) => {
                 console.error('[capture] failed:', e);
